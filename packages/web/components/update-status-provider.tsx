@@ -12,7 +12,7 @@ import {
 import { api, type UpdateStatus } from "@/lib/api";
 
 const UPDATE_POLL_MS = 15 * 60 * 1000;
-const UPDATE_IN_PROGRESS_POLL_MS = 3000;
+const UPDATE_IN_PROGRESS_POLL_MS = 2000;
 
 type UpdateStatusContextValue = {
   status: UpdateStatus | null;
@@ -59,6 +59,9 @@ export function UpdateStatusProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
 
       const updating = Boolean(next?.updateInProgress);
+      if (updating && !wasUpdatingRef.current) {
+        setModalOpen(true);
+      }
       if (wasUpdatingRef.current && !updating) {
         await refresh(true);
       }

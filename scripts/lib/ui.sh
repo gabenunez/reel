@@ -62,3 +62,24 @@ reel_version_label() {
     echo "legacy install (no git)"
   fi
 }
+
+reel_progress() {
+  local phase="$1"
+  local message="$2"
+  local progress_dir="${HOME}/.config/reel"
+  local tag="${REEL_RELEASE_TAG:-}"
+  mkdir -p "$progress_dir"
+  node -e "
+    const fs = require('fs');
+    const payload = {
+      phase: process.argv[1],
+      message: process.argv[2],
+      releaseTag: process.argv[3] || null,
+      updatedAt: new Date().toISOString(),
+    };
+    fs.writeFileSync(process.argv[4], JSON.stringify(payload));
+  " "$phase" "$message" "$tag" "$progress_dir/update-progress.json" 2>/dev/null \
+    || printf '{"phase":"%s","message":"%s","releaseTag":"%s","updatedAt":"%s"}\n' \
+      "$phase" "$message" "$tag" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$progress_dir/update-progress.json"
+  echo "REEL_UPDATE_PROGRESS phase=$phase"
+}

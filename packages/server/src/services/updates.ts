@@ -21,6 +21,35 @@ export interface UpdateStatus {
   updateSupported: boolean;
   updateInProgress: boolean;
   installDir: string;
+  updateProgress: UpdateProgress | null;
+}
+
+export type UpdatePhase =
+  | "preparing"
+  | "downloading"
+  | "building"
+  | "restarting"
+  | "complete"
+  | "failed"
+  | "unknown";
+
+export type UpdateStepStatus = "pending" | "active" | "complete" | "failed";
+
+export interface UpdateStep {
+  id: UpdatePhase;
+  label: string;
+  status: UpdateStepStatus;
+}
+
+export interface UpdateProgress {
+  phase: UpdatePhase;
+  message: string;
+  releaseTag: string | null;
+  startedAt: string | null;
+  updatedAt: string | null;
+  elapsedMs: number;
+  steps: UpdateStep[];
+  logTail: string[];
 }
 
 interface GitHubRelease {
@@ -97,6 +126,204 @@ export function getCurrentVersion(installDir = detectInstallDir()): string {
   return "0.0.0";
 }
 
+function getConfigDir(): string {
+  return path.join(os.homedir(), ".config/reel");
+}
+
+function getUpdateLogPath(): string {
+  return path.join(getConfigDir(), "update.log");
+}
+
+function getUpdateProgressPath(): string {
+  return path.join(getConfigDir(), "update-progress.json");
+}
+
+function stripAnsi(value: string): string {
+  return value.replace(/\x1B\[[0-9;]*m/g, "");
+}
+
+const UPDATE_STEP_ORDER: UpdatePhase[] = [
+  "preparing",
+  "downloading",
+  "building",
+  "restarting",
+];
+
+const UPDATE_STEP_LABELS: Record<UpdatePhase, string> = {
+  preparing: "Prepare update",
+  downloading: "Download release",
+  building: "Build application",
+  restarting: "Restart server",
+  complete: "Complete",
+  failed: "Failed",
+  unknown: "Working",
+};
+
+function buildUpdateSteps(phase: UpdatePhase): UpdateStep[] {
+  if (phase === "complete") {
+    return UPDATE_STEP_ORDER.map((id) => ({
+      id,
+      label: UPDATE_STEP_LABELS[id],
+      status: "complete" as const,
+    }));
+  }
+
+  if (phase === "failed") {
+    const activeIndex = UPDATE_STEP_ORDER.length - 1;
+    return UPDATE_STEP_ORDER.map((id, index) => ({
+      id,
+      label: UPDATE_STEP_LABELS[id],
+      status:
+        index < activeIndex
+          ? ("complete" as const)
+          : index === activeIndex
+            ? ("failed" as const)
+            : ("pending" as const),
+    }));
+  }
+
+  const activeIndex = Math.max(0, UPDATE_STEP_ORDER.indexOf(phase));
+
+  return UPDATE_STEP_ORDER.map((id, index) => ({
+    id,
+    label: UPDATE_STEP_LABELS[id],
+    status:
+      index < activeIndex
+        ? ("complete" as const)
+        : index === activeIndex
+          ? ("active" as const)
+          : ("pending" as const),
+  }));
+}
+
+function inferPhaseFromLog(lines: string[]): UpdatePhase {
+  const text = lines.join("\n");
+  if (/Update complete|Update finished|upgraded to/i.test(text)) return "complete";
+  if (/Restarting via|Restarting reel service|Restarting Reel process/i.test(text)) {
+    return "restarting";
+  }
+  if (/\[3\] Building|Installing dependencies and building|Tasks:\s+\d+ successful/i.test(text)) {
+    return "building";
+  }
+  if (/\[2\] Downloading|Checking out release|Pulling latest|Synced release/i.test(text)) {
+    return "downloading";
+  }
+  if (/\[1\] Checking install|Preparing update/i.test(text)) return "preparing";
+  if (/Update failed|✗|failed/i.test(text)) return "failed";
+  return "unknown";
+}
+
+function readLogTail(maxLines = 12): string[] {
+  const logPath = getUpdateLogPath();
+  if (!fs.existsSync(logPath)) return [];
+
+  try {
+    const raw = fs.readFileSync(logPath, "utf8");
+    return raw
+      .split("\n")
+      .map((line) => stripAnsi(line).trim())
+      .filter(Boolean)
+      .filter(
+        (line) =>
+          !line.startsWith("--- Update started") &&
+          !/^━+$/.test(line) &&
+          line !== "Reel — Update" &&
+          line !== "Pull latest, rebuild, and restart",
+      )
+      .slice(-maxLines);
+  } catch {
+    return [];
+  }
+}
+
+function readLockMeta(): { startedAt: string | null; releaseTag: string | null } {
+  const lockPath = getUpdateLockPath();
+  if (!fs.existsSync(lockPath)) {
+    return { startedAt: null, releaseTag: null };
+  }
+
+  try {
+    const [startedMs, releaseTag] = fs.readFileSync(lockPath, "utf8").trim().split("\n");
+    const startedAt = startedMs && /^\d+$/.test(startedMs)
+      ? new Date(Number(startedMs)).toISOString()
+      : null;
+    return { startedAt, releaseTag: releaseTag?.trim() || null };
+  } catch {
+    return { startedAt: null, releaseTag: null };
+  }
+}
+
+function writeUpdateProgress(
+  phase: UpdatePhase,
+  message: string,
+  releaseTag: string | null,
+): void {
+  const configDir = getConfigDir();
+  fs.mkdirSync(configDir, { recursive: true });
+  fs.writeFileSync(
+    getUpdateProgressPath(),
+    JSON.stringify({
+      phase,
+      message,
+      releaseTag,
+      updatedAt: new Date().toISOString(),
+    }),
+  );
+}
+
+export function getUpdateProgress(): UpdateProgress | null {
+  if (!isUpdateInProgress()) {
+    return null;
+  }
+
+  const logTail = readLogTail();
+  const { startedAt, releaseTag: lockTag } = readLockMeta();
+  const startedMs = startedAt ? Date.parse(startedAt) : Date.now();
+  const elapsedMs = Math.max(0, Date.now() - startedMs);
+
+  let phase: UpdatePhase = "unknown";
+  let message = "Update in progress...";
+  let releaseTag = lockTag;
+  let updatedAt: string | null = null;
+
+  const progressPath = getUpdateProgressPath();
+  if (fs.existsSync(progressPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(progressPath, "utf8")) as {
+        phase?: UpdatePhase;
+        message?: string;
+        releaseTag?: string | null;
+        updatedAt?: string;
+      };
+      if (parsed.phase) phase = parsed.phase;
+      if (parsed.message) message = parsed.message;
+      if (parsed.releaseTag) releaseTag = parsed.releaseTag;
+      if (parsed.updatedAt) updatedAt = parsed.updatedAt;
+    } catch {
+      // fall through to log inference
+    }
+  }
+
+  if (phase === "unknown") {
+    phase = inferPhaseFromLog(logTail);
+  }
+
+  if (message === "Update in progress...") {
+    message = UPDATE_STEP_LABELS[phase] ?? message;
+  }
+
+  return {
+    phase,
+    message,
+    releaseTag,
+    startedAt,
+    updatedAt,
+    elapsedMs,
+    steps: buildUpdateSteps(phase),
+    logTail,
+  };
+}
+
 function getUpdateLockPath(): string {
   return path.join(os.homedir(), ".config/reel/updating.lock");
 }
@@ -140,17 +367,24 @@ export async function checkForUpdates(force = false): Promise<UpdateStatus> {
   const updateSupported = isUpdateSupported(installDir);
   const updateInProgress = isUpdateInProgress();
 
+  const finalize = (
+    partial: Omit<UpdateStatus, "updateProgress">,
+  ): UpdateStatus => ({
+    ...partial,
+    updateProgress: partial.updateInProgress ? getUpdateProgress() : null,
+  });
+
   if (
     !force &&
     cachedCheck &&
     Date.now() - cachedCheck.at < CHECK_CACHE_MS &&
     cachedCheck.status.currentVersion === currentVersion
   ) {
-    return {
+    return finalize({
       ...cachedCheck.status,
       updateInProgress,
       updateSupported,
-    };
+    });
   }
 
   let latestVersion: string | null = null;
@@ -174,7 +408,7 @@ export async function checkForUpdates(force = false): Promise<UpdateStatus> {
     // Leave defaults — still return current version info.
   }
 
-  const status: UpdateStatus = {
+  const status = finalize({
     currentVersion,
     latestVersion,
     latestReleaseName,
@@ -185,9 +419,9 @@ export async function checkForUpdates(force = false): Promise<UpdateStatus> {
     updateSupported,
     updateInProgress,
     installDir,
-  };
+  });
 
-  cachedCheck = { at: Date.now(), status };
+  cachedCheck = { at: Date.now(), status: { ...status, updateProgress: null } };
   return status;
 }
 
@@ -206,6 +440,7 @@ export function triggerUpdate(releaseTag: string, installDir = detectInstallDir(
   const logPath = path.join(configDir, "update.log");
   fs.writeFileSync(getUpdateLockPath(), `${Date.now()}\n${releaseTag}\n`);
   fs.appendFileSync(logPath, `\n--- Update started ${new Date().toISOString()} (${releaseTag}) ---\n`);
+  writeUpdateProgress("preparing", "Starting update...", releaseTag);
 
   const logFd = fs.openSync(logPath, "a");
 

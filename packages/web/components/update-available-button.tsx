@@ -12,14 +12,15 @@ export function UpdateAvailableButton() {
   }
 
   if (status.updateInProgress) {
+    const label = status.updateProgress?.message ?? "Updating";
     return (
       <button
         type="button"
         onClick={openModal}
-        className="flex h-9 items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 text-sm font-medium text-primary transition-colors hover:bg-primary/15"
+        className="flex h-9 max-w-[12rem] items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 text-sm font-medium text-primary transition-colors hover:bg-primary/15"
       >
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="hidden sm:inline">Updating</span>
+        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+        <span className="truncate hidden sm:inline">{label}</span>
       </button>
     );
   }

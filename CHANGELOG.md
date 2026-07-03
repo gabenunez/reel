@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.12 — 2026-07-03
+
+### In-app updates
+- **Live update progress** — step checklist (prepare, download, build, restart), status message, elapsed time, and recent log output while upgrading
+- Update modal opens automatically and stays visible until the server restarts
+- Navbar update chip shows the current step instead of a generic "Updating" label
+
+### UI
+- Removed confusing **"Local signal"**, **"Signal online"**, and **"Control room"** copy — plain "Reel" branding and Settings labels throughout
+
 ## 0.1.11 — 2026-07-03
 
 ### UI

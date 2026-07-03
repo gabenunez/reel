@@ -11,6 +11,7 @@ import {
 import { api } from "@/lib/api";
 import { formatReleaseDate, previewReleaseNotes } from "@/lib/update-utils";
 import { useUpdateStatus } from "@/components/update-status-provider";
+import { UpdateProgressPanel } from "@/components/update-progress-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -89,7 +90,9 @@ export function UpdateManager() {
               </Button>
             </div>
 
-            {status?.updateInProgress && (
+            {status?.updateInProgress && status.updateProgress ? (
+              <UpdateProgressPanel progress={status.updateProgress} />
+            ) : status?.updateInProgress ? (
               <div className="rounded-md border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
                 <div className="flex items-center gap-2 font-medium text-primary">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -100,7 +103,7 @@ export function UpdateManager() {
                   minute.
                 </p>
               </div>
-            )}
+            ) : null}
 
             {status?.updateAvailable && !status.updateInProgress && (
               <div className="rounded-md border border-accent/30 bg-accent/10 px-4 py-4">

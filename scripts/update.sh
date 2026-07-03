@@ -220,9 +220,17 @@ main() {
   cleanup_update_lock() {
     rm -f "${HOME}/.config/reel/updating.lock" 2>/dev/null || true
   }
+
+  on_update_error() {
+    reel_progress "failed" "Update failed — see ~/.config/reel/update.log for details"
+    cleanup_update_lock
+    exit 1
+  }
+
+  trap on_update_error ERR
   trap cleanup_update_lock EXIT
 
-  echo ""
+  reel_progress "preparing" "Preparing update..."
   echo -e "${REEL_BOLD}  Reel — Update${REEL_RESET}"
   echo -e "${REEL_DIM}  Pull latest, rebuild, and restart${REEL_RESET}"
   echo ""
@@ -251,9 +259,11 @@ main() {
     exit 0
   fi
 
+  reel_progress "downloading" "Downloading ${REEL_RELEASE_TAG:-latest release}..."
   reel_step "Downloading updates"
   pull_latest "$install_dir" "$service_user"
 
+  reel_progress "building" "Installing dependencies and building — this may take a few minutes..."
   reel_step "Building"
   if ! command -v pnpm >/dev/null 2>&1; then
     if command -v corepack >/dev/null 2>&1; then
@@ -264,10 +274,13 @@ main() {
   command -v pnpm >/dev/null 2>&1 || reel_fail "pnpm not found. Install Node 20+ and enable corepack."
   build_app "$install_dir" "$service_user"
 
+  reel_progress "restarting" "Restarting Reel — this page will reconnect when the server is back..."
   reel_step "Restarting"
   restart_service
 
   after="$(reel_version_label "$install_dir")"
+
+  reel_progress "complete" "Update complete — upgraded to ${after}"
 
   echo ""
   echo -e "${REEL_GREEN}${REEL_BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${REEL_RESET}"

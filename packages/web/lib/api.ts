@@ -112,6 +112,35 @@ export interface UpdateStatus {
   updateSupported: boolean;
   updateInProgress: boolean;
   installDir: string;
+  updateProgress: UpdateProgress | null;
+}
+
+export type UpdatePhase =
+  | "preparing"
+  | "downloading"
+  | "building"
+  | "restarting"
+  | "complete"
+  | "failed"
+  | "unknown";
+
+export type UpdateStepStatus = "pending" | "active" | "complete" | "failed";
+
+export interface UpdateStep {
+  id: UpdatePhase;
+  label: string;
+  status: UpdateStepStatus;
+}
+
+export interface UpdateProgress {
+  phase: UpdatePhase;
+  message: string;
+  releaseTag: string | null;
+  startedAt: string | null;
+  updatedAt: string | null;
+  elapsedMs: number;
+  steps: UpdateStep[];
+  logTail: string[];
 }
 
 export interface SubtitleTrack {
