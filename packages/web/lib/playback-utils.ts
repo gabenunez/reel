@@ -62,27 +62,21 @@ export function resolvePlaybackStream(
   }
 
   const codec = streamInfo.audioCodec?.toUpperCase() ?? "this format";
-  const videoCodec = streamInfo.videoCodec?.toUpperCase() ?? "video";
 
   if (mode === "remux") {
     return {
       usingHls: true,
       hlsQuality: "remux",
-      audioCompatNotice: `${codec} audio is being converted for browser playback — video stays at original quality.`,
+      audioCompatNotice: null,
     };
   }
 
   if (mode === "transcode") {
     const fallback = pickTranscodeQualityForPlayback(streamInfo.availableQualities);
-    const hevcTranscode =
-      normalizeCodecName(streamInfo.videoCodec) === "hevc" ||
-      normalizeCodecName(streamInfo.videoCodec) === "h265";
     return {
       usingHls: true,
       hlsQuality: fallback,
-      audioCompatNotice: hevcTranscode
-        ? `${codec} audio and ${videoCodec} video aren't supported in this browser — playing a compatible ${fallback.toUpperCase()} stream.`
-        : `${codec} audio isn't supported in the browser — playing a compatible ${fallback.toUpperCase()} stream.`,
+      audioCompatNotice: null,
     };
   }
 
@@ -184,6 +178,18 @@ export function getVideoSeekableEnd(video: HTMLVideoElement): number {
   }
 
   return ranges.end(ranges.length - 1);
+}
+
+/** All contiguous buffered ranges on the media timeline (video element time). */
+export function getVideoBufferedRanges(
+  video: HTMLVideoElement,
+): Array<{ start: number; end: number }> {
+  const ranges: Array<{ start: number; end: number }> = [];
+  const buffered = video.buffered;
+  for (let i = 0; i < buffered.length; i++) {
+    ranges.push({ start: buffered.start(i), end: buffered.end(i) });
+  }
+  return ranges;
 }
 
 /** End of the buffered range containing the current playhead (or before it in a gap). */

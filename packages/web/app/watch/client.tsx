@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { api, type StreamInfo, type StreamQuality } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { getVideoBufferedEnd, getVideoSeekableEnd, resolvePlaybackStream, startDirectPlaybackWithResume } from "@/lib/playback-utils";
+import { getVideoBufferedRanges, getVideoSeekableEnd, resolvePlaybackStream, startDirectPlaybackWithResume } from "@/lib/playback-utils";
 import { cn, formatDuration } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CastButton } from "@/components/cast-button";
@@ -157,7 +157,9 @@ export function WatchClient() {
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [bufferingMidPlayback, setBufferingMidPlayback] = useState(false);
-  const [bufferedSeconds, setBufferedSeconds] = useState(0);
+  const [bufferedRanges, setBufferedRanges] = useState<Array<{ start: number; end: number }>>(
+    [],
+  );
   const [subtitles, setSubtitles] = useState<SubtitleTrack[]>([]);
   const [activeSubtitle, setActiveSubtitle] = useState<number | null>(null);
   const [subtitleMenuOpen, setSubtitleMenuOpen] = useState(false);
@@ -181,7 +183,6 @@ export function WatchClient() {
   const [volumeMenuOpen, setVolumeMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [streamInfo, setStreamInfo] = useState<StreamInfo | null>(null);
-  const [audioCompatNotice, setAudioCompatNotice] = useState<string | null>(null);
   const [initialResumeSeconds, setInitialResumeSeconds] = useState<number | null>(null);
 
   const playbackStream = useMemo(
@@ -236,11 +237,14 @@ export function WatchClient() {
     const video = videoRef.current;
     if (!video) return;
 
-    const localBufferedEnd = getVideoBufferedEnd(video);
-    const absoluteBuffered =
-      usingHlsPlayback ? hlsStartOffset + localBufferedEnd : localBufferedEnd;
-    setBufferedSeconds(absoluteBuffered);
-  }, [usingHlsPlayback, hlsStartOffset]);
+    const offset = usingHlsPlayback ? hlsStartOffsetRef.current : 0;
+    setBufferedRanges(
+      getVideoBufferedRanges(video).map((range) => ({
+        start: offset + range.start,
+        end: offset + range.end,
+      })),
+    );
+  }, [usingHlsPlayback]);
 
   const saveProgress = useCallback(() => {
     const video = videoRef.current;
@@ -270,15 +274,6 @@ export function WatchClient() {
   }, [fileId, type]);
 
   useEffect(() => {
-    const playback = resolvePlaybackStream(quality, streamInfo);
-    if (quality === "original" && playback.audioCompatNotice) {
-      setAudioCompatNotice(playback.audioCompatNotice);
-    } else {
-      setAudioCompatNotice(null);
-    }
-  }, [quality, streamInfo]);
-
-  useEffect(() => {
     if (!fileId || Number.isNaN(fileId)) return;
 
     setInitialResumeSeconds(null);
@@ -296,10 +291,8 @@ export function WatchClient() {
         const playback = resolvePlaybackStream("original", info);
         if (!playback.usingHls && playback.audioCompatNotice) {
           setError(playback.audioCompatNotice);
-          setAudioCompatNotice(null);
         } else {
           setError(null);
-          setAudioCompatNotice(playback.audioCompatNotice);
         }
 
         const positionMs = info.watchProgress?.positionMs ?? 0;
@@ -382,8 +375,8 @@ export function WatchClient() {
 
     setError(null);
     setBuffering(true);
+    setBufferedRanges([]);
     setBufferingMidPlayback(false);
-    setBufferedSeconds(0);
 
     if (hlsRef.current) {
       hlsRef.current.stopLoad();
@@ -644,9 +637,9 @@ export function WatchClient() {
     timelinePreviewPercent !== null && absoluteDurationMs > 0
       ? (timelinePreviewPercent / 100) * absoluteDurationMs
       : null;
-  const bufferedPercent =
+  const toTimelinePercent = (seconds: number) =>
     absoluteDurationMs > 0
-      ? Math.min(100, (bufferedSeconds * 1000) / absoluteDurationMs * 100)
+      ? Math.min(100, Math.max(0, ((seconds * 1000) / absoluteDurationMs) * 100))
       : 0;
 
   const seekToAbsolute = useCallback(
@@ -845,12 +838,6 @@ export function WatchClient() {
         onClick={togglePlay}
       />
 
-      {audioCompatNotice && !error && (
-        <div className="pointer-events-none absolute left-1/2 top-20 z-20 max-w-lg -translate-x-1/2 rounded-md border border-white/15 bg-background/85 px-4 py-2 text-center text-xs text-white/90 backdrop-blur">
-          {audioCompatNotice}
-        </div>
-      )}
-
       {showLoadingOverlay && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
           <div className="flex items-center gap-3 rounded-md border border-white/10 bg-background/80 px-4 py-3 text-sm text-white">
@@ -913,8 +900,8 @@ export function WatchClient() {
         </div>
 
         <div className="pointer-events-auto bg-gradient-to-t from-background/95 via-background/45 to-transparent px-3 pb-3 pt-10 sm:px-4 sm:pb-4">
-          <div className="mx-auto max-w-7xl rounded-md border border-white/10 bg-background/75 p-3 backdrop-blur">
-            <div className="mb-3 flex items-center gap-3">
+          <div className="mx-auto max-w-7xl overflow-visible rounded-md border border-white/10 bg-background/75 p-3 backdrop-blur">
+            <div className="relative isolate z-0 mb-3 flex items-center gap-3">
               <div
                 ref={timelineRef}
                 className="relative flex h-4 flex-1 items-center"
@@ -929,14 +916,22 @@ export function WatchClient() {
                     {formatDuration(timelinePreviewMs)}
                   </div>
                 )}
-                <div className="pointer-events-none absolute inset-x-0 h-1.5 overflow-hidden rounded-full bg-white/20">
-                  <div
-                    className="absolute inset-y-0 left-0 rounded-full bg-white/45 transition-[width] duration-150"
-                    style={{ width: `${bufferedPercent}%` }}
-                  />
+                <div className="pointer-events-none absolute inset-x-0 h-2 overflow-hidden rounded-full bg-white/15">
+                  {bufferedRanges.map((range, index) => {
+                    const left = toTimelinePercent(range.start);
+                    const width = Math.max(0, toTimelinePercent(range.end) - left);
+                    if (width <= 0) return null;
+                    return (
+                      <div
+                        key={index}
+                        className="absolute inset-y-0 bg-white/55"
+                        style={{ left: `${left}%`, width: `${width}%` }}
+                      />
+                    );
+                  })}
                   <div
                     className={cn(
-                      "absolute inset-y-0 left-0 rounded-full bg-primary/70",
+                      "absolute inset-y-0 left-0 z-[1] rounded-full bg-primary",
                       !isOptimisticScrub && "transition-[width] duration-150",
                     )}
                     style={{ width: `${displayedProgress}%` }}
@@ -958,12 +953,12 @@ export function WatchClient() {
                   onTouchEnd={(e) =>
                     handleScrubCommit(parseFloat((e.currentTarget as HTMLInputElement).value))
                   }
-                  className="range-signal range-signal-overlay relative z-10 h-4 w-full cursor-pointer appearance-none bg-transparent"
+                  className="range-signal range-signal-overlay relative z-[2] h-4 w-full cursor-pointer appearance-none bg-transparent"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="relative z-10 flex items-center justify-between gap-2 sm:gap-4">
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -1059,7 +1054,7 @@ export function WatchClient() {
                     )}
                   </Button>
                   {volumeMenuOpen && (
-                    <div className="absolute bottom-full left-0 mb-2 rounded-md border border-border bg-card p-3 shadow-xl">
+                    <div className="absolute bottom-full left-0 z-50 mb-2 rounded-md border border-border bg-card p-3 shadow-xl">
                       <input
                         type="range"
                         min={0}
@@ -1105,7 +1100,7 @@ export function WatchClient() {
                     <Subtitles className="h-4 w-4" />
                   </Button>
                   {subtitleMenuOpen && (
-                    <div className="absolute bottom-full right-0 mb-2 min-w-56 rounded-md border border-border bg-card p-1 shadow-xl">
+                    <div className="absolute bottom-full right-0 z-50 mb-2 min-w-56 rounded-md border border-border bg-card p-1 shadow-xl">
                       <button
                         className="block w-full rounded px-3 py-1.5 text-left text-sm hover:bg-muted"
                         onClick={() => {
@@ -1183,7 +1178,7 @@ export function WatchClient() {
                     </span>
                   </Button>
                   {qualityMenuOpen && (
-                    <div className="absolute bottom-full right-0 mb-2 min-w-40 rounded-md border border-border bg-card p-1 shadow-xl">
+                    <div className="absolute bottom-full right-0 z-50 mb-2 min-w-40 rounded-md border border-border bg-card p-1 shadow-xl">
                       {availableQualities.map((option) => (
                         <button
                           key={option}

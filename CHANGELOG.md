@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.32 — 2026-07-03
+
+### Playback
+- **Scrubber buffer** — timeline shows loaded buffer ranges behind the playhead
+- **Silent audio conversion** — removed the AC3/transcode info banner during playback
+
+### UI
+- **Player menus** — subtitle, quality, and volume dropdowns stack above the scrubber
+- **Live upgrade status** — update progress polls every 2s without a page refresh
+
 ## 0.1.31 — 2026-07-03
 
 ### UI
