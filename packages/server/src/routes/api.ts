@@ -6,6 +6,7 @@ import type { AppConfig } from "@reel/shared";
 import type { DatabaseInstance } from "../db/index.js";
 import type { ScannerService } from "../services/scanner.js";
 import type { MetadataService } from "../services/metadata.js";
+import type { ThemeService } from "../services/themes.js";
 import {
   listDecksWithCounts,
   getDeckItems,
@@ -68,6 +69,7 @@ export async function apiRoutes(
   config: AppConfig,
   scanner: ScannerService,
   metadata: MetadataService,
+  themes: ThemeService,
 ) {
   app.get("/api/status", async () => {
     const ffmpegAvailable = await checkFfmpegAvailable();
@@ -249,6 +251,30 @@ export async function apiRoutes(
     },
   );
 
+  app.get<{ Params: { id: string } }>("/api/media/:id/theme", async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const item = await db.query.mediaItems.findFirst({
+      where: eq(mediaItems.id, id),
+    });
+
+    if (!item) {
+      return reply.status(404).send({ error: "Not found" });
+    }
+
+    let themePath =
+      item.themePath && fs.existsSync(item.themePath)
+        ? item.themePath
+        : await themes.syncForMediaItem(item);
+
+    if (!themePath || !fs.existsSync(themePath)) {
+      return reply.status(404).send({ error: "No theme music available" });
+    }
+
+    return reply
+      .type(themes.mimeTypeForPath(themePath))
+      .send(fs.createReadStream(themePath));
+  });
+
   app.get<{ Params: { id: string } }>("/api/media/:id", async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const item = await db.query.mediaItems.findFirst({
@@ -257,6 +283,10 @@ export async function apiRoutes(
 
     if (!item) return reply.status(404).send({ error: "Not found" });
 
+    const themePath = themes.hasThemeMusic(item)
+      ? item.themePath
+      : await themes.syncForMediaItem(item);
+    const hasThemeMusic = Boolean(themePath && fs.existsSync(themePath));
     const favorite = await isFavorite(db, id);
 
     if (item.type === "movie") {
@@ -276,7 +306,14 @@ export async function apiRoutes(
         ),
       });
 
-      return { ...item, files, subtitles: subs, watchProgress: progress ?? null, isFavorite: favorite };
+      return {
+        ...item,
+        files,
+        subtitles: subs,
+        watchProgress: progress ?? null,
+        isFavorite: favorite,
+        hasThemeMusic,
+      };
     }
 
     const seasons = await db.query.tvSeasons.findMany({
@@ -310,7 +347,7 @@ export async function apiRoutes(
       }),
     );
 
-    return { ...item, seasons: seasonsWithEpisodes, isFavorite: favorite };
+    return { ...item, seasons: seasonsWithEpisodes, isFavorite: favorite, hasThemeMusic };
   });
 
   app.get<{ Params: { id: string } }>("/api/media/:id/related", async (request, reply) => {

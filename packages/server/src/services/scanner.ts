@@ -23,6 +23,7 @@ import {
 } from "../db/schema.js";
 import { MetadataService } from "./metadata.js";
 import { SubtitleService } from "./subtitles.js";
+import { ThemeService } from "./themes.js";
 import { probeFile } from "../utils/ffmpeg.js";
 
 export class ScannerService {
@@ -34,6 +35,7 @@ export class ScannerService {
     private configManager: ConfigManager,
     private metadata: MetadataService,
     private subtitles: SubtitleService,
+    private themes: ThemeService,
   ) {}
 
   private get config() {
@@ -224,6 +226,8 @@ export class ScannerService {
       if (this.metadata.isConfigured()) {
         await this.refreshMetadata(libraryId);
       }
+
+      await this.themes.syncThemesForLibrary(libraryId);
     } catch (err) {
       await this.db
         .update(scanJobs)

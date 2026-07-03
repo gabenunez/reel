@@ -18,6 +18,7 @@ export interface ServerConfig {
 export interface MetadataConfig {
   tmdb_api_key: string;
   language: string;
+  fanart_api_key?: string;
 }
 
 export interface TranscodingConfig {

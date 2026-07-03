@@ -498,6 +498,7 @@ export const api = {
     return `${API_BASE}/api/stream/${fileId}/hls/master.m3u8?${params.toString()}`;
   },
   subtitleUrl: (id: number) => `${API_BASE}/api/subtitles/${id}`,
+  themeMusicUrl: (mediaId: number) => `${API_BASE}/api/media/${mediaId}/theme`,
   imageUrl: (path?: string | null) => {
     if (!path) return null;
     if (path.startsWith("http")) return path;

@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { ParsedEpisode } from "../types.js";
 import { isVideoFile } from "./movie.js";
 
@@ -80,4 +81,17 @@ export function extractShowFolder(filePath: string, libraryRoot: string): string
     : filePath;
   const parts = relative.split(/[/\\]/);
   return parts.length >= 2 ? cleanShowName(parts[0]) : cleanShowName(parts[0] ?? "");
+}
+
+/** Absolute path to the TV show root directory (first folder under the library). */
+export function resolveShowDirectory(
+  filePath: string,
+  libraryRoot: string,
+): string | null {
+  const relative = filePath.startsWith(libraryRoot)
+    ? filePath.slice(libraryRoot.length).replace(/^[/\\]+/, "")
+    : filePath;
+  const parts = relative.split(/[/\\]/).filter(Boolean);
+  if (parts.length < 2) return null;
+  return path.join(libraryRoot, parts[0]);
 }

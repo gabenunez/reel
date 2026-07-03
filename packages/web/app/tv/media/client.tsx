@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { tvRoutes } from "@/lib/tv/routes";
 import { TvFocusButton, TvFocusLink } from "@/components/tv/tv-focus-link";
 import { TvFavoriteButton } from "@/components/tv/tv-favorite-button";
+import { ThemeMusicPlayer } from "@/components/theme-music-player";
 import { formatDuration, getPlaybackButtonLabel } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
@@ -36,6 +37,7 @@ interface MediaDetail {
   backdropPath?: string | null;
   type: "movie" | "tv";
   isFavorite?: boolean;
+  hasThemeMusic?: boolean;
   watchProgress?: { positionMs: number; durationMs?: number | null } | null;
   files?: Array<{ id: number; durationMs?: number | null }>;
   seasons?: Season[];
@@ -110,6 +112,7 @@ export function TvMediaClient() {
 
   return (
     <div>
+      {media.hasThemeMusic && <ThemeMusicPlayer mediaId={media.id} />}
       <section className="relative overflow-hidden border-b border-border/70">
         {backdropUrl && (
           // eslint-disable-next-line @next/next/no-img-element

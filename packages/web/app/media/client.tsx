@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MediaRow } from "@/components/media-row";
 import { FavoriteButton } from "@/components/favorite-button";
+import { ThemeMusicPlayer } from "@/components/theme-music-player";
 import { formatDuration, getPlaybackButtonLabel } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
@@ -47,6 +48,7 @@ interface MediaDetail {
   genres?: string | null;
   rating?: number | null;
   isFavorite?: boolean;
+  hasThemeMusic?: boolean;
   watchProgress?: { positionMs: number; durationMs?: number | null } | null;
   files?: MovieFile[];
   seasons?: Season[];
@@ -121,6 +123,7 @@ export function MediaClient() {
 
   return (
     <div>
+      {media.hasThemeMusic && <ThemeMusicPlayer mediaId={media.id} />}
       <section className="relative overflow-hidden border-b border-border/70">
         {backdropUrl && (
           // eslint-disable-next-line @next/next/no-img-element

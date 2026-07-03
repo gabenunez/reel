@@ -8,6 +8,7 @@ import { loadConfig, getDbPath, getWebOutPath, ConfigManager } from "./config.js
 import { runMigrations } from "./db/index.js";
 import { MetadataService } from "./services/metadata.js";
 import { SubtitleService } from "./services/subtitles.js";
+import { ThemeService } from "./services/themes.js";
 import { ScannerService } from "./services/scanner.js";
 import { apiRoutes } from "./routes/api.js";
 import { streamRoutes, subtitleRoutes } from "./routes/stream.js";
@@ -31,7 +32,8 @@ async function main() {
 
   const metadata = new MetadataService(configManager);
   const subtitles = new SubtitleService(db, config);
-  const scanner = new ScannerService(db, configManager, metadata, subtitles);
+  const themes = new ThemeService(db, configManager, metadata);
+  const scanner = new ScannerService(db, configManager, metadata, subtitles, themes);
   const auth = new AuthService(configManager);
 
   const app = Fastify({ logger: true });
@@ -113,7 +115,7 @@ async function main() {
   });
 
   await authRoutes(app, auth, configManager);
-  await apiRoutes(app, db, config, scanner, metadata);
+  await apiRoutes(app, db, config, scanner, metadata, themes);
   await settingsRoutes(app, db, configManager, scanner, metadata);
   await updateRoutes(app);
   await castRoutes(app, db, config, auth);

@@ -174,6 +174,15 @@ export const SKIP_SCAN_DIR_NAMES = new Set([
   "go1",
 ]);
 
+/** Filenames checked for Plex-style theme music in movie/show folders. */
+export const THEME_FILENAMES = [
+  "theme.mp3",
+  "theme.flac",
+  "theme.m4a",
+  "theme.wav",
+  "theme.ogg",
+];
+
 export const SUBTITLE_EXTENSIONS = new Set([
   ".srt",
   ".vtt",

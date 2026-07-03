@@ -159,6 +159,21 @@ export class MetadataService {
     }) as Promise<{ match: TmdbTvDetails | null; confidence: number }>;
   }
 
+  async getTvdbId(tmdbId: number): Promise<number | null> {
+    if (!this.apiKey || this.apiKey === "YOUR_KEY_HERE") return null;
+
+    return this.queue.add(async () => {
+      try {
+        const data = await this.fetchTmdb<{ tvdb_id?: number | null }>(
+          `/tv/${tmdbId}/external_ids`,
+        );
+        return data.tvdb_id ?? null;
+      } catch {
+        return null;
+      }
+    }) as Promise<number | null>;
+  }
+
   async getTvSeason(tmdbId: number, seasonNumber: number): Promise<TmdbSeasonDetails | null> {
     if (!this.apiKey || this.apiKey === "YOUR_KEY_HERE") return null;
 

@@ -28,6 +28,7 @@ export const mediaItems = sqliteTable("media_items", {
   year: integer("year"),
   posterPath: text("poster_path"),
   backdropPath: text("backdrop_path"),
+  themePath: text("theme_path"),
   type: text("type", { enum: ["movie", "tv"] }).notNull(),
   genres: text("genres"),
   rating: real("rating"),

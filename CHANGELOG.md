@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.33 — 2026-07-03
+
+### Features
+- **Theme music** — Plex-style show/movie themes on detail pages with fade in/out; local `theme.mp3` in the media folder, or automatic fetch from fanart.tv when `fanart_api_key` is set in config
+
 ## 0.1.32 — 2026-07-03
 
 ### Playback
