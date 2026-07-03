@@ -209,6 +209,12 @@ export function triggerUpdate(releaseTag: string, installDir = detectInstallDir(
 
   const logFd = fs.openSync(logPath, "a");
 
+  const home = os.homedir();
+  const nodeBin = path.join(home, "node", "bin");
+  const pathEnv = fs.existsSync(nodeBin)
+    ? `${nodeBin}:${process.env.PATH ?? ""}`
+    : process.env.PATH;
+
   const child = spawn("bash", [updateScript], {
     cwd: installDir,
     detached: true,
@@ -218,8 +224,10 @@ export function triggerUpdate(releaseTag: string, installDir = detectInstallDir(
       REEL_NONINTERACTIVE: "1",
       REEL_RELEASE_TAG: releaseTag,
       REEL_INSTALL_DIR: installDir,
-      HOME: os.homedir(),
-      PATH: process.env.PATH,
+      REEL_REPO: `https://github.com/${GITHUB_REPO}.git`,
+      GIT_TERMINAL_PROMPT: "0",
+      HOME: home,
+      PATH: pathEnv,
     },
   });
 

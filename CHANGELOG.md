@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4 — 2026-07-03
+
+### In-app updates
+- **Fixed Update now failing silently** when git remote used SSH — updates now force HTTPS, fall back to clone+rsync, and pass `pnpm` PATH to the update subprocess
+- **Update available** button in the navbar opens a modal to start upgrades from anywhere in the app
+
+### Search
+- **Inline search popover** in the header replaces the separate search page — results appear as you type
+
 ## 0.1.3 — 2026-07-03
 
 ### Video player

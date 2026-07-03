@@ -62,32 +62,77 @@ run_as_install_user() {
   fi
 }
 
+normalize_git_origin() {
+  local dir="$1"
+  [[ -d "$dir/.git" ]] || return 0
+  git -C "$dir" remote set-url origin "$REEL_REPO"
+}
+
+sync_release_from_github() {
+  local dir="$1"
+  local ref="${REEL_RELEASE_TAG:-$REEL_BRANCH}"
+
+  reel_warn "Git fetch failed — syncing from GitHub over HTTPS"
+  local tmp
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' RETURN
+
+  GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$ref" "$REEL_REPO" "$tmp/reel"
+
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete \
+      --exclude config.yaml \
+      --exclude data \
+      --exclude node_modules \
+      --exclude .next \
+      --exclude out \
+      --exclude .turbo \
+      "$tmp/reel/" "$dir/"
+  else
+    find "$dir" -mindepth 1 -maxdepth 1 \
+      ! -name config.yaml ! -name data ! -name node_modules \
+      -exec rm -rf {} +
+    cp -a "$tmp/reel/." "$dir/"
+    rm -f "$dir/config.yaml"
+  fi
+
+  reel_ok "Synced release $ref"
+}
+
 pull_latest() {
   local dir="$1"
   local user="$2"
 
   if [[ -d "$dir/.git" ]]; then
+    normalize_git_origin "$dir"
+
     if [[ -n "${REEL_RELEASE_TAG:-}" ]]; then
       reel_ok "Checking out release ${REEL_RELEASE_TAG}..."
-      run_as_install_user "$user" "
+      if ! run_as_install_user "$user" "
         set -euo pipefail
+        export GIT_TERMINAL_PROMPT=0
         cd '$dir'
         git fetch origin 'refs/tags/${REEL_RELEASE_TAG}:refs/tags/${REEL_RELEASE_TAG}' --depth=1 2>/dev/null \
           || git fetch origin tag '${REEL_RELEASE_TAG}' --depth=1 2>/dev/null \
           || git fetch origin tag '${REEL_RELEASE_TAG}'
         git checkout '${REEL_RELEASE_TAG}'
-      "
+      "; then
+        sync_release_from_github "$dir"
+      fi
       return 0
     fi
 
     reel_ok "Pulling latest from $REEL_BRANCH..."
-    run_as_install_user "$user" "
+    if ! run_as_install_user "$user" "
       set -euo pipefail
+      export GIT_TERMINAL_PROMPT=0
       cd '$dir'
       git fetch origin '$REEL_BRANCH' --depth=1 2>/dev/null || git fetch origin '$REEL_BRANCH'
       git checkout '$REEL_BRANCH' 2>/dev/null || true
       git reset --hard 'origin/$REEL_BRANCH' 2>/dev/null || git pull origin '$REEL_BRANCH'
-    "
+    "; then
+      sync_release_from_github "$dir"
+    fi
     return 0
   fi
 
@@ -127,6 +172,7 @@ build_app() {
     set -euo pipefail
     cd '$dir'
     export CI=1
+    export PATH=\"\${HOME}/node/bin:\${PATH:-}\"
     pnpm install --frozen-lockfile 2>/dev/null || pnpm install
     pnpm build
   "

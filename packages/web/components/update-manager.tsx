@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ArrowUpCircle,
   CheckCircle2,
@@ -8,52 +8,18 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
-import { api, type UpdateStatus } from "@/lib/api";
+import { api } from "@/lib/api";
+import { formatReleaseDate, previewReleaseNotes } from "@/lib/update-utils";
+import { useUpdateStatus } from "@/components/update-status-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-function formatReleaseDate(value: string | null): string | null {
-  if (!value) return null;
-  return new Date(value).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function previewNotes(notes: string | null, maxLines = 4): string | null {
-  if (!notes?.trim()) return null;
-  return notes.trim().split("\n").slice(0, maxLines).join("\n");
-}
-
 export function UpdateManager() {
-  const [status, setStatus] = useState<UpdateStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [checking, setChecking] = useState(false);
+  const { status, loading, checking, refresh } = useUpdateStatus();
   const [applying, setApplying] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const loadStatus = useCallback(async (force = false) => {
-    setError(null);
-    if (force) setChecking(true);
-    else setLoading(true);
-
-    try {
-      const data = await api.checkForUpdates(force);
-      setStatus(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to check for updates");
-    } finally {
-      setLoading(false);
-      setChecking(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadStatus();
-  }, [loadStatus]);
 
   const handleApply = async () => {
     if (!status?.latestVersion) return;
@@ -65,9 +31,7 @@ export function UpdateManager() {
     try {
       const result = await api.applyUpdate(`v${status.latestVersion}`);
       setMessage(result.message);
-      setStatus((current) =>
-        current ? { ...current, updateInProgress: true } : current,
-      );
+      await refresh(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Update failed to start");
     } finally {
@@ -76,7 +40,7 @@ export function UpdateManager() {
   };
 
   const releaseDate = formatReleaseDate(status?.publishedAt ?? null);
-  const notesPreview = previewNotes(status?.releaseNotes ?? null);
+  const notesPreview = previewReleaseNotes(status?.releaseNotes ?? null, 4);
 
   return (
     <Card>
@@ -109,7 +73,7 @@ export function UpdateManager() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => loadStatus(true)}
+                onClick={() => refresh(true)}
                 disabled={checking || applying}
               >
                 {checking ? (

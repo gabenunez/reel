@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clapperboard, Film, Home, Search, Settings, Tv } from "lucide-react";
+import { Clapperboard, Film, Home, Settings, Tv } from "lucide-react";
+import { UpdateAvailableButton } from "@/components/update-available-button";
+import { SearchPopover } from "@/components/search-popover";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/search", label: "Search", icon: Search },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -34,26 +35,30 @@ export function Navbar() {
           </div>
         </Link>
 
-        <nav className="flex items-center gap-1">
-          {navItems.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "relative flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors sm:px-4",
-                pathname === href
-                  ? "bg-primary/[0.12] text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              <span className="hidden sm:inline">{label}</span>
-              {pathname === href && (
-                <span className="absolute inset-x-3 bottom-1 h-px bg-primary/70" />
-              )}
-            </Link>
-          ))}
-        </nav>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <UpdateAvailableButton />
+          <SearchPopover />
+          <nav className="flex items-center gap-1">
+            {navItems.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "relative flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors sm:px-4",
+                  pathname === href
+                    ? "bg-primary/[0.12] text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{label}</span>
+                {pathname === href && (
+                  <span className="absolute inset-x-3 bottom-1 h-px bg-primary/70" />
+                )}
+              </Link>
+            ))}
+          </nav>
+        </div>
       </div>
     </header>
   );

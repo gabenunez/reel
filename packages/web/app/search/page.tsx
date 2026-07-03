@@ -1,10 +1,14 @@
-import { Suspense } from "react";
-import { SearchClient } from "./client";
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SearchPage() {
-  return (
-    <Suspense fallback={<div className="px-6 py-10">Loading...</div>}>
-      <SearchClient />
-    </Suspense>
-  );
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/");
+  }, [router]);
+
+  return null;
 }
