@@ -74,6 +74,9 @@ export function UpdateManager() {
                     {releaseDate ? ` · ${releaseDate}` : ""}
                   </p>
                 )}
+                {status?.updateCheckWarning && (
+                  <p className="mt-1 text-xs text-amber-400/90">{status.updateCheckWarning}</p>
+                )}
               </div>
               <Button
                 variant="outline"

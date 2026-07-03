@@ -26,39 +26,6 @@ import {
   libraryDecks,
 } from "../db/schema.js";
 
-type PlayTarget = {
-  type: "movie" | "episode";
-  fileId: number;
-  mediaId: number;
-};
-
-async function resolvePlayTarget(
-  db: DatabaseInstance,
-  item: { id: number; type: string },
-): Promise<PlayTarget | null> {
-  if (item.type === "movie") {
-    const file = await db.query.movieFiles.findFirst({
-      where: eq(movieFiles.mediaItemId, item.id),
-    });
-    if (!file) return null;
-    return { type: "movie", fileId: file.id, mediaId: item.id };
-  }
-
-  const season = await db.query.tvSeasons.findFirst({
-    where: eq(tvSeasons.mediaItemId, item.id),
-    orderBy: [tvSeasons.seasonNumber],
-  });
-  if (!season) return null;
-
-  const episode = await db.query.tvEpisodes.findFirst({
-    where: eq(tvEpisodes.seasonId, season.id),
-    orderBy: [tvEpisodes.episodeNumber],
-  });
-  if (!episode) return null;
-
-  return { type: "episode", fileId: episode.id, mediaId: item.id };
-}
-
 export async function apiRoutes(
   app: FastifyInstance,
   db: DatabaseInstance,
@@ -365,11 +332,20 @@ export async function apiRoutes(
       }),
     );
     const decks = await listDecksWithCounts(db);
-    const featured = recent[0] ?? null;
-    const recentPlay = featured ? await resolvePlayTarget(db, featured) : null;
+    const continueItems = continueWatching.filter(
+      (item): item is NonNullable<(typeof continueWatching)[number]> => item != null,
+    );
+    const latestContinue = continueItems[0] ?? null;
+    const recentPlay = latestContinue
+      ? {
+          type: latestContinue.itemType,
+          fileId: latestContinue.itemId,
+          mediaId: latestContinue.mediaId,
+        }
+      : null;
 
     return {
-      continueWatching: continueWatching.filter(Boolean),
+      continueWatching: continueItems,
       recentlyAdded: recent,
       libraries: librariesWithCounts,
       decks,

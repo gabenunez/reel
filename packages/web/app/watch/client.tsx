@@ -163,6 +163,7 @@ export function WatchClient() {
   const [volumeMenuOpen, setVolumeMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [streamInfo, setStreamInfo] = useState<StreamInfo | null>(null);
+  const [initialResumeSeconds, setInitialResumeSeconds] = useState<number | null>(null);
 
   const revealControls = useCallback((autoHide = true) => {
     setShowControls(true);
@@ -222,6 +223,8 @@ export function WatchClient() {
   useEffect(() => {
     if (!fileId || Number.isNaN(fileId)) return;
 
+    setInitialResumeSeconds(null);
+
     api
       .getStreamInfo(fileId, type === "movie" ? "movie" : "episode")
       .then((info) => {
@@ -233,8 +236,23 @@ export function WatchClient() {
         setQuality((current) =>
           info.availableQualities.includes(current) ? current : "original",
         );
+
+        const positionMs = info.watchProgress?.positionMs ?? 0;
+        const durationMs =
+          info.watchProgress?.durationMs ?? info.durationMs ?? 0;
+        if (positionMs > 0 && durationMs > 0) {
+          const percent = positionMs / durationMs;
+          if (percent > 0.02 && percent < 0.95) {
+            setInitialResumeSeconds(positionMs / 1000);
+            return;
+          }
+        }
+        setInitialResumeSeconds(0);
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        setInitialResumeSeconds(0);
+      });
   }, [fileId, type]);
 
   useEffect(() => {
@@ -288,7 +306,7 @@ export function WatchClient() {
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !fileId || Number.isNaN(fileId)) return;
+    if (!video || !fileId || Number.isNaN(fileId) || initialResumeSeconds === null) return;
 
     setError(null);
     setBuffering(quality !== "original");
@@ -298,7 +316,7 @@ export function WatchClient() {
       hlsRef.current = null;
     }
 
-    const startAt = resumeTimeRef.current;
+    const startAt = resumeTimeRef.current || initialResumeSeconds;
     resumeTimeRef.current = 0;
     const usingHls = quality !== "original";
 
@@ -367,7 +385,7 @@ export function WatchClient() {
       if (progressInterval.current) clearInterval(progressInterval.current);
       saveProgress();
     };
-  }, [fileId, type, quality, streamGeneration, saveProgress]);
+  }, [fileId, type, quality, streamGeneration, saveProgress, initialResumeSeconds]);
 
   const changeQuality = useCallback(
     (nextQuality: StreamQuality) => {

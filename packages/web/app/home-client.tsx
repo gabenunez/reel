@@ -63,15 +63,13 @@ export function HomeClient() {
   const decks = data?.decks ?? [];
   const recentlyAdded = data?.recentlyAdded ?? [];
   const continueWatching = data?.continueWatching ?? [];
+  const continueTarget = continueWatching[0] ?? null;
   const featured = recentlyAdded[0];
-  const recentPlay = data?.recentPlay ?? null;
+  const continueHref =
+    continueTarget != null
+      ? routes.watch(continueTarget.itemType, continueTarget.itemId, continueTarget.mediaId)
+      : null;
   const featuredImage = api.imageUrl(featured?.posterPath ?? featured?.backdropPath);
-  const featuredPlayHref =
-    recentPlay != null
-      ? routes.watch(recentPlay.type, recentPlay.fileId, recentPlay.mediaId)
-      : featured
-        ? routes.media(featured.id)
-        : null;
   const tmdbConfigured = data?.tmdbConfigured;
   const totalItems = libraries.reduce(
     (sum, library) => sum + (library.itemCount ?? 0),
@@ -108,11 +106,11 @@ export function HomeClient() {
             <div className={cn("mt-6", !loaded && "min-h-11")}>
               {!loaded ? (
                 <Skeleton className="h-11 w-[9.25rem] rounded-md" />
-              ) : featured && featuredPlayHref ? (
+              ) : continueTarget && continueHref ? (
                 <Button size="lg" asChild>
-                  <Link href={featuredPlayHref}>
+                  <Link href={continueHref}>
                     <Play className="h-5 w-5 fill-current" />
-                    Play recent
+                    Continue
                   </Link>
                 </Button>
               ) : null}
@@ -188,10 +186,10 @@ export function HomeClient() {
                 <>
                   <h2 className="line-clamp-2 text-2xl font-bold">{featured.title}</h2>
                   <div className="mt-4 flex items-center gap-3">
-                    <Button size="sm" asChild>
-                      <Link href={featuredPlayHref ?? routes.media(featured.id)}>
-                        <Play className="h-4 w-4 fill-current" />
-                        Play recent
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={routes.media(featured.id)}>
+                        Open
+                        <ArrowRight className="h-4 w-4" />
                       </Link>
                     </Button>
                     <span className="font-mono text-[0.68rem] uppercase text-muted-foreground">

@@ -178,6 +178,21 @@ build_app() {
   "
 }
 
+stop_running_reel() {
+  local pid=""
+  if [[ -f "${HOME}/.config/reel/reel.pid" ]]; then
+    pid="$(cat "${HOME}/.config/reel/reel.pid" 2>/dev/null || true)"
+  fi
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    reel_ok "Stopping Reel (pid $pid)..."
+    kill "$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
+    sleep 2
+  fi
+  pkill -f "node packages/server/dist/index.js" 2>/dev/null || true
+  sleep 1
+  rm -f "${HOME}/.config/reel/reel.pid"
+}
+
 restart_service() {
   if uses_systemd; then
     reel_ok "Restarting reel service..."
@@ -194,6 +209,7 @@ restart_service() {
     fi
   elif [[ -x "${HOME}/.startup/reel" ]]; then
     reel_ok "Restarting via ~/.startup/reel..."
+    stop_running_reel
     "${HOME}/.startup/reel"
   elif [[ -f "${HOME}/.config/reel/reel.pid" ]]; then
     reel_ok "Restarting Reel process..."

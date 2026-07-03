@@ -113,6 +113,7 @@ export interface UpdateStatus {
   updateInProgress: boolean;
   installDir: string;
   updateProgress: UpdateProgress | null;
+  updateCheckWarning: string | null;
 }
 
 export type UpdatePhase =
@@ -217,6 +218,10 @@ export interface StreamInfo {
   bitrate?: number | null;
   availableQualities: StreamQuality[];
   transcodingEnabled: boolean;
+  watchProgress?: {
+    positionMs: number;
+    durationMs?: number | null;
+  } | null;
 }
 
 export interface ServerStatus {

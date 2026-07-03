@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { GITHUB_REPO, isNewerVersion, normalizeVersion } from "@reel/shared";
+import { GITHUB_REPO, compareVersions, isNewerVersion, normalizeVersion } from "@reel/shared";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -22,6 +23,7 @@ export interface UpdateStatus {
   updateInProgress: boolean;
   installDir: string;
   updateProgress: UpdateProgress | null;
+  updateCheckWarning: string | null;
 }
 
 export type UpdatePhase =
@@ -337,20 +339,26 @@ function isUpdateSupported(installDir: string): boolean {
   return fs.existsSync(updateScript) && fs.existsSync(installDir);
 }
 
-async function fetchLatestRelease(): Promise<GitHubRelease | null> {
-  const res = await fetch(GITHUB_API, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      "User-Agent": `Reel/${getCurrentVersion()}`,
-    },
-  });
+async function fetchLatestReleaseFromGitHubApi(): Promise<GitHubRelease | null> {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": `Reel/${getCurrentVersion()}`,
+  };
+  const token = process.env.GITHUB_TOKEN?.trim();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(GITHUB_API, { headers });
 
   if (res.status === 404) {
     return null;
   }
 
   if (!res.ok) {
-    throw new Error(`GitHub API error: ${res.status}`);
+    const body = (await res.json().catch(() => null)) as { message?: string } | null;
+    const detail = body?.message ?? `HTTP ${res.status}`;
+    throw new Error(`GitHub API error: ${detail}`);
   }
 
   const release = (await res.json()) as GitHubRelease;
@@ -359,6 +367,102 @@ async function fetchLatestRelease(): Promise<GitHubRelease | null> {
   }
 
   return release;
+}
+
+function fetchLatestTagFromGit(installDir: string): string | null {
+  if (!fs.existsSync(path.join(installDir, ".git"))) {
+    return null;
+  }
+
+  try {
+    execFileSync(
+      "git",
+      ["-C", installDir, "remote", "set-url", "origin", `https://github.com/${GITHUB_REPO}.git`],
+      { stdio: "ignore" },
+    );
+    const stdout = execFileSync(
+      "git",
+      ["-C", installDir, "ls-remote", "--tags", "origin"],
+      {
+        encoding: "utf8",
+        timeout: 20000,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      },
+    );
+
+    const versions = stdout
+      .split("\n")
+      .map((line) => line.match(/refs\/tags\/v?(\d+\.\d+\.\d+)/)?.[1])
+      .filter((value): value is string => Boolean(value));
+
+    const unique = [...new Set(versions)];
+    unique.sort((a, b) => compareVersions(b, a));
+    return unique[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function extractChangelogSection(markdown: string, version: string): string | null {
+  const escaped = version.replace(/\./g, "\\.");
+  const header = new RegExp(`^##\\s+${escaped}\\s*(?:—|-).*?$`, "m");
+  const match = markdown.match(header);
+  if (!match || match.index === undefined) {
+    return null;
+  }
+
+  const start = match.index + match[0].length;
+  const rest = markdown.slice(start);
+  const nextHeader = rest.search(/^##\s+\d+\.\d+\.\d+/m);
+  const section = (nextHeader === -1 ? rest : rest.slice(0, nextHeader)).trim();
+  return section || null;
+}
+
+async function fetchReleaseNotesFromChangelog(version: string): Promise<string | null> {
+  const tag = `v${version}`;
+  const urls = [
+    `https://raw.githubusercontent.com/${GITHUB_REPO}/${tag}/CHANGELOG.md`,
+    `https://raw.githubusercontent.com/${GITHUB_REPO}/main/CHANGELOG.md`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        headers: { "User-Agent": `Reel/${getCurrentVersion()}` },
+      });
+      if (!res.ok) continue;
+
+      const markdown = await res.text();
+      const section = extractChangelogSection(markdown, version);
+      if (section) return section;
+    } catch {
+      // try next URL
+    }
+  }
+
+  return null;
+}
+
+function resolveLatestFromGit(
+  installDir: string,
+  currentVersion: string,
+): {
+  latestVersion: string;
+  latestReleaseName: string;
+  releaseUrl: string;
+  updateAvailable: boolean;
+} | null {
+  const gitLatest = fetchLatestTagFromGit(installDir);
+  if (!gitLatest) {
+    return null;
+  }
+
+  return {
+    latestVersion: gitLatest,
+    latestReleaseName: `v${gitLatest}`,
+    releaseUrl: `https://github.com/${GITHUB_REPO}/releases/tag/v${gitLatest}`,
+    updateAvailable: isNewerVersion(gitLatest, currentVersion),
+  };
 }
 
 export async function checkForUpdates(force = false): Promise<UpdateStatus> {
@@ -384,6 +488,7 @@ export async function checkForUpdates(force = false): Promise<UpdateStatus> {
       ...cachedCheck.status,
       updateInProgress,
       updateSupported,
+      updateCheckWarning: cachedCheck.status.updateCheckWarning ?? null,
     });
   }
 
@@ -393,19 +498,30 @@ export async function checkForUpdates(force = false): Promise<UpdateStatus> {
   let releaseNotes: string | null = null;
   let publishedAt: string | null = null;
   let updateAvailable = false;
+  let updateCheckWarning: string | null = null;
 
-  try {
-    const release = await fetchLatestRelease();
-    if (release) {
-      latestVersion = normalizeVersion(release.tag_name);
-      latestReleaseName = release.name || release.tag_name;
-      releaseUrl = release.html_url;
-      releaseNotes = release.body?.trim() || null;
-      publishedAt = release.published_at;
-      updateAvailable = isNewerVersion(latestVersion, currentVersion);
+  const gitLatest = resolveLatestFromGit(installDir, currentVersion);
+  if (gitLatest) {
+    latestVersion = gitLatest.latestVersion;
+    latestReleaseName = gitLatest.latestReleaseName;
+    releaseUrl = gitLatest.releaseUrl;
+    updateAvailable = gitLatest.updateAvailable;
+    releaseNotes = await fetchReleaseNotesFromChangelog(gitLatest.latestVersion);
+  } else {
+    try {
+      const release = await fetchLatestReleaseFromGitHubApi();
+      if (release) {
+        latestVersion = normalizeVersion(release.tag_name);
+        latestReleaseName = release.name || release.tag_name;
+        releaseUrl = release.html_url;
+        releaseNotes = release.body?.trim() || null;
+        publishedAt = release.published_at;
+        updateAvailable = isNewerVersion(latestVersion, currentVersion);
+      }
+    } catch (err) {
+      updateCheckWarning =
+        err instanceof Error ? err.message : "Update check failed";
     }
-  } catch {
-    // Leave defaults — still return current version info.
   }
 
   const status = finalize({
@@ -419,6 +535,7 @@ export async function checkForUpdates(force = false): Promise<UpdateStatus> {
     updateSupported,
     updateInProgress,
     installDir,
+    updateCheckWarning,
   });
 
   cachedCheck = { at: Date.now(), status: { ...status, updateProgress: null } };

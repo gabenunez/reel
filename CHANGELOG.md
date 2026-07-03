@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.14 — 2026-07-03
+
+### UI
+- **Continue** on the home hero picks up your last watched movie or episode (replaces "Play recent")
+- Recently added panel uses **Open** to browse titles instead of starting playback
+
+### Playback
+- Watch page **resumes saved progress** automatically when you return to something in progress
+
+### In-app updates
+- Update checks use **git tags** instead of the GitHub API — avoids rate limits on shared hosts
+- Release notes load from `CHANGELOG.md` (no API needed)
+- Update script **stops the running process** before restart so new builds actually go live
+
 ## 0.1.13 — 2026-07-03
 
 ### UI

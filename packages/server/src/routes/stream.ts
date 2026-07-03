@@ -6,8 +6,8 @@ import type { AppConfig } from "@reel/shared";
 import { getAvailableQualities, parseTranscodeQuality } from "@reel/shared";
 import type { DatabaseInstance } from "../db/index.js";
 import type { SubtitleService } from "../services/subtitles.js";
-import { movieFiles, tvEpisodes, subtitles } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { movieFiles, tvEpisodes, subtitles, watchProgress } from "../db/schema.js";
+import { and, eq } from "drizzle-orm";
 import {
   startHlsTranscode,
   resolveHlsSession,
@@ -119,6 +119,12 @@ export async function streamRoutes(
       const sourceHeight = await resolveSourceHeight(file);
       const sourceWidth = file.width ?? null;
       const probe = await probeFile(file.filePath);
+      const progress = await db.query.watchProgress.findFirst({
+        where: and(
+          eq(watchProgress.itemType, type),
+          eq(watchProgress.itemId, fileId),
+        ),
+      });
 
       return {
         id: file.id,
@@ -137,6 +143,12 @@ export async function streamRoutes(
         bitrate: probe?.bitrate ?? null,
         availableQualities: getAvailableQualities(sourceHeight),
         transcodingEnabled: config.transcoding.enabled,
+        watchProgress: progress
+          ? {
+              positionMs: progress.positionMs,
+              durationMs: progress.durationMs,
+            }
+          : null,
       };
     },
   );
