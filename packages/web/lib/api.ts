@@ -92,6 +92,8 @@ export interface AppSettings {
   metadata: {
     tmdbConfigured: boolean;
     tmdbApiKeyPreview: string;
+    fanartConfigured: boolean;
+    fanartApiKeyPreview: string;
     language: string;
   };
   subtitles: {
@@ -401,6 +403,15 @@ export const api = {
         body: JSON.stringify({ opensubtitles_api_key }),
       },
     ),
+  updateFanartKey: (fanart_api_key: string) =>
+    fetchApi<{
+      success: boolean;
+      fanartConfigured: boolean;
+      themesSynced?: number;
+    }>("/api/settings/fanart", {
+      method: "PUT",
+      body: JSON.stringify({ fanart_api_key }),
+    }),
   listSubtitles: (fileId: number, type: "movie" | "episode") =>
     fetchApi<{
       tracks: SubtitleTrack[];

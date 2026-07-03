@@ -116,7 +116,7 @@ async function main() {
 
   await authRoutes(app, auth, configManager);
   await apiRoutes(app, db, config, scanner, metadata, themes);
-  await settingsRoutes(app, db, configManager, scanner, metadata);
+  await settingsRoutes(app, db, configManager, scanner, metadata, themes);
   await updateRoutes(app);
   await castRoutes(app, db, config, auth);
   await streamRoutes(app, db, config);

@@ -3,6 +3,7 @@ import type { DatabaseInstance } from "../db/index.js";
 import type { ConfigManager } from "../config.js";
 import type { ScannerService } from "../services/scanner.js";
 import type { MetadataService } from "../services/metadata.js";
+import type { ThemeService } from "../services/themes.js";
 import { getBrowseShortcuts } from "../config.js";
 import { browseDirectory, validateLibraryPath } from "../utils/paths.js";
 import { checkFfmpegAvailable } from "../utils/ffmpeg.js";
@@ -23,6 +24,7 @@ export async function settingsRoutes(
   configManager: ConfigManager,
   scanner: ScannerService,
   metadata: MetadataService,
+  themes: ThemeService,
 ) {
   app.get("/api/settings", async () => {
     const config = configManager.get();
@@ -50,6 +52,8 @@ export async function settingsRoutes(
 
     const key = config.metadata.tmdb_api_key?.trim() ?? "";
     const hasKey = Boolean(key && key !== "YOUR_KEY_HERE");
+    const fanartKey = config.metadata.fanart_api_key?.trim() ?? "";
+    const hasFanartKey = Boolean(fanartKey && fanartKey !== "YOUR_KEY_HERE");
     const osKey = config.subtitles?.opensubtitles_api_key?.trim() ?? "";
     const hasOsKey = Boolean(osKey && osKey !== "YOUR_KEY_HERE");
 
@@ -62,6 +66,10 @@ export async function settingsRoutes(
         tmdbConfigured: hasKey,
         tmdbApiKeyPreview: hasKey
           ? `${key.slice(0, 4)}${"•".repeat(Math.max(0, key.length - 8))}${key.slice(-4)}`
+          : "",
+        fanartConfigured: hasFanartKey,
+        fanartApiKeyPreview: hasFanartKey
+          ? `${fanartKey.slice(0, 4)}${"•".repeat(Math.max(0, fanartKey.length - 8))}${fanartKey.slice(-4)}`
           : "",
         language: config.metadata.language,
       },
@@ -269,6 +277,31 @@ export async function settingsRoutes(
       const configured = Boolean(trimmed && trimmed !== "YOUR_KEY_HERE");
 
       return { success: true, opensubtitlesConfigured: configured };
+    },
+  );
+
+  app.put<{ Body: { fanart_api_key?: string } }>(
+    "/api/settings/fanart",
+    async (request, reply) => {
+      const apiKey = request.body?.fanart_api_key;
+      if (apiKey === undefined) {
+        return reply.status(400).send({ error: "fanart_api_key is required" });
+      }
+
+      configManager.setFanartApiKey(apiKey);
+      const trimmed = apiKey.trim();
+      const configured = Boolean(trimmed && trimmed !== "YOUR_KEY_HERE");
+
+      let themesSynced = 0;
+      if (configured) {
+        const allLibraries = await db.query.libraries.findMany();
+        for (const lib of allLibraries) {
+          await themes.syncThemesForLibrary(lib.id);
+          themesSynced += 1;
+        }
+      }
+
+      return { success: true, fanartConfigured: configured, themesSynced };
     },
   );
 

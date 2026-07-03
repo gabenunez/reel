@@ -9,6 +9,7 @@ import {
   LogOut,
   XCircle,
   KeyRound,
+  Music2,
   Subtitles,
 } from "lucide-react";
 import { api, type AppSettings } from "@/lib/api";
@@ -30,10 +31,13 @@ export function SettingsClient() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState<number | null>(null);
   const [tmdbKey, setTmdbKey] = useState("");
+  const [fanartKey, setFanartKey] = useState("");
   const [osKey, setOsKey] = useState("");
   const [savingKey, setSavingKey] = useState(false);
+  const [savingFanartKey, setSavingFanartKey] = useState(false);
   const [savingOsKey, setSavingOsKey] = useState(false);
   const [keyMessage, setKeyMessage] = useState<string | null>(null);
+  const [fanartKeyMessage, setFanartKeyMessage] = useState<string | null>(null);
   const [osKeyMessage, setOsKeyMessage] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -86,6 +90,27 @@ export function SettingsClient() {
       setOsKeyMessage(err instanceof Error ? err.message : "Failed to save key");
     } finally {
       setSavingOsKey(false);
+    }
+  };
+
+  const handleSaveFanartKey = async () => {
+    setSavingFanartKey(true);
+    setFanartKeyMessage(null);
+    try {
+      const result = await api.updateFanartKey(fanartKey);
+      setFanartKeyMessage(
+        result.fanartConfigured
+          ? result.themesSynced
+            ? `Fanart API key saved — checked themes in ${result.themesSynced} librar${result.themesSynced === 1 ? "y" : "ies"}`
+            : "Fanart API key saved"
+          : "Key cleared",
+      );
+      setFanartKey("");
+      loadSettings();
+    } catch (err) {
+      setFanartKeyMessage(err instanceof Error ? err.message : "Failed to save key");
+    } finally {
+      setSavingFanartKey(false);
     }
   };
 
@@ -373,6 +398,57 @@ export function SettingsClient() {
             </SettingsSection>
 
             <SettingsSection
+              icon={Music2}
+              title="Theme music"
+              description={
+                <>
+                  Free API key from{" "}
+                  <a
+                    href="https://fanart.tv/get-an-api-key/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary transition-colors hover:text-accent"
+                  >
+                    fanart.tv
+                  </a>{" "}
+                  fetches TV show themes for detail pages. Local <code className="text-xs">theme.mp3</code>{" "}
+                  files in a show folder still work without a key.
+                </>
+              }
+            >
+              {settings?.metadata.fanartConfigured &&
+                settings.metadata.fanartApiKeyPreview && (
+                  <p className="mb-2 text-sm text-muted-foreground">
+                    Current key:{" "}
+                    <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-accent">
+                      {settings.metadata.fanartApiKeyPreview}
+                    </code>
+                  </p>
+                )}
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  type="password"
+                  value={fanartKey}
+                  onChange={(e) => setFanartKey(e.target.value)}
+                  placeholder="Paste your fanart.tv API key"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleSaveFanartKey}
+                  disabled={savingFanartKey || !fanartKey.trim()}
+                  className="shrink-0"
+                >
+                  {savingFanartKey ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Save key
+                </Button>
+              </div>
+              {fanartKeyMessage && (
+                <p className="mt-2 text-sm text-muted-foreground">{fanartKeyMessage}</p>
+              )}
+            </SettingsSection>
+
+            <SettingsSection
               icon={Subtitles}
               title="OpenSubtitles"
               description={
@@ -435,6 +511,12 @@ export function SettingsClient() {
                 <StatusRow
                   label="TMDB API"
                   ok={settings?.metadata.tmdbConfigured ?? false}
+                  okText="Configured"
+                  failText="Not configured"
+                />
+                <StatusRow
+                  label="Fanart.tv"
+                  ok={settings?.metadata.fanartConfigured ?? false}
                   okText="Configured"
                   failText="Not configured"
                 />

@@ -156,6 +156,11 @@ export class ConfigManager {
     this.save();
   }
 
+  setFanartApiKey(apiKey: string): void {
+    this.config.metadata.fanart_api_key = apiKey.trim();
+    this.save();
+  }
+
   setOpenSubtitlesApiKey(apiKey: string): void {
     if (!this.config.subtitles) {
       this.config.subtitles = {};

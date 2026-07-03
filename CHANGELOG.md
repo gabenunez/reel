@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.34 — 2026-07-03
+
+### Settings
+- **Fanart.tv API key** — configure theme music in Settings; saving the key syncs TV show themes across libraries
+
 ## 0.1.33 — 2026-07-03
 
 ### Features
