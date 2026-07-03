@@ -20,6 +20,38 @@ export interface PlaybackMediaDetail {
   seasons?: TvSeasonSummary[];
 }
 
+/** End of the seekable range containing the current playhead (or before it in a gap). */
+export function getVideoSeekableEnd(video: HTMLVideoElement): number {
+  const ranges = video.seekable;
+  if (!ranges.length) return 0;
+
+  const t = video.currentTime;
+  for (let i = 0; i < ranges.length; i++) {
+    const start = ranges.start(i);
+    const end = ranges.end(i);
+    if (t >= start && t <= end) return end;
+    if (t < start) return i > 0 ? ranges.end(i - 1) : 0;
+  }
+
+  return ranges.end(ranges.length - 1);
+}
+
+/** End of the buffered range containing the current playhead (or before it in a gap). */
+export function getVideoBufferedEnd(video: HTMLVideoElement): number {
+  const ranges = video.buffered;
+  if (!ranges.length) return 0;
+
+  const t = video.currentTime;
+  for (let i = 0; i < ranges.length; i++) {
+    const start = ranges.start(i);
+    const end = ranges.end(i);
+    if (t >= start && t <= end) return end;
+    if (t < start) return i > 0 ? ranges.end(i - 1) : 0;
+  }
+
+  return ranges.end(ranges.length - 1);
+}
+
 export function pickTranscodeQualityForPlayback(
   available: StreamQuality[],
 ): Exclude<StreamQuality, "original"> {

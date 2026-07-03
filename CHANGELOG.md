@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.25 — 2026-07-03
+
+### Playback
+- **Seek fix** — scrubbing and skip-ahead to unbuffered positions now correctly restart HLS transcoding using the video seekable range (not buffered bytes)
+- Remove the AC3 / transcoded-audio banner during playback; auto-fallback to transcoded audio still applies silently
+
 ## 0.1.24 — 2026-07-03
 
 ### Server

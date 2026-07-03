@@ -8,6 +8,7 @@ import { api, type StreamInfo, type StreamQuality } from "@/lib/api";
 import { tvRoutes } from "@/lib/tv/routes";
 import {
   buildPlaybackTitle,
+  getVideoSeekableEnd,
   pickTranscodeQualityForPlayback,
   PROGRESS_SAVE_MS,
   type PlaybackMediaDetail,
@@ -182,7 +183,7 @@ export function TvWatchClient() {
 
     if (usingHls) {
       if (Hls.isSupported()) {
-        const hls = new Hls({ backBufferLength: 90 });
+        const hls = new Hls({ backBufferLength: 90, maxBufferHole: 0.5, nudgeOnVideoHole: true });
         hls.loadSource(url);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -244,17 +245,36 @@ export function TvWatchClient() {
 
       const clamped = Math.max(0, Math.min(seconds, totalDurationSeconds));
 
-      if (quality !== "original") {
-        setStreamStartSeconds(clamped);
-        setStreamGeneration((g) => g + 1);
+      if (quality === "original") {
+        video.currentTime = clamped;
         revealControls(true);
         return;
       }
 
-      video.currentTime = clamped;
+      const relativeTarget = clamped - hlsStartOffset;
+
+      if (relativeTarget < 0) {
+        setStreamStartSeconds(clamped);
+        setStreamGeneration((g) => g + 1);
+        setBuffering(true);
+        revealControls(true);
+        return;
+      }
+
+      const seekableEnd = getVideoSeekableEnd(video);
+      if (relativeTarget <= seekableEnd + 0.25 && video.readyState >= 1) {
+        video.currentTime = relativeTarget;
+        setCurrentTime(relativeTarget);
+        revealControls(true);
+        return;
+      }
+
+      setStreamStartSeconds(clamped);
+      setStreamGeneration((g) => g + 1);
+      setBuffering(true);
       revealControls(true);
     },
-    [quality, totalDurationSeconds, revealControls],
+    [quality, totalDurationSeconds, hlsStartOffset, revealControls],
   );
 
   seekToAbsoluteRef.current = seekToAbsolute;

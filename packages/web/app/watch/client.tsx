@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { api, type StreamInfo, type StreamQuality } from "@/lib/api";
 import { routes } from "@/lib/routes";
+import { getVideoBufferedEnd, getVideoSeekableEnd } from "@/lib/playback-utils";
 import { cn, formatDuration } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CastButton } from "@/components/cast-button";
@@ -133,19 +134,6 @@ function loadStoredVolume(): number {
   return Math.min(1, parsed);
 }
 
-function getVideoBufferedEnd(video: HTMLVideoElement): number {
-  const ranges = video.buffered;
-  if (!ranges.length) return 0;
-
-  for (let index = 0; index < ranges.length; index++) {
-    if (video.currentTime >= ranges.start(index) && video.currentTime <= ranges.end(index)) {
-      return ranges.end(index);
-    }
-  }
-
-  return ranges.end(ranges.length - 1);
-}
-
 export function WatchClient() {
   const searchParams = useSearchParams();
   const type = (searchParams.get("type") ?? "movie") as "movie" | "episode";
@@ -197,7 +185,6 @@ export function WatchClient() {
   const [volumeMenuOpen, setVolumeMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [streamInfo, setStreamInfo] = useState<StreamInfo | null>(null);
-  const [playbackNotice, setPlaybackNotice] = useState<string | null>(null);
   const [initialResumeSeconds, setInitialResumeSeconds] = useState<number | null>(null);
 
   useDocumentTitle(title || null);
@@ -284,7 +271,6 @@ export function WatchClient() {
     if (!fileId || Number.isNaN(fileId)) return;
 
     setInitialResumeSeconds(null);
-    setPlaybackNotice(null);
 
     api
       .getStreamInfo(fileId, type === "movie" ? "movie" : "episode")
@@ -302,17 +288,6 @@ export function WatchClient() {
           info.availableQualities.some((q) => q !== "original")
         ) {
           selectedQuality = pickTranscodeQualityForPlayback(info.availableQualities);
-          const codec = info.audioCodec?.toUpperCase() ?? "This audio";
-          setPlaybackNotice(
-            `${codec} is not supported in your browser — using transcoded audio.`,
-          );
-        } else if (
-          info.directPlayAudioSupported === false &&
-          !info.transcodingEnabled
-        ) {
-          setPlaybackNotice(
-            "This file uses an audio format your browser may not play. Enable transcoding on the server for audio support.",
-          );
         }
 
         setQuality((current) => {
@@ -437,6 +412,8 @@ export function WatchClient() {
       if (Hls.isSupported()) {
         const hls = new Hls({
           backBufferLength: 90,
+          maxBufferHole: 0.5,
+          nudgeOnVideoHole: true,
         });
         hls.loadSource(url);
         hls.attachMedia(video);
@@ -653,11 +630,18 @@ export function WatchClient() {
       }
 
       const relativeTarget = clamped - hlsStartOffset;
-      const bufferedRelative = Math.max(0, bufferedSeconds - hlsStartOffset);
-      const canSeekInBuffer =
-        relativeTarget >= 0 && relativeTarget <= bufferedRelative + 0.5;
 
-      if (canSeekInBuffer && video.readyState >= 1) {
+      if (relativeTarget < 0) {
+        setScrubPreview(null);
+        setStreamStartSeconds(clamped);
+        setStreamGeneration((current) => current + 1);
+        setBuffering(true);
+        revealControls(true);
+        return;
+      }
+
+      const seekableEnd = getVideoSeekableEnd(video);
+      if (relativeTarget <= seekableEnd + 0.25 && video.readyState >= 1) {
         video.currentTime = relativeTarget;
         setCurrentTime(relativeTarget);
         setScrubPreview(null);
@@ -675,7 +659,6 @@ export function WatchClient() {
       totalDurationSeconds,
       quality,
       hlsStartOffset,
-      bufferedSeconds,
       revealControls,
     ],
   );
@@ -864,11 +847,6 @@ export function WatchClient() {
 
         <div className="pointer-events-auto bg-gradient-to-t from-background/95 via-background/45 to-transparent px-3 pb-3 pt-10 sm:px-4 sm:pb-4">
           <div className="mx-auto max-w-7xl rounded-md border border-white/10 bg-background/75 p-3 backdrop-blur">
-            {playbackNotice ? (
-              <p className="mb-3 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
-                {playbackNotice}
-              </p>
-            ) : null}
             <div className="mb-3 flex items-center gap-3">
               <div className="relative flex h-4 flex-1 items-center">
                 <div className="pointer-events-none absolute inset-x-0 h-1.5 overflow-hidden rounded-full bg-white/20">
