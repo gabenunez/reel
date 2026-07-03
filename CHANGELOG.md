@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.38 — 2026-07-03
+
+### UI
+- **Subtitle menu** — show "None available" when a title has no subtitle tracks instead of "Off"
+
 ## 0.1.37 — 2026-07-03
 
 ### Subtitles

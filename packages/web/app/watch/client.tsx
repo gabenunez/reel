@@ -1105,15 +1105,24 @@ export function WatchClient() {
                   </Button>
                   {subtitleMenuOpen && (
                     <div className="absolute bottom-full right-0 z-50 mb-2 min-w-56 rounded-md border border-border bg-card p-1 shadow-xl">
-                      <button
-                        className="block w-full rounded px-3 py-1.5 text-left text-sm hover:bg-muted"
-                        onClick={() => {
-                          setActiveSubtitle(null);
-                          setSubtitleMenuOpen(false);
-                        }}
-                      >
-                        Off
-                      </button>
+                      {subtitles.length === 0 ? (
+                        <p className="px-3 py-1.5 text-sm text-muted-foreground">
+                          None available
+                        </p>
+                      ) : (
+                        <button
+                          className={cn(
+                            "block w-full rounded px-3 py-1.5 text-left text-sm hover:bg-muted",
+                            activeSubtitle === null && "bg-primary/10 text-primary",
+                          )}
+                          onClick={() => {
+                            setActiveSubtitle(null);
+                            setSubtitleMenuOpen(false);
+                          }}
+                        >
+                          Off
+                        </button>
+                      )}
                       {subtitles.map((sub) => (
                         <div
                           key={sub.id}
