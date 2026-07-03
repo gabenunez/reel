@@ -54,19 +54,41 @@ export function UpdateStatusProvider({ children }: { children: ReactNode }) {
     let firstPoll = true;
 
     const poll = async () => {
-      const next = await refresh(firstPoll);
-      firstPoll = false;
       if (cancelled) return;
 
-      const updating = Boolean(next?.updateInProgress);
-      if (updating && !wasUpdatingRef.current) {
-        setModalOpen(true);
-      }
-      if (wasUpdatingRef.current && !updating) {
-        await refresh(true);
-      }
-      wasUpdatingRef.current = updating;
+      let updating = wasUpdatingRef.current;
 
+      if (updating) {
+        try {
+          const progressRes = await api.getUpdateProgress();
+          updating = progressRes.updateInProgress;
+          setStatus((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  updateInProgress: progressRes.updateInProgress,
+                  updateProgress: progressRes.progress,
+                }
+              : prev,
+          );
+          if (wasUpdatingRef.current && !updating) {
+            await refresh(true);
+          }
+        } catch {
+          // Server may be restarting — keep polling until it comes back.
+        }
+      } else {
+        const next = await refresh(firstPoll);
+        firstPoll = false;
+        if (cancelled) return;
+
+        updating = Boolean(next?.updateInProgress);
+        if (updating) {
+          setModalOpen(true);
+        }
+      }
+
+      wasUpdatingRef.current = updating;
       const interval = updating ? UPDATE_IN_PROGRESS_POLL_MS : UPDATE_POLL_MS;
       timeout = setTimeout(poll, interval);
     };

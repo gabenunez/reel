@@ -1,7 +1,17 @@
 import type { FastifyInstance } from "fastify";
-import { checkForUpdates, triggerUpdate } from "../services/updates.js";
+import {
+  checkForUpdates,
+  getUpdateProgress,
+  isUpdateInProgress,
+  triggerUpdate,
+} from "../services/updates.js";
 
 export async function updateRoutes(app: FastifyInstance) {
+  app.get("/api/updates/progress", async () => ({
+    updateInProgress: isUpdateInProgress(),
+    progress: isUpdateInProgress() ? getUpdateProgress() : null,
+  }));
+
   app.get<{ Querystring: { force?: string } }>("/api/updates/check", async (request) => {
     const force = request.query.force === "1";
     return checkForUpdates(force);

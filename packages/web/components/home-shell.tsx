@@ -1,7 +1,3 @@
-import Link from "next/link";
-import { Settings } from "lucide-react";
-import { Button } from "@/components/ui/button";
-
 /** Prerendered static hero copy — baked into the static export shell. */
 export function HomeHeroStatic() {
   return (
@@ -10,15 +6,6 @@ export function HomeHeroStatic() {
       <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
         Your personal library for movies and TV, played locally on your network.
       </p>
-
-      <div className="mt-6 flex flex-wrap gap-3">
-        <Button variant="outline" size="lg" asChild>
-          <Link href="/settings">
-            <Settings className="h-5 w-5" />
-            Settings
-          </Link>
-        </Button>
-      </div>
     </div>
   );
 }

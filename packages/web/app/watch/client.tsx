@@ -630,14 +630,14 @@ export function WatchClient() {
             <Button
               variant="ghost"
               size="icon"
-              className="text-white hover:bg-white/10"
+              className="shrink-0 text-white hover:bg-white/10"
               asChild
             >
               <Link href={mediaId ? routes.media(parseInt(mediaId, 10)) : "/"}>
                 <ArrowLeft className="h-5 w-5" />
               </Link>
             </Button>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="font-mono text-[0.62rem] uppercase text-primary">
                 Now playing
               </p>
@@ -645,6 +645,20 @@ export function WatchClient() {
                 {title}
               </h1>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0 text-white hover:bg-white/10"
+              onClick={() => {
+                setDetailsOpen(true);
+                setSubtitleMenuOpen(false);
+                setQualityMenuOpen(false);
+                setVolumeMenuOpen(false);
+              }}
+            >
+              <Info className="h-4 w-4" />
+              <span className="hidden sm:inline">Details</span>
+            </Button>
           </div>
         </div>
 
@@ -845,21 +859,6 @@ export function WatchClient() {
                     </div>
                   )}
                 </div>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white hover:bg-white/10"
-                  onClick={() => {
-                    setDetailsOpen(true);
-                    setSubtitleMenuOpen(false);
-                    setQualityMenuOpen(false);
-                    setVolumeMenuOpen(false);
-                  }}
-                >
-                  <Info className="h-4 w-4" />
-                  <span className="hidden sm:inline">Details</span>
-                </Button>
 
                 <div className="relative">
                   <Button

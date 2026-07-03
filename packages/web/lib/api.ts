@@ -294,6 +294,8 @@ export const api = {
       totalPages: number;
     }>(`/api/libraries/${id}/items?page=${page}`),
   getMedia: (id: number) => fetchApi<Record<string, unknown>>(`/api/media/${id}`),
+  getRelatedMedia: (id: number) =>
+    fetchApi<{ items: MediaItem[] }>(`/api/media/${id}/related`),
   search: (q: string) =>
     fetchApi<{ results: MediaItem[] }>(`/api/search?q=${encodeURIComponent(q)}`),
   scanLibrary: (id: number) =>
@@ -404,6 +406,10 @@ export const api = {
     ),
   checkForUpdates: (force = false) =>
     fetchApi<UpdateStatus>(`/api/updates/check${force ? "?force=1" : ""}`),
+  getUpdateProgress: () =>
+    fetchApi<{ updateInProgress: boolean; progress: UpdateProgress | null }>(
+      "/api/updates/progress",
+    ),
   applyUpdate: (releaseTag?: string) =>
     fetchApi<{ success: boolean; message: string; releaseTag: string }>(
       "/api/updates/apply",

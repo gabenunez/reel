@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.16 — 2026-07-03
+
+### UI
+- **Media pages** — related films or series from your library below the title (matched by genre)
+- **Watch page** — Details button moved to the far right of the title bar
+- **Home** — removed the large Settings button from the hero (Settings stays in the navbar)
+
+### In-app updates
+- Update progress steps now advance live during upgrades (dedicated progress polling + smarter phase detection)
+
 ## 0.1.15 — 2026-07-03
 
 ### Playback

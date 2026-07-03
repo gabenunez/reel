@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Calendar, ChevronLeft, Clock3, Layers3, Play, Star } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, type MediaItem } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MediaRow } from "@/components/media-row";
 import { formatDuration } from "@/lib/utils";
 
 interface MovieFile {
@@ -51,14 +52,19 @@ export function MediaClient() {
   const searchParams = useSearchParams();
   const mediaId = parseInt(searchParams.get("id") ?? "", 10);
   const [media, setMedia] = useState<MediaDetail | null>(null);
+  const [related, setRelated] = useState<MediaItem[]>([]);
   const [selectedSeason, setSelectedSeason] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!mediaId || Number.isNaN(mediaId)) return;
-    api
-      .getMedia(mediaId)
-      .then((data) => setMedia(data as unknown as MediaDetail))
+    setLoading(true);
+    setRelated([]);
+
+    Promise.all([
+      api.getMedia(mediaId).then((data) => setMedia(data as unknown as MediaDetail)),
+      api.getRelatedMedia(mediaId).then((data) => setRelated(data.items)),
+    ])
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [mediaId]);
@@ -260,6 +266,15 @@ export function MediaClient() {
               </Link>
             ))}
           </div>
+        </section>
+      )}
+
+      {related.length > 0 && (
+        <section className="border-t border-border/70 pb-12 pt-10">
+          <MediaRow
+            title={media.type === "movie" ? "More films in your library" : "More series in your library"}
+            items={related}
+          />
         </section>
       )}
     </div>

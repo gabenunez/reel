@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
-import { eq, like, or, desc, sql, and } from "drizzle-orm";
+import { eq, like, or, desc, sql, and, ne } from "drizzle-orm";
 import type { AppConfig } from "@reel/shared";
 import type { DatabaseInstance } from "../db/index.js";
 import type { ScannerService } from "../services/scanner.js";
@@ -25,6 +25,31 @@ import {
   subtitles,
   libraryDecks,
 } from "../db/schema.js";
+
+function parseGenreSet(genres: string | null | undefined): Set<string> {
+  if (!genres?.trim()) return new Set();
+  return new Set(
+    genres
+      .split(",")
+      .map((genre) => genre.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+function genreOverlapScore(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): number {
+  const leftGenres = parseGenreSet(left);
+  const rightGenres = parseGenreSet(right);
+  if (!leftGenres.size || !rightGenres.size) return 0;
+
+  let overlap = 0;
+  for (const genre of leftGenres) {
+    if (rightGenres.has(genre)) overlap++;
+  }
+  return overlap;
+}
 
 export async function apiRoutes(
   app: FastifyInstance,
@@ -232,6 +257,39 @@ export async function apiRoutes(
     );
 
     return { ...item, seasons: seasonsWithEpisodes };
+  });
+
+  app.get<{ Params: { id: string } }>("/api/media/:id/related", async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const item = await db.query.mediaItems.findFirst({
+      where: eq(mediaItems.id, id),
+    });
+
+    if (!item) {
+      return reply.status(404).send({ error: "Not found" });
+    }
+
+    const candidates = await db.query.mediaItems.findMany({
+      where: and(
+        eq(mediaItems.libraryId, item.libraryId),
+        eq(mediaItems.type, item.type),
+        ne(mediaItems.id, id),
+      ),
+    });
+
+    const items = candidates
+      .map((candidate) => ({
+        candidate,
+        score: genreOverlapScore(item.genres, candidate.genres),
+      }))
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return (b.candidate.rating ?? 0) - (a.candidate.rating ?? 0);
+      })
+      .slice(0, 12)
+      .map(({ candidate }) => candidate);
+
+    return { items };
   });
 
   app.get<{ Querystring: { q?: string } }>("/api/search", async (request) => {

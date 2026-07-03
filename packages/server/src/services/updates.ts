@@ -161,6 +161,21 @@ const UPDATE_STEP_LABELS: Record<UpdatePhase, string> = {
   unknown: "Working",
 };
 
+const UPDATE_PHASE_RANK: Record<UpdatePhase, number> = {
+  failed: -2,
+  unknown: -1,
+  preparing: 0,
+  downloading: 1,
+  building: 2,
+  restarting: 3,
+  complete: 4,
+};
+
+function maxUpdatePhase(a: UpdatePhase, b: UpdatePhase): UpdatePhase {
+  if (a === "failed" || b === "failed") return "failed";
+  return UPDATE_PHASE_RANK[a] >= UPDATE_PHASE_RANK[b] ? a : b;
+}
+
 function buildUpdateSteps(phase: UpdatePhase): UpdateStep[] {
   if (phase === "complete") {
     return UPDATE_STEP_ORDER.map((id) => ({
@@ -184,7 +199,10 @@ function buildUpdateSteps(phase: UpdatePhase): UpdateStep[] {
     }));
   }
 
-  const activeIndex = Math.max(0, UPDATE_STEP_ORDER.indexOf(phase));
+  const activeIndex =
+    phase === "unknown"
+      ? 0
+      : Math.max(0, UPDATE_STEP_ORDER.indexOf(phase));
 
   return UPDATE_STEP_ORDER.map((id, index) => ({
     id,
@@ -201,21 +219,38 @@ function buildUpdateSteps(phase: UpdatePhase): UpdateStep[] {
 function inferPhaseFromLog(lines: string[]): UpdatePhase {
   const text = lines.join("\n");
   if (/Update complete|Update finished|upgraded to/i.test(text)) return "complete";
-  if (/Restarting via|Restarting reel service|Restarting Reel process/i.test(text)) {
+  if (
+    /\[4\] Restarting|Restarting via|Restarting reel service|Restarting Reel process|Stopping Reel/i.test(
+      text,
+    )
+  ) {
     return "restarting";
   }
-  if (/\[3\] Building|Installing dependencies and building|Tasks:\s+\d+ successful/i.test(text)) {
+  if (
+    /\[3\] Building|Installing dependencies and building|Tasks:\s+\d+ successful|Compiled successfully|next build|@reel\/.*:build/i.test(
+      text,
+    )
+  ) {
     return "building";
   }
-  if (/\[2\] Downloading|Checking out release|Pulling latest|Synced release/i.test(text)) {
+  if (
+    /\[2\] Downloading|Checking out release|Pulling latest|Synced release|git reset --hard|HEAD is now at/i.test(
+      text,
+    )
+  ) {
     return "downloading";
   }
   if (/\[1\] Checking install|Preparing update/i.test(text)) return "preparing";
-  if (/Update failed|✗|failed/i.test(text)) return "failed";
+  if (/Update failed|reel_progress "failed"|✗ Update failed/i.test(text)) return "failed";
   return "unknown";
 }
 
-function readLogTail(maxLines = 12): string[] {
+function resolveUpdatePhase(filePhase: UpdatePhase, logLines: string[]): UpdatePhase {
+  const logPhase = inferPhaseFromLog(logLines);
+  return maxUpdatePhase(filePhase, logPhase);
+}
+
+function readLogTail(maxLines = 40): string[] {
   const logPath = getUpdateLogPath();
   if (!fs.existsSync(logPath)) return [];
 
@@ -306,11 +341,9 @@ export function getUpdateProgress(): UpdateProgress | null {
     }
   }
 
-  if (phase === "unknown") {
-    phase = inferPhaseFromLog(logTail);
-  }
+  phase = resolveUpdatePhase(phase, logTail);
 
-  if (message === "Update in progress...") {
+  if (message === "Update in progress..." || message === "Starting update...") {
     message = UPDATE_STEP_LABELS[phase] ?? message;
   }
 
@@ -480,6 +513,7 @@ export async function checkForUpdates(force = false): Promise<UpdateStatus> {
 
   if (
     !force &&
+    !updateInProgress &&
     cachedCheck &&
     Date.now() - cachedCheck.at < CHECK_CACHE_MS &&
     cachedCheck.status.currentVersion === currentVersion
