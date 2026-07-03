@@ -7,6 +7,9 @@ import {
   parseEpisodeFromPath,
   isVideoFile,
   isUnknownVideoCandidate,
+  isSubtitleFile,
+  isExcludedFromVideoProbe,
+  SKIP_SCAN_DIR_NAMES,
 } from "@reel/shared";
 import type { ConfigManager } from "../config.js";
 import type { DatabaseInstance } from "../db/index.js";
@@ -66,8 +69,52 @@ export class ScannerService {
       if (!stillConfigured) continue;
 
       this.startWatcher(lib.id, lib.path);
-      await this.scanLibrary(lib.id);
+      this.scheduleScan(lib.id);
     }
+  }
+
+  /** Run a library scan in the background without blocking the caller. */
+  scheduleScan(libraryId: number): void {
+    void this.scanLibrary(libraryId).catch((err) => {
+      console.error(
+        `Background scan failed for library ${libraryId}:`,
+        err instanceof Error ? err.message : err,
+      );
+    });
+  }
+
+  private shouldSkipScanEntry(name: string, isDirectory: boolean): boolean {
+    if (name.startsWith(".")) return true;
+    if (isDirectory && SKIP_SCAN_DIR_NAMES.has(name)) return true;
+    return false;
+  }
+
+  private pathHasSkippedSegment(watchPath: string): boolean {
+    for (const segment of watchPath.split(/[/\\]/)) {
+      if (!segment) continue;
+      if (segment.startsWith(".")) return true;
+      if (SKIP_SCAN_DIR_NAMES.has(segment)) return true;
+    }
+    return false;
+  }
+
+  private shouldWatchPath(
+    watchPath: string,
+    stats?: { isDirectory: () => boolean; isFile: () => boolean },
+  ): boolean {
+    if (this.pathHasSkippedSegment(watchPath)) return true;
+
+    const name = path.basename(watchPath);
+    if (this.shouldSkipScanEntry(name, stats?.isDirectory() ?? false)) {
+      return true;
+    }
+    if (stats?.isFile()) {
+      if (isVideoFile(name) || isSubtitleFile(name)) return false;
+      if (isExcludedFromVideoProbe(name)) return true;
+      const ext = path.extname(name).toLowerCase();
+      if (ext && ext !== "") return true;
+    }
+    return false;
   }
 
   startWatcher(libraryId: number, libraryPath: string): void {
@@ -79,11 +126,23 @@ export class ScannerService {
     }
 
     const watcher = chokidar.watch(libraryPath, {
-      ignored: /(^|[/\\])\../,
+      ignored: (watchPath, stats) => this.shouldWatchPath(watchPath, stats),
       persistent: true,
       ignoreInitial: true,
-      depth: 10,
+      depth: 8,
       followSymlinks: true,
+      ignorePermissionErrors: true,
+      awaitWriteFinish: {
+        stabilityThreshold: 2000,
+        pollInterval: 500,
+      },
+    });
+
+    watcher.on("error", (err) => {
+      console.warn(
+        `File watcher error for library ${libraryId}:`,
+        err instanceof Error ? err.message : err,
+      );
     });
 
     watcher.on("add", async (filePath) => {
@@ -415,7 +474,7 @@ export class ScannerService {
 
     await this.syncConfigLibraries();
     this.startWatcher(lib.id, lib.path);
-    await this.scanLibrary(lib.id);
+    this.scheduleScan(lib.id);
     return lib;
   }
 
@@ -456,7 +515,7 @@ export class ScannerService {
     await this.syncConfigLibraries();
 
     if (pathChanged) {
-      await this.scanLibrary(updated.id);
+      this.scheduleScan(updated.id);
     }
 
     return updated;
@@ -502,6 +561,10 @@ export class ScannerService {
       }
 
       for (const entry of entries) {
+        if (this.shouldSkipScanEntry(entry.name, entry.isDirectory())) {
+          continue;
+        }
+
         const fullPath = path.join(current, entry.name);
 
         if (entry.isDirectory()) {
@@ -526,7 +589,7 @@ export class ScannerService {
 
         if (isVideoFile(entry.name)) {
           results.push(fullPath);
-        } else {
+        } else if (!isExcludedFromVideoProbe(entry.name)) {
           try {
             const size = fs.statSync(fullPath).size;
             if (isUnknownVideoCandidate(entry.name, size)) {

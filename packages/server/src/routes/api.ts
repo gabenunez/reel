@@ -329,14 +329,14 @@ export async function apiRoutes(
     "/api/libraries/:id/scan",
     async (request, reply) => {
       const libraryId = parseInt(request.params.id, 10);
-      try {
-        await scanner.scanLibrary(libraryId);
-        return { success: true };
-      } catch (err) {
-        return reply.status(500).send({
-          error: err instanceof Error ? err.message : "Scan failed",
-        });
+      const lib = await db.query.libraries.findFirst({
+        where: eq(libraries.id, libraryId),
+      });
+      if (!lib) {
+        return reply.status(404).send({ error: "Library not found" });
       }
+      scanner.scheduleScan(libraryId);
+      return { success: true, message: "Scan started" };
     },
   );
 

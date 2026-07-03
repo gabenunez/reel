@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 — 2026-07-03
+
+### Library scanning
+- **Adding a library no longer hangs** — scans run in the background; the API returns immediately
+- **Manual scan** returns right away while progress shows in the UI
+- **File watcher hardening** — ignores source code, dev folders, and non-media files so large non-media trees (e.g. Go source) won't exhaust inotify watchers or crash the server
+- **Scan walks skip** `node_modules`, `.git`, `go1`, and other common dev directories
+
 ## 0.1.1 — 2026-07-03
 
 ### In-app updates
