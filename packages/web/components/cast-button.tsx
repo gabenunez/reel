@@ -5,15 +5,13 @@ import { Cast, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   castMedia,
+  formatCastError,
+  getCastContextHint,
+  isCastBrowser,
   isCastSupported,
   loadCastFramework,
   subscribeToCastState,
 } from "@/lib/cast";
-
-function formatCastErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  return "Cast failed";
-}
 
 interface CastButtonProps {
   disabled?: boolean;
@@ -36,16 +34,21 @@ export function CastButton({ disabled, className, onCast }: CastButtonProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isCastBrowser()) return;
+
+    setAvailable(true);
+
     if (!isCastSupported()) return;
 
     let unsubscribe: (() => void) | undefined;
 
     loadCastFramework()
       .then(() => {
-        setAvailable(true);
         unsubscribe = subscribeToCastState(setConnected);
       })
-      .catch(() => setAvailable(false));
+      .catch((err) => {
+        setError(formatCastError(err).message);
+      });
 
     return () => {
       unsubscribe?.();
@@ -54,19 +57,27 @@ export function CastButton({ disabled, className, onCast }: CastButtonProps) {
 
   const handleCast = useCallback(async () => {
     setError(null);
+
+    const contextHint = getCastContextHint();
+    if (contextHint) {
+      setError(contextHint);
+      return;
+    }
+
     setLoading(true);
     try {
       const media = await onCast();
       await castMedia(media);
     } catch (err) {
-      const message = formatCastErrorMessage(err);
-      setError(message);
+      setError(formatCastError(err).message);
     } finally {
       setLoading(false);
     }
   }, [onCast]);
 
   if (!available) return null;
+
+  const contextHint = getCastContextHint();
 
   return (
     <div className="relative">
@@ -75,7 +86,10 @@ export function CastButton({ disabled, className, onCast }: CastButtonProps) {
         size="sm"
         disabled={disabled || loading}
         onClick={handleCast}
-        title={connected ? "Cast to connected device" : "Cast to TV"}
+        title={
+          contextHint ??
+          (connected ? "Cast to connected device" : "Cast to TV")
+        }
         className={className}
       >
         {loading ? (

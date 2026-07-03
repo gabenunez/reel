@@ -9,7 +9,7 @@ import { movieFiles, tvEpisodes } from "../db/schema.js";
 import {
   startHlsTranscode,
   getHlsSession,
-  waitForCompletePlaylist,
+  waitForPlaylist,
   checkFfmpegAvailable,
   probeFile,
   canDirectCast,
@@ -101,10 +101,10 @@ export async function castRoutes(
         );
       }
 
-      const ready = await waitForCompletePlaylist(session.playlistPath);
+      const ready = await waitForPlaylist(session.playlistPath);
       if (!ready) {
         return reply.status(500).send({
-          error: "Transcoding is still starting — try casting again in a moment",
+          error: "Transcoding failed to start — try casting again in a moment",
         });
       }
 

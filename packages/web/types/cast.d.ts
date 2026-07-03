@@ -51,9 +51,9 @@ declare global {
         DEFAULT_MEDIA_RECEIVER_APP_ID: string;
         MediaInfo: new (contentId: string, contentType: string) => CastMediaInfo;
         GenericMediaMetadata: new () => CastGenericMediaMetadata;
-        LoadMediaRequest: new (mediaInfo: CastMediaInfo) => CastLoadMediaRequest;
+        LoadRequest: new (mediaInfo: CastMediaInfo) => CastLoadRequest;
         TextTrackStyle: new () => CastTextTrackStyle;
-        StreamType: { BUFFERED: string };
+        StreamType: { BUFFERED: string; LIVE: string };
         TrackType: { TEXT: string };
         TextTrackType: { SUBTITLES: string };
       };
@@ -67,6 +67,7 @@ declare global {
         static getInstance(): CastContext;
         setOptions(options: CastContextOptions): void;
         requestSession(): Promise<void>;
+        endCurrentSession(stopCasting: boolean): void;
         getCurrentSession(): CastSession | null;
         addEventListener(
           type: string,
@@ -104,11 +105,7 @@ declare global {
   }
 
   interface CastSession {
-    loadMedia(
-      request: CastLoadMediaRequest,
-      onSuccess?: () => void,
-      onError?: (error: Error) => void,
-    ): void;
+    loadMedia(request: CastLoadRequest): Promise<void>;
   }
 
   interface CastMediaInfo {
@@ -124,7 +121,7 @@ declare global {
     images?: Array<{ url: string }>;
   }
 
-  interface CastLoadMediaRequest {
+  interface CastLoadRequest {
     currentTime?: number;
   }
 

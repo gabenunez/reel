@@ -1,12 +1,19 @@
 let castFrameworkLoaded = false;
+let castOptionsSet = false;
 let castFrameworkLoading: Promise<void> | null = null;
 
 function initializeCastContext(): void {
+  if (castOptionsSet && window.cast?.framework) {
+    castFrameworkLoaded = true;
+    return;
+  }
+
   const context = cast.framework.CastContext.getInstance();
   context.setOptions({
     receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
     autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
   });
+  castOptionsSet = true;
   castFrameworkLoaded = true;
 }
 
@@ -53,14 +60,54 @@ export function loadCastFramework(): Promise<void> {
       script.onerror = () =>
         reject(new Error("Failed to load Google Cast SDK"));
       document.head.appendChild(script);
+      return;
     }
+
+    // Script tag exists but callback may have fired before we registered it.
+    const pollStart = Date.now();
+    const poll = () => {
+      if (window.cast?.framework) {
+        finishInit();
+        return;
+      }
+      if (Date.now() - pollStart > 10_000) {
+        reject(new Error("Google Cast SDK timed out"));
+        return;
+      }
+      setTimeout(poll, 100);
+    };
+    poll();
   });
 
   return castFrameworkLoading;
 }
 
+export function isCastBrowser(): boolean {
+  if (typeof window === "undefined") return false;
+  if (/CrKey/i.test(navigator.userAgent)) return false;
+  return /Chrome|Chromium|Edg/i.test(navigator.userAgent);
+}
+
+export function isCastContextSecure(): boolean {
+  if (typeof window === "undefined") return false;
+  const { hostname } = window.location;
+  return (
+    window.isSecureContext ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.endsWith(".localhost")
+  );
+}
+
+export function getCastContextHint(): string | null {
+  if (!isCastBrowser()) return null;
+  if (isCastContextSecure()) return null;
+  const port = window.location.port || "8096";
+  return `Open http://localhost:${port} in Chrome to enable Chromecast. Media URLs still use your LAN IP automatically.`;
+}
+
 export function isCastSupported(): boolean {
-  return typeof window !== "undefined" && !/CrKey/i.test(navigator.userAgent);
+  return isCastBrowser() && isCastContextSecure();
 }
 
 export interface CastMediaOptions {
@@ -73,39 +120,128 @@ export interface CastMediaOptions {
   startTime?: number;
 }
 
-function formatCastError(err: unknown): Error {
+const CAST_ERROR_HINTS: Record<string, string> = {
+  session_error:
+    "Chromecast couldn't load the video. Make sure your TV and Mac are on the same Wi-Fi, then allow incoming connections for Node/Reel in System Settings → Network → Firewall.",
+  load_media_failed:
+    "Your TV couldn't play this file. Try enabling Transcode in the player, then cast again.",
+  cancel: "Cast cancelled.",
+  receiver_unavailable: "No Chromecast device was found.",
+  timeout: "Cast timed out. Try again.",
+  channel_error: "Lost connection to Chromecast. Try again.",
+};
+
+function normalizeCastErrorCode(err: unknown): string | null {
+  if (typeof err === "string") {
+    return err.toLowerCase();
+  }
+
   if (err && typeof err === "object") {
-    const castErr = err as { description?: string; code?: string | number };
+    const castErr = err as { code?: string | number; description?: string };
+    if (typeof castErr.code === "string") {
+      return castErr.code.toLowerCase();
+    }
+    if (typeof castErr.description === "string") {
+      return castErr.description.toLowerCase();
+    }
+  }
+
+  return null;
+}
+
+function validateCastMediaUrl(url: string): void {
+  const parsed = new URL(url);
+  if (
+    parsed.hostname === "localhost" ||
+    parsed.hostname === "127.0.0.1" ||
+    parsed.hostname.endsWith(".localhost")
+  ) {
+    throw new Error(
+      "Cast URL is localhost — your TV can't reach that. Restart Reel and try again.",
+    );
+  }
+}
+
+async function ensureCastSession(): Promise<CastSession> {
+  const context = cast.framework.CastContext.getInstance();
+  let session = context.getCurrentSession();
+  if (session) {
+    return session;
+  }
+
+  try {
+    await context.requestSession();
+  } catch (err) {
+    throw formatCastError(err);
+  }
+
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    session = context.getCurrentSession();
+    if (session) {
+      return session;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  throw new Error("Could not connect to a Cast device");
+}
+
+export function formatCastError(err: unknown): Error {
+  const code = normalizeCastErrorCode(err);
+  if (code && CAST_ERROR_HINTS[code]) {
+    return new Error(CAST_ERROR_HINTS[code]);
+  }
+
+  if (err instanceof Error) {
+    return err.message ? err : new Error("Cast failed");
+  }
+
+  if (err && typeof err === "object") {
+    const castErr = err as {
+      description?: string;
+      message?: string;
+      code?: string | number;
+    };
     if (castErr.description) {
       return new Error(castErr.description);
     }
+    if (castErr.message) {
+      return new Error(castErr.message);
+    }
     if (castErr.code !== undefined) {
-      return new Error(`Cast failed (code ${castErr.code})`);
+      return new Error(`Cast failed (${String(castErr.code)})`);
+    }
+    try {
+      return new Error(JSON.stringify(err));
+    } catch {
+      // fall through
     }
   }
-  return err instanceof Error ? err : new Error("Cast failed to load media");
+
+  if (typeof err === "string" && err.trim()) {
+    return new Error(err);
+  }
+
+  return new Error("Cast failed to load media");
 }
 
 export async function castMedia(options: CastMediaOptions): Promise<void> {
   await loadCastFramework();
+  validateCastMediaUrl(options.contentUrl);
 
-  const context = cast.framework.CastContext.getInstance();
-  let session = context.getCurrentSession();
-
-  if (!session) {
-    await context.requestSession();
-    session = context.getCurrentSession();
-  }
-
-  if (!session) {
-    throw new Error("Could not connect to a Cast device");
-  }
+  const session = await ensureCastSession();
 
   const mediaInfo = new chrome.cast.media.MediaInfo(
     options.contentUrl,
     options.contentType,
   );
-  mediaInfo.streamType = chrome.cast.media.StreamType.BUFFERED;
+  const isHls =
+    options.contentType.includes("mpegurl") ||
+    options.contentUrl.includes(".m3u8");
+  mediaInfo.streamType = isHls
+    ? chrome.cast.media.StreamType.LIVE
+    : chrome.cast.media.StreamType.BUFFERED;
   mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
   mediaInfo.metadata.title = options.title;
 
@@ -126,21 +262,30 @@ export async function castMedia(options: CastMediaOptions): Promise<void> {
       },
     ];
     mediaInfo.textTrackStyle = new chrome.cast.media.TextTrackStyle();
-    mediaInfo.activeTrackIds = [1];
   }
 
-  const request = new chrome.cast.media.LoadMediaRequest(mediaInfo);
-  if (options.startTime && options.startTime > 0) {
+  const request = new chrome.cast.media.LoadRequest(mediaInfo);
+  if (!isHls && options.startTime && options.startTime > 0) {
     request.currentTime = options.startTime;
   }
 
-  return new Promise((resolve, reject) => {
-    session.loadMedia(
-      request,
-      () => resolve(),
-      (err: unknown) => reject(formatCastError(err)),
-    );
-  });
+  try {
+    await session.loadMedia(request);
+  } catch (err) {
+    const code = normalizeCastErrorCode(err);
+    if (code === "session_error") {
+      const context = cast.framework.CastContext.getInstance();
+      context.endCurrentSession(true);
+      const retrySession = await ensureCastSession();
+      try {
+        await retrySession.loadMedia(request);
+      } catch (retryErr) {
+        throw formatCastError(retryErr);
+      }
+      return;
+    }
+    throw formatCastError(err);
+  }
 }
 
 export function subscribeToCastState(
