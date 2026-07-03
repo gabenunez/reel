@@ -232,7 +232,7 @@ export function WatchClient() {
     };
   }, [fileId, type, activeSubtitle, title, posterPath, subtitles]);
 
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
@@ -241,7 +241,27 @@ export function WatchClient() {
       video.pause();
     }
     revealControls(!video.paused);
-  };
+  }, [revealControls]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      e.preventDefault();
+      togglePlay();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [togglePlay]);
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
@@ -302,11 +322,11 @@ export function WatchClient() {
 
       <div
         className={cn(
-          "absolute inset-0 z-20 flex flex-col justify-between transition-opacity duration-300",
-          showControls ? "opacity-100" : "pointer-events-none opacity-0",
+          "absolute inset-0 z-20 flex flex-col justify-between transition-opacity duration-300 pointer-events-none",
+          showControls ? "opacity-100" : "opacity-0",
         )}
       >
-        <div className="bg-gradient-to-b from-black/90 via-black/40 to-transparent px-4 pb-8 pt-4">
+        <div className="pointer-events-auto bg-gradient-to-b from-black/90 via-black/40 to-transparent px-4 pb-8 pt-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" asChild>
               <Link href={mediaId ? routes.media(parseInt(mediaId, 10)) : "/"}>
@@ -317,7 +337,7 @@ export function WatchClient() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-t from-black/90 via-black/40 to-transparent px-4 pb-4 pt-10">
+        <div className="pointer-events-auto bg-gradient-to-t from-black/90 via-black/40 to-transparent px-4 pb-4 pt-10">
           <div className="mb-3 flex items-center gap-3">
             <input
               type="range"
