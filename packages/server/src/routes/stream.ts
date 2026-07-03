@@ -3,13 +3,14 @@ import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import mime from "mime-types";
 import type { AppConfig } from "@reel/shared";
-import { getAvailableQualities, isBrowserDirectPlayAudioSupported, parseTranscodeQuality } from "@reel/shared";
+import { getAvailableQualities, isBrowserDirectPlayAudioSupported, parseHlsQuality, resolveOriginalPlaybackMode } from "@reel/shared";
 import type { DatabaseInstance } from "../db/index.js";
 import type { SubtitleService } from "../services/subtitles.js";
 import { movieFiles, tvEpisodes, subtitles, watchProgress } from "../db/schema.js";
 import { and, eq } from "drizzle-orm";
 import {
   startHlsTranscode,
+  startHlsRemux,
   resolveHlsSession,
   generateHlsPlaylist,
   isTranscodeInProgress,
@@ -201,6 +202,11 @@ export async function streamRoutes(
         directPlayAudioSupported: isBrowserDirectPlayAudioSupported(
           metadata.audioCodec,
         ),
+        originalPlaybackMode: resolveOriginalPlaybackMode({
+          audioCodec: metadata.audioCodec,
+          videoCodec: metadata.videoCodec,
+          transcodingEnabled: config.transcoding.enabled,
+        }),
         watchProgress: progress
           ? {
               positionMs: progress.positionMs,
@@ -285,7 +291,7 @@ export async function streamRoutes(
 
       const fileId = parseInt(request.params.fileId, 10);
       const type = request.query.type ?? "movie";
-      const quality = parseTranscodeQuality(request.query.quality) ?? "720p";
+      const hlsQuality = parseHlsQuality(request.query.quality) ?? "720p";
       const file = await resolveFile(fileId, type);
 
       if (!file || !fs.existsSync(file.filePath)) {
@@ -293,17 +299,20 @@ export async function streamRoutes(
       }
 
       const sourceHeight = await resolveSourceHeight(file);
-      const available = getAvailableQualities(sourceHeight).filter(
-        (q) => q !== "original",
-      );
-      if (!available.includes(quality)) {
-        return reply.status(400).send({
-          error: `${quality} is not available for this video`,
-        });
+
+      if (hlsQuality !== "remux") {
+        const available = getAvailableQualities(sourceHeight).filter(
+          (q) => q !== "original",
+        );
+        if (!available.includes(hlsQuality)) {
+          return reply.status(400).send({
+            error: `${hlsQuality} is not available for this video`,
+          });
+        }
       }
 
       const startSeconds = parseStartSeconds(request.query.start);
-      const sessionId = createStreamSessionId(type, fileId, quality, startSeconds);
+      const sessionId = createStreamSessionId(type, fileId, hlsQuality, startSeconds);
       const outputDir = path.join(config.transcoding.cache_dir, sessionId);
 
       stopTranscodeSessionsForFile(
@@ -313,18 +322,35 @@ export async function streamRoutes(
         sessionId,
       );
 
+      const [metadata, probe] = await Promise.all([
+        resolveStreamMetadata(file),
+        probeFile(file.filePath),
+      ]);
+
       let session = resolveHlsSession(sessionId, outputDir, startSeconds);
 
       if (!session) {
-        session = startHlsTranscode(
-          sessionId,
-          file.filePath,
-          outputDir,
-          config.transcoding.hls_segment_duration,
-          quality,
-          sourceHeight,
-          startSeconds,
-        );
+        session =
+          hlsQuality === "remux"
+            ? startHlsRemux(
+                sessionId,
+                file.filePath,
+                outputDir,
+                config.transcoding.hls_segment_duration,
+                startSeconds,
+                metadata.videoCodec,
+                probe?.audioStreamIndex,
+              )
+            : startHlsTranscode(
+                sessionId,
+                file.filePath,
+                outputDir,
+                config.transcoding.hls_segment_duration,
+                hlsQuality,
+                sourceHeight,
+                startSeconds,
+                probe?.audioStreamIndex,
+              );
 
         const ready = await waitForFirstSegment(outputDir);
         if (!ready) {
@@ -362,7 +388,7 @@ export async function streamRoutes(
       const rewritten = playlist.replace(
         /segment_\d+\.ts/g,
         (match) => {
-          const segmentPath = `/api/stream/${fileId}/hls/${match}?type=${type}&quality=${quality}&start=${Math.floor(startSeconds)}${tokenSuffix}`;
+          const segmentPath = `/api/stream/${fileId}/hls/${match}?type=${type}&quality=${hlsQuality}&start=${Math.floor(startSeconds)}${tokenSuffix}`;
           return useAbsolute ? toAbsoluteUrl(baseUrl, segmentPath) : segmentPath;
         },
       );
@@ -381,7 +407,7 @@ export async function streamRoutes(
     async (request, reply) => {
       const fileId = parseInt(request.params.fileId, 10);
       const type = request.query.type ?? "movie";
-      const quality = parseTranscodeQuality(request.query.quality) ?? "720p";
+      const quality = parseHlsQuality(request.query.quality) ?? "720p";
       const startSeconds = parseStartSeconds(request.query.start);
       const sessionId = createStreamSessionId(type, fileId, quality, startSeconds);
       const outputDir = path.join(config.transcoding.cache_dir, sessionId);

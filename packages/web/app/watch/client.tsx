@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Hls from "hls.js";
@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { api, type StreamInfo, type StreamQuality } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { getVideoBufferedEnd, getVideoSeekableEnd } from "@/lib/playback-utils";
+import { getVideoBufferedEnd, getVideoSeekableEnd, resolvePlaybackStream, startDirectPlaybackWithResume } from "@/lib/playback-utils";
 import { cn, formatDuration } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CastButton } from "@/components/cast-button";
@@ -134,6 +134,7 @@ export function WatchClient() {
   const containerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const hlsStartOffsetRef = useRef(0);
   const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveProgressRef = useRef<() => void>(() => {});
@@ -180,7 +181,14 @@ export function WatchClient() {
   const [volumeMenuOpen, setVolumeMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [streamInfo, setStreamInfo] = useState<StreamInfo | null>(null);
+  const [audioCompatNotice, setAudioCompatNotice] = useState<string | null>(null);
   const [initialResumeSeconds, setInitialResumeSeconds] = useState<number | null>(null);
+
+  const playbackStream = useMemo(
+    () => resolvePlaybackStream(quality, streamInfo),
+    [quality, streamInfo],
+  );
+  const usingHlsPlayback = playbackStream.usingHls;
 
   useDocumentTitle(title || null);
 
@@ -230,9 +238,9 @@ export function WatchClient() {
 
     const localBufferedEnd = getVideoBufferedEnd(video);
     const absoluteBuffered =
-      quality !== "original" ? hlsStartOffset + localBufferedEnd : localBufferedEnd;
+      usingHlsPlayback ? hlsStartOffset + localBufferedEnd : localBufferedEnd;
     setBufferedSeconds(absoluteBuffered);
-  }, [quality, hlsStartOffset]);
+  }, [usingHlsPlayback, hlsStartOffset]);
 
   const saveProgress = useCallback(() => {
     const video = videoRef.current;
@@ -243,17 +251,16 @@ export function WatchClient() {
     );
     if (!durationMs) return;
 
-    const positionSeconds =
-      quality !== "original"
-        ? hlsStartOffset + video.currentTime
-        : video.currentTime;
+    const positionSeconds = usingHlsPlayback
+      ? hlsStartOffset + video.currentTime
+      : video.currentTime;
     api.saveProgress({
       itemType: type === "movie" ? "movie" : "episode",
       itemId: fileId,
       positionMs: Math.floor(positionSeconds * 1000),
       durationMs,
     }).catch(() => {});
-  }, [fileId, type, quality, hlsStartOffset, sourceDurationMs]);
+  }, [fileId, type, usingHlsPlayback, hlsStartOffset, sourceDurationMs]);
 
   saveProgressRef.current = saveProgress;
 
@@ -261,6 +268,15 @@ export function WatchClient() {
     setStreamStartSeconds(null);
     setStreamGeneration(0);
   }, [fileId, type]);
+
+  useEffect(() => {
+    const playback = resolvePlaybackStream(quality, streamInfo);
+    if (quality === "original" && playback.audioCompatNotice) {
+      setAudioCompatNotice(playback.audioCompatNotice);
+    } else {
+      setAudioCompatNotice(null);
+    }
+  }, [quality, streamInfo]);
 
   useEffect(() => {
     if (!fileId || Number.isNaN(fileId)) return;
@@ -276,6 +292,15 @@ export function WatchClient() {
         setSourceDurationMs(info.durationMs ?? 0);
         setTranscodingEnabled(info.transcodingEnabled);
         setQuality("original");
+
+        const playback = resolvePlaybackStream("original", info);
+        if (!playback.usingHls && playback.audioCompatNotice) {
+          setError(playback.audioCompatNotice);
+          setAudioCompatNotice(null);
+        } else {
+          setError(null);
+          setAudioCompatNotice(playback.audioCompatNotice);
+        }
 
         const positionMs = info.watchProgress?.positionMs ?? 0;
         const durationMs =
@@ -346,7 +371,14 @@ export function WatchClient() {
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !fileId || Number.isNaN(fileId) || initialResumeSeconds === null) return;
+    if (!video || !fileId || Number.isNaN(fileId) || initialResumeSeconds === null || !streamInfo) {
+      return;
+    }
+
+    const playback = resolvePlaybackStream(quality, streamInfo);
+    if (!playback.usingHls && playback.audioCompatNotice) {
+      return;
+    }
 
     setError(null);
     setBuffering(true);
@@ -364,8 +396,10 @@ export function WatchClient() {
     video.load();
 
     const startAt = streamStartSeconds ?? initialResumeSeconds ?? 0;
-    const usingHls = quality !== "original";
+    const stream = resolvePlaybackStream(quality, streamInfo);
+    const usingHls = stream.usingHls;
 
+    hlsStartOffsetRef.current = usingHls ? startAt : 0;
     if (usingHls) {
       setHlsStartOffset(startAt);
     } else {
@@ -374,7 +408,7 @@ export function WatchClient() {
 
     video.pause();
     video.currentTime = 0;
-    setCurrentTime(0);
+    setCurrentTime(usingHls || startAt <= 0 ? 0 : startAt);
 
     const url = api.streamUrl(
       fileId,
@@ -382,16 +416,10 @@ export function WatchClient() {
       quality,
       usingHls ? startAt : undefined,
       streamGeneration,
+      stream.hlsQuality,
     );
 
-    let resumeApplied = false;
-    const applyResume = () => {
-      if (resumeApplied || startAt <= 0 || !video.duration || !Number.isFinite(video.duration)) {
-        return;
-      }
-      resumeApplied = true;
-      video.currentTime = Math.min(startAt, video.duration);
-    };
+    let stopDirectPlayback: (() => void) | null = null;
 
     if (usingHls) {
       if (Hls.isSupported()) {
@@ -424,21 +452,20 @@ export function WatchClient() {
       }
     } else {
       video.src = url;
-      video.onloadeddata = applyResume;
-      video.onloadedmetadata = applyResume;
-      video.play().catch(() => {});
+      stopDirectPlayback = startDirectPlaybackWithResume(video, startAt, {
+        onSeekComplete: (seconds) => setCurrentTime(seconds),
+      });
     }
 
     progressInterval.current = setInterval(() => saveProgressRef.current(), PROGRESS_SAVE_MS);
 
     return () => {
-      video.onloadeddata = null;
-      video.onloadedmetadata = null;
+      stopDirectPlayback?.();
       if (hlsRef.current) hlsRef.current.destroy();
       if (progressInterval.current) clearInterval(progressInterval.current);
       saveProgressRef.current();
     };
-  }, [fileId, type, quality, streamGeneration, streamStartSeconds, initialResumeSeconds]);
+  }, [fileId, type, quality, streamGeneration, streamStartSeconds, initialResumeSeconds, streamInfo]);
 
   useEffect(() => {
     const onPageHide = () => saveProgress();
@@ -450,10 +477,9 @@ export function WatchClient() {
     (nextQuality: StreamQuality) => {
       const video = videoRef.current;
       if (video) {
-        const absoluteTime =
-          quality !== "original"
-            ? hlsStartOffset + video.currentTime
-            : video.currentTime;
+        const absoluteTime = usingHlsPlayback
+          ? hlsStartOffset + video.currentTime
+          : video.currentTime;
         if (absoluteTime > 0) {
           setStreamStartSeconds(absoluteTime);
         }
@@ -462,7 +488,7 @@ export function WatchClient() {
       setQualityMenuOpen(false);
       revealControls(true);
     },
-    [revealControls, quality, hlsStartOffset],
+    [revealControls, usingHlsPlayback, hlsStartOffset],
   );
 
   useEffect(() => {
@@ -499,8 +525,9 @@ export function WatchClient() {
     };
     const onSeeked = () => {
       if (optimisticAbsoluteSeconds === null) return;
-      const actual =
-        quality !== "original" ? hlsStartOffset + video.currentTime : video.currentTime;
+      const actual = usingHlsPlayback
+        ? hlsStartOffset + video.currentTime
+        : video.currentTime;
       if (Math.abs(actual - optimisticAbsoluteSeconds) < 1.5) {
         setOptimisticAbsoluteSeconds(null);
       }
@@ -529,7 +556,7 @@ export function WatchClient() {
       video.removeEventListener("canplay", onCanPlay);
       video.removeEventListener("seeked", onSeeked);
     };
-  }, [revealControls, saveProgress, updateBufferedPosition, optimisticAbsoluteSeconds, quality, hlsStartOffset]);
+  }, [revealControls, saveProgress, updateBufferedPosition, optimisticAbsoluteSeconds, usingHlsPlayback, quality, hlsStartOffset]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -573,9 +600,8 @@ export function WatchClient() {
       posterPath,
       startTimeMs: video
         ? Math.floor(
-            (quality !== "original"
-              ? hlsStartOffset + video.currentTime
-              : video.currentTime) * 1000,
+            (usingHlsPlayback ? hlsStartOffset + video.currentTime : video.currentTime) *
+              1000,
           )
         : 0,
     });
@@ -591,10 +617,10 @@ export function WatchClient() {
       subtitleLanguage: subtitles.find((s) => s.id === activeSubtitle)?.language,
       startTime: prepared.startTime,
     };
-  }, [fileId, type, activeSubtitle, title, posterPath, subtitles, quality, hlsStartOffset]);
+  }, [fileId, type, activeSubtitle, title, posterPath, subtitles, usingHlsPlayback, hlsStartOffset]);
 
   const absoluteCurrentTime =
-    quality !== "original" ? hlsStartOffset + currentTime : currentTime;
+    usingHlsPlayback ? hlsStartOffsetRef.current + currentTime : currentTime;
   const absoluteDurationMs = sourceDurationMs || duration * 1000;
   const totalDurationSeconds =
     absoluteDurationMs > 0 ? absoluteDurationMs / 1000 : 0;
@@ -631,7 +657,7 @@ export function WatchClient() {
       const clamped = Math.max(0, Math.min(targetSeconds, totalDurationSeconds));
       setOptimisticAbsoluteSeconds(clamped);
 
-      if (quality === "original") {
+      if (!usingHlsPlayback) {
         video.currentTime = clamped;
         revealControls(true);
         return;
@@ -662,7 +688,7 @@ export function WatchClient() {
     },
     [
       totalDurationSeconds,
-      quality,
+      usingHlsPlayback,
       hlsStartOffset,
       revealControls,
     ],
@@ -684,18 +710,20 @@ export function WatchClient() {
     },
     [absoluteCurrentTime, seekToAbsolute],
   );
-  const isPreparing = initialResumeSeconds === null;
+  const isPreparing = initialResumeSeconds === null || !streamInfo;
   const showLoadingOverlay =
     (isPreparing || buffering) &&
     !error &&
-    !(quality === "original" && optimisticAbsoluteSeconds !== null);
+    !(!usingHlsPlayback && optimisticAbsoluteSeconds !== null);
   const loadingMessage = isPreparing
     ? "Preparing playback..."
     : bufferingMidPlayback
       ? "Buffering..."
-      : quality !== "original"
-        ? `Starting ${quality.toUpperCase()} stream...`
-        : "Loading video...";
+      : usingHlsPlayback && quality === "original"
+        ? "Preparing original stream..."
+        : usingHlsPlayback
+          ? `Starting ${(playbackStream.hlsQuality ?? quality).toUpperCase()} stream...`
+          : "Loading video...";
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
@@ -816,6 +844,12 @@ export function WatchClient() {
         preload="auto"
         onClick={togglePlay}
       />
+
+      {audioCompatNotice && !error && (
+        <div className="pointer-events-none absolute left-1/2 top-20 z-20 max-w-lg -translate-x-1/2 rounded-md border border-white/15 bg-background/85 px-4 py-2 text-center text-xs text-white/90 backdrop-blur">
+          {audioCompatNotice}
+        </div>
+      )}
 
       {showLoadingOverlay && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">

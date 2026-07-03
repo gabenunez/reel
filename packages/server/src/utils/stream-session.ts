@@ -1,9 +1,9 @@
-import type { TranscodeQuality } from "@reel/shared";
+import type { HlsQuality } from "@reel/shared";
 
 export function createStreamSessionId(
   type: "movie" | "episode",
   fileId: number,
-  quality: TranscodeQuality,
+  quality: HlsQuality,
   startSeconds = 0,
 ): string {
   const start = Math.max(0, Math.floor(startSeconds));
@@ -13,7 +13,7 @@ export function createStreamSessionId(
 export function createStreamSessionPrefix(
   type: "movie" | "episode",
   fileId: number,
-  quality: TranscodeQuality,
+  quality: HlsQuality,
 ): string {
   return `${type}-${fileId}-${quality}-`;
 }

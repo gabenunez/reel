@@ -2,7 +2,7 @@ import { execFile, execSync, spawn, type ChildProcess } from "node:child_process
 import { promisify } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
-import type { TranscodeQuality } from "@reel/shared";
+import type { HlsQuality, TranscodeQuality } from "@reel/shared";
 import {
   TRANSCODE_PRESETS,
   effectiveTranscodeHeight,
@@ -18,6 +18,7 @@ export interface ProbeResult {
   durationMs: number;
   videoCodec?: string;
   audioCodec?: string;
+  audioStreamIndex?: number;
   width?: number;
   height?: number;
   bitrate?: number;
@@ -27,6 +28,47 @@ export interface ProbeResult {
     title?: string;
     codec?: string;
   }>;
+}
+
+type FfprobeStream = {
+  index?: number;
+  codec_type?: string;
+  codec_name?: string;
+  width?: number;
+  height?: number;
+  disposition?: { default?: number; original?: number };
+  tags?: { language?: string; title?: string };
+};
+
+function scoreAudioStream(stream: FfprobeStream): number {
+  let score = 0;
+  if (stream.disposition?.default) score += 100;
+  if (stream.disposition?.original) score += 50;
+
+  const title = stream.tags?.title ?? "";
+  if (/(commentary|descr|description|visual impaired|hi)/i.test(title)) {
+    score -= 200;
+  }
+
+  return score;
+}
+
+function pickAudioStream(
+  streams: FfprobeStream[] | undefined,
+): FfprobeStream | null {
+  const audioStreams = (streams ?? []).filter((s) => s.codec_type === "audio");
+  if (!audioStreams.length) return null;
+
+  return [...audioStreams].sort(
+    (a, b) => scoreAudioStream(b) - scoreAudioStream(a),
+  )[0];
+}
+
+function audioMapArgs(audioStreamIndex?: number | null): string[] {
+  if (audioStreamIndex != null && audioStreamIndex >= 0) {
+    return ["-map", `0:${audioStreamIndex}`];
+  }
+  return ["-map", "0:a:0?"];
 }
 
 export async function checkFfmpegAvailable(): Promise<boolean> {
@@ -53,17 +95,11 @@ export async function probeFile(filePath: string): Promise<ProbeResult | null> {
 
     const data = JSON.parse(stdout) as {
       format?: { duration?: string; bit_rate?: string };
-      streams?: Array<{
-        codec_type?: string;
-        codec_name?: string;
-        width?: number;
-        height?: number;
-        tags?: { language?: string; title?: string };
-      }>;
+      streams?: FfprobeStream[];
     };
 
     const videoStream = data.streams?.find((s) => s.codec_type === "video");
-    const audioStream = data.streams?.find((s) => s.codec_type === "audio");
+    const audioStream = pickAudioStream(data.streams);
     const subtitleStreams =
       data.streams
         ?.map((s, index) => ({ ...s, index }))
@@ -81,6 +117,7 @@ export async function probeFile(filePath: string): Promise<ProbeResult | null> {
       durationMs: Math.round(durationSec * 1000),
       videoCodec: videoStream?.codec_name,
       audioCodec: audioStream?.codec_name,
+      audioStreamIndex: audioStream?.index,
       width: videoStream?.width,
       height: videoStream?.height,
       bitrate: data.format?.bit_rate
@@ -177,6 +214,7 @@ export function startHlsTranscode(
   quality: TranscodeQuality,
   sourceHeight?: number | null,
   startSeconds = 0,
+  audioStreamIndex?: number | null,
 ): HlsSession {
   enforceTranscodeCapacity(sessionId);
   stopHlsSession(sessionId);
@@ -207,8 +245,7 @@ export function startHlsTranscode(
     filePath,
     "-map",
     "0:v:0",
-    "-map",
-    "0:a:0?",
+    ...audioMapArgs(audioStreamIndex),
     "-vf",
     `scale=-2:${height}`,
     "-c:v",
@@ -233,6 +270,8 @@ export function startHlsTranscode(
     preset.audioBitrate,
     "-ac",
     "2",
+    "-ar",
+    "48000",
     "-f",
     "hls",
     "-hls_time",
@@ -274,6 +313,117 @@ export function startHlsTranscode(
     closeLog();
     activeSessions.delete(sessionId);
     console.warn(`HLS transcode failed for session ${sessionId}:`, err.message);
+  });
+
+  return session;
+}
+
+function hlsVideoCopyArgs(videoCodec?: string | null, filePath?: string): string[] {
+  const normalized = videoCodec?.toLowerCase().split(".")[0]?.split("_")[0];
+  const ext = filePath?.toLowerCase().slice(filePath.lastIndexOf(".")) ?? "";
+
+  if (normalized === "h264" || normalized === "avc1") {
+    const args = ["-c:v", "copy"];
+    if (ext === ".mp4" || ext === ".m4v" || ext === ".mov") {
+      args.push("-bsf:v", "h264_mp4toannexb");
+    }
+    return args;
+  }
+
+  if (normalized === "hevc" || normalized === "h265") {
+    const args = ["-c:v", "copy"];
+    if (ext === ".mp4" || ext === ".m4v" || ext === ".mov") {
+      args.push("-bsf:v", "hevc_mp4toannexb");
+    }
+    return args;
+  }
+
+  return ["-c:v", "copy"];
+}
+
+export function startHlsRemux(
+  sessionId: string,
+  filePath: string,
+  outputDir: string,
+  segmentDuration: number,
+  startSeconds = 0,
+  videoCodec?: string | null,
+  audioStreamIndex?: number | null,
+): HlsSession {
+  enforceTranscodeCapacity(sessionId);
+  stopHlsSession(sessionId);
+  fs.mkdirSync(outputDir, { recursive: true });
+  const playlistPath = `${outputDir}/master.m3u8`;
+
+  clearTranscodeOutput(outputDir);
+  writeStartOffset(outputDir, startSeconds);
+
+  const logPath = `${outputDir}/ffmpeg.log`;
+  const logStream = fs.openSync(logPath, "a");
+  let logClosed = false;
+  const closeLog = () => {
+    if (!logClosed) {
+      logClosed = true;
+      fs.closeSync(logStream);
+    }
+  };
+
+  const args = ["-y"];
+  if (startSeconds > 0) {
+    args.push("-ss", String(startSeconds));
+  }
+  args.push("-i", filePath, "-map", "0:v:0", ...audioMapArgs(audioStreamIndex));
+  args.push(...hlsVideoCopyArgs(videoCodec, filePath));
+  args.push(
+    "-c:a",
+    "aac",
+    "-b:a",
+    "192k",
+    "-ac",
+    "2",
+    "-ar",
+    "48000",
+    "-f",
+    "hls",
+    "-hls_time",
+    String(segmentDuration),
+    "-hls_list_size",
+    "0",
+    "-hls_playlist_type",
+    "event",
+    "-hls_flags",
+    "independent_segments+append_list",
+    "-hls_segment_filename",
+    `${outputDir}/segment_%03d.ts`,
+    playlistPath,
+  );
+
+  const process = spawn("ffmpeg", args, {
+    stdio: ["ignore", logStream, logStream],
+  });
+
+  const session: HlsSession = {
+    id: sessionId,
+    process,
+    outputDir,
+    playlistPath,
+    lastAccess: Date.now(),
+  };
+
+  activeSessions.set(sessionId, session);
+
+  process.on("close", (code) => {
+    closeLog();
+    activeSessions.delete(sessionId);
+    if (code !== 0 && code !== null) {
+      console.warn(`HLS remux exited with code ${code} for session ${sessionId}`);
+    }
+  });
+
+  process.on("error", (err) => {
+    closeLog();
+    activeSessions.delete(sessionId);
+    console.warn(`HLS remux failed for session ${sessionId}:`, err.message);
   });
 
   return session;

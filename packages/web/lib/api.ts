@@ -219,6 +219,7 @@ export interface StreamInfo {
   availableQualities: StreamQuality[];
   transcodingEnabled: boolean;
   directPlayAudioSupported: boolean;
+  originalPlaybackMode?: "direct" | "remux" | "transcode" | "unsupported";
   watchProgress?: {
     positionMs: number;
     durationMs?: number | null;
@@ -469,11 +470,13 @@ export const api = {
     quality: StreamQuality = "original",
     startSeconds?: number,
     cacheKey?: number,
+    hlsQuality?: StreamQuality | "remux",
   ) => {
-    if (quality === "original") {
+    if (quality === "original" && !hlsQuality) {
       return `${API_BASE}/api/stream/${fileId}?type=${type}`;
     }
-    const params = new URLSearchParams({ type, quality });
+    const effectiveQuality = hlsQuality ?? quality;
+    const params = new URLSearchParams({ type, quality: effectiveQuality });
     params.set("start", String(Math.floor(Math.max(0, startSeconds ?? 0))));
     if (cacheKey !== undefined) {
       params.set("_", String(cacheKey));

@@ -2,6 +2,9 @@ export type StreamQuality = "original" | "480p" | "720p" | "1080p";
 
 export type TranscodeQuality = Exclude<StreamQuality, "original">;
 
+/** HLS session quality — includes remux (source video + AAC audio). */
+export type HlsQuality = TranscodeQuality | "remux";
+
 export interface TranscodePreset {
   label: string;
   maxHeight: number;
@@ -47,6 +50,11 @@ export function parseTranscodeQuality(value?: string | null): TranscodeQuality |
     return value;
   }
   return null;
+}
+
+export function parseHlsQuality(value?: string | null): HlsQuality | null {
+  if (value === "remux") return "remux";
+  return parseTranscodeQuality(value);
 }
 
 export function getAvailableQualities(sourceHeight?: number | null): StreamQuality[] {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.28 — 2026-07-03
+
+### Playback
+- **Universal audio compatibility** — any non-AAC/MP3 audio (TrueHD, DTS, AC3, FLAC, PCM, etc.) is automatically converted to AAC on Original quality via remux or transcode
+- **HEVC remux** — H.264/HEVC video stays at source quality while audio is converted; falls back to transcoded H.264 on browsers without HEVC support
+- **Resume fix** — resuming playback no longer flashes 0:00; player seeks to the saved position before starting
+- Smarter audio track selection (default track, skips commentary) and standardized AAC output at 48 kHz
+
 ## 0.1.27 — 2026-07-03
 
 ### Playback

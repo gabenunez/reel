@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Hls from "hls.js";
 import { ChevronLeft, Loader2, Pause, Play } from "lucide-react";
@@ -10,6 +10,8 @@ import {
   buildPlaybackTitle,
   getVideoSeekableEnd,
   PROGRESS_SAVE_MS,
+  resolvePlaybackStream,
+  startDirectPlaybackWithResume,
   type PlaybackMediaDetail,
 } from "@/lib/playback-utils";
 import { TvFocusLink } from "@/components/tv/tv-focus-link";
@@ -25,6 +27,7 @@ export function TvWatchClient() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const hlsStartOffsetRef = useRef(0);
   const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveProgressRef = useRef<() => void>(() => {});
@@ -42,7 +45,14 @@ export function TvWatchClient() {
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
+  const [streamInfo, setStreamInfo] = useState<StreamInfo | null>(null);
   const [initialResumeSeconds, setInitialResumeSeconds] = useState<number | null>(null);
+
+  const playbackStream = useMemo(
+    () => resolvePlaybackStream(quality, streamInfo),
+    [quality, streamInfo],
+  );
+  const usingHlsPlayback = playbackStream.usingHls;
 
   const backHref =
     mediaId && !Number.isNaN(parseInt(mediaId, 10))
@@ -69,8 +79,9 @@ export function TvWatchClient() {
     );
     if (!durationMs) return;
 
-    const positionSeconds =
-      quality !== "original" ? hlsStartOffset + video.currentTime : video.currentTime;
+    const positionSeconds = usingHlsPlayback
+      ? hlsStartOffset + video.currentTime
+      : video.currentTime;
 
     api
       .saveProgress({
@@ -80,7 +91,7 @@ export function TvWatchClient() {
         durationMs,
       })
       .catch(() => {});
-  }, [fileId, type, quality, hlsStartOffset, sourceDurationMs]);
+  }, [fileId, type, usingHlsPlayback, hlsStartOffset, sourceDurationMs]);
 
   saveProgressRef.current = saveProgress;
 
@@ -98,8 +109,16 @@ export function TvWatchClient() {
     api
       .getStreamInfo(fileId, type === "movie" ? "movie" : "episode")
       .then((info: StreamInfo) => {
+        setStreamInfo(info);
         setSourceDurationMs(info.durationMs ?? 0);
         setQuality("original");
+
+        const playback = resolvePlaybackStream("original", info);
+        if (!playback.usingHls && playback.audioCompatNotice) {
+          setError(playback.audioCompatNotice);
+        } else {
+          setError(null);
+        }
 
         const positionMs = info.watchProgress?.positionMs ?? 0;
         const durationMs = info.watchProgress?.durationMs ?? info.durationMs ?? 0;
@@ -129,7 +148,14 @@ export function TvWatchClient() {
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !fileId || Number.isNaN(fileId) || initialResumeSeconds === null) return;
+    if (!video || !fileId || Number.isNaN(fileId) || initialResumeSeconds === null || !streamInfo) {
+      return;
+    }
+
+    const playback = resolvePlaybackStream(quality, streamInfo);
+    if (!playback.usingHls && playback.audioCompatNotice) {
+      return;
+    }
 
     setError(null);
     setBuffering(true);
@@ -143,8 +169,10 @@ export function TvWatchClient() {
     video.load();
 
     const startAt = streamStartSeconds ?? initialResumeSeconds ?? 0;
-    const usingHls = quality !== "original";
+    const stream = resolvePlaybackStream(quality, streamInfo);
+    const usingHls = stream.usingHls;
 
+    hlsStartOffsetRef.current = usingHls ? startAt : 0;
     if (usingHls) {
       setHlsStartOffset(startAt);
     } else {
@@ -153,7 +181,7 @@ export function TvWatchClient() {
 
     video.pause();
     video.currentTime = 0;
-    setCurrentTime(0);
+    setCurrentTime(usingHls || startAt <= 0 ? 0 : startAt);
 
     const url = api.streamUrl(
       fileId,
@@ -161,7 +189,10 @@ export function TvWatchClient() {
       quality,
       usingHls ? startAt : undefined,
       streamGeneration,
+      stream.hlsQuality,
     );
+
+    let stopDirectPlayback: (() => void) | null = null;
 
     if (usingHls) {
       if (Hls.isSupported()) {
@@ -187,31 +218,21 @@ export function TvWatchClient() {
         setError("HLS not supported on this device");
       }
     } else {
-      let resumeApplied = false;
-      const applyResume = () => {
-        if (resumeApplied || startAt <= 0 || !video.duration || !Number.isFinite(video.duration)) {
-          return;
-        }
-        resumeApplied = true;
-        video.currentTime = Math.min(startAt, video.duration);
-      };
-
       video.src = url;
-      video.onloadeddata = applyResume;
-      video.onloadedmetadata = applyResume;
-      video.play().catch(() => {});
+      stopDirectPlayback = startDirectPlaybackWithResume(video, startAt, {
+        onSeekComplete: (seconds) => setCurrentTime(seconds),
+      });
     }
 
     progressInterval.current = setInterval(() => saveProgressRef.current(), PROGRESS_SAVE_MS);
 
     return () => {
-      video.onloadeddata = null;
-      video.onloadedmetadata = null;
+      stopDirectPlayback?.();
       if (hlsRef.current) hlsRef.current.destroy();
       if (progressInterval.current) clearInterval(progressInterval.current);
       saveProgressRef.current();
     };
-  }, [fileId, type, quality, streamGeneration, streamStartSeconds, initialResumeSeconds]);
+  }, [fileId, type, quality, streamGeneration, streamStartSeconds, initialResumeSeconds, streamInfo]);
 
   useEffect(() => {
     const onPageHide = () => saveProgress();
@@ -220,7 +241,7 @@ export function TvWatchClient() {
   }, [saveProgress]);
 
   const absoluteCurrentTime =
-    quality !== "original" ? hlsStartOffset + currentTime : currentTime;
+    usingHlsPlayback ? hlsStartOffsetRef.current + currentTime : currentTime;
   const absoluteDurationMs = sourceDurationMs || duration * 1000;
   const totalDurationSeconds =
     absoluteDurationMs > 0 ? absoluteDurationMs / 1000 : 0;
@@ -234,7 +255,7 @@ export function TvWatchClient() {
 
       const clamped = Math.max(0, Math.min(seconds, totalDurationSeconds));
 
-      if (quality === "original") {
+      if (!usingHlsPlayback) {
         video.currentTime = clamped;
         revealControls(true);
         return;
@@ -263,7 +284,7 @@ export function TvWatchClient() {
       setBuffering(true);
       revealControls(true);
     },
-    [quality, totalDurationSeconds, hlsStartOffset, revealControls],
+    [usingHlsPlayback, totalDurationSeconds, hlsStartOffset, revealControls],
   );
 
   seekToAbsoluteRef.current = seekToAbsolute;
