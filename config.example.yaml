@@ -1,0 +1,22 @@
+server:
+  port: 8096
+  host: 0.0.0.0
+
+libraries:
+  - name: Movies
+    type: movies
+    path: /path/to/movies
+  - name: TV Shows
+    type: tv
+    path: /path/to/tv
+
+metadata:
+  tmdb_api_key: YOUR_KEY_HERE
+  language: en-US
+
+transcoding:
+  enabled: true
+  hls_segment_duration: 6
+  cache_dir: ./data/transcode-cache
+
+data_dir: ./data

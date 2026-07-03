@@ -1,0 +1,24 @@
+{
+  "name": "reel",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "start": "pnpm --filter @reel/server start",
+    "db:generate": "pnpm --filter @reel/server db:generate",
+    "db:migrate": "pnpm --filter @reel/server db:migrate",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@10.26.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3"]
+  }
+}

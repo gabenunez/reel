@@ -1,0 +1,17 @@
+[Unit]
+Description=Reel Media Server
+After=network.target
+
+[Service]
+Type=simple
+User=reel
+Group=reel
+WorkingDirectory=/opt/reel
+ExecStart=/usr/bin/node packages/server/dist/index.js
+Restart=on-failure
+RestartSec=10
+Environment=NODE_ENV=production
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=multi-user.target

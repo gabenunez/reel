@@ -1,0 +1,17 @@
+node_modules/
+dist/
+packages/*/dist/
+out/
+packages/web/out/
+.next/
+.turbo/
+data/
+*.db
+*.db-journal
+config.yaml
+.env
+.env.local
+.env*.local
+.DS_Store
+*.log
+pnpm-debug.log*

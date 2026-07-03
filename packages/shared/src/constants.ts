@@ -1,0 +1,130 @@
+export const VIDEO_EXTENSIONS = new Set([
+  // Common containers
+  ".mkv",
+  ".mp4",
+  ".m4v",
+  ".mov",
+  ".avi",
+  ".webm",
+  ".wmv",
+  ".flv",
+  ".f4v",
+  // MPEG transport / broadcast
+  ".ts",
+  ".m2ts",
+  ".mts",
+  ".m2t",
+  ".trp",
+  ".tp",
+  // MPEG program stream
+  ".mpg",
+  ".mpeg",
+  ".mpe",
+  ".mpv",
+  ".mpv2",
+  ".m2v",
+  // Legacy / niche
+  ".divx",
+  ".xvid",
+  ".3gp",
+  ".3g2",
+  ".ogv",
+  ".ogm",
+  ".vob",
+  ".asf",
+  ".rm",
+  ".rmvb",
+  ".dv",
+  ".mxf",
+  ".nut",
+  ".wtv",
+  ".dvr-ms",
+  ".rec",
+  ".dvr",
+  ".mod",
+  // Disc images (FFmpeg can often read these)
+  ".iso",
+  ".img",
+  ".bin",
+]);
+
+/** Extensions we should never treat as video (skip FFprobe during scans). */
+export const NON_VIDEO_EXTENSIONS = new Set([
+  // Subtitles
+  ".srt",
+  ".vtt",
+  ".ass",
+  ".ssa",
+  ".sub",
+  ".idx",
+  ".sup",
+  ".smi",
+  ".txt",
+  // Audio
+  ".mp3",
+  ".flac",
+  ".aac",
+  ".m4a",
+  ".m4b",
+  ".ogg",
+  ".opus",
+  ".wav",
+  ".wma",
+  ".ape",
+  ".alac",
+  // Images
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".bmp",
+  ".tiff",
+  ".tif",
+  // Metadata / sidecar
+  ".nfo",
+  ".xml",
+  ".json",
+  ".yaml",
+  ".yml",
+  ".csv",
+  ".sfv",
+  ".md5",
+  ".sha1",
+  ".srr",
+  ".rar",
+  ".zip",
+  ".7z",
+  ".tar",
+  ".gz",
+  ".exe",
+  ".dmg",
+  ".pkg",
+  ".deb",
+  ".torrent",
+  ".strm",
+  ".lnk",
+  ".url",
+  ".ds_store",
+]);
+
+export const SUBTITLE_EXTENSIONS = new Set([
+  ".srt",
+  ".vtt",
+  ".ass",
+  ".ssa",
+  ".sub",
+  ".idx",
+  ".smi",
+]);
+
+export const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
+export const TMDB_POSTER_SIZE = "w500";
+export const TMDB_BACKDROP_SIZE = "w1280";
+export const TMDB_PROFILE_SIZE = "w185";
+
+export const DEFAULT_PORT = 8096;
+export const DEFAULT_LANGUAGE = "en-US";
+
+/** Minimum file size (bytes) before probing unknown extensions. */
+export const MIN_PROBE_FILE_SIZE = 512 * 1024;
