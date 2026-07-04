@@ -96,7 +96,7 @@ export function SubtitleSearchDialog({
     return (
       <div
         data-tv-watch-menu=""
-        className="fixed inset-0 z-50 flex flex-col bg-background/98 backdrop-blur-xl"
+        className="fixed inset-0 z-50 flex flex-col bg-background"
       >
         <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
           <div className="min-w-0">

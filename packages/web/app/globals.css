@@ -98,29 +98,26 @@
     overflow: hidden;
     --tv-focus-glow:
       0 0 0 2px hsl(var(--background)),
-      0 0 0 4px hsl(var(--primary)),
-      0 0 20px hsl(var(--primary) / 0.25);
+      0 0 0 4px hsl(var(--primary));
     --tv-focus-glow-strong:
       0 0 0 2px hsl(var(--background)),
-      0 0 0 4px hsl(var(--primary)),
-      0 0 24px hsl(var(--primary) / 0.3);
-    /* Compact ring for buttons/chips — stays inside the layout box */
-    --tv-focus-ring-compact:
-      inset 0 0 0 2px hsl(var(--primary-foreground) / 0.18),
-      0 0 0 2px hsl(var(--primary));
-    --tv-focus-ring-compact-strong:
-      inset 0 0 0 2px hsl(var(--primary-foreground) / 0.28),
-      0 0 0 3px hsl(var(--primary)),
-      0 0 12px hsl(var(--primary) / 0.22);
+      0 0 0 4px hsl(var(--primary));
+    /* Outer ring only — inset shadows render poorly on Android TV WebView */
+    --tv-focus-ring-compact: 0 0 0 2px hsl(var(--primary));
+    --tv-focus-ring-compact-strong: 0 0 0 3px hsl(var(--primary));
     --tv-poster-focus-ring:
       0 0 0 2px hsl(var(--background)),
       0 0 0 3px hsl(var(--primary));
+    --tv-focus-border: 2px solid hsl(var(--primary));
+    --tv-focus-border-selected: 2px solid hsl(var(--primary) / 0.55);
   }
 
   /* —— Side nav —— */
   .tv-ui [data-tv-item].tv-focus-nav {
     color: hsl(var(--muted-foreground));
     background-color: transparent;
+    border: 2px solid transparent;
+    box-shadow: none;
   }
 
   .tv-ui [data-tv-item].tv-focus-nav[data-tv-nav-active]:not([data-tv-focused]) {
@@ -131,7 +128,8 @@
   .tv-ui [data-tv-item].tv-focus-nav[data-tv-focused] {
     background-color: hsl(var(--primary));
     color: hsl(var(--primary-foreground));
-    box-shadow: var(--tv-focus-ring-compact-strong);
+    border-color: hsl(var(--accent));
+    box-shadow: none;
     transform: none;
   }
 
@@ -139,11 +137,14 @@
   .tv-ui [data-tv-item].tv-focus-button {
     background-color: hsl(var(--muted) / 0.65);
     color: hsl(var(--foreground));
+    border: 2px solid transparent;
+    box-shadow: none;
   }
 
   .tv-ui [data-tv-item].tv-focus-button[data-tv-focused] {
     background-color: hsl(var(--primary) / 0.2);
-    box-shadow: var(--tv-focus-ring-compact);
+    border-color: hsl(var(--primary));
+    box-shadow: none;
     transform: none;
   }
 
@@ -152,19 +153,23 @@
     background-color: hsl(var(--muted) / 0.55);
     color: hsl(var(--foreground));
     font-weight: 500;
+    border: 2px solid transparent;
+    box-shadow: none;
   }
 
   .tv-ui [data-tv-item].tv-focus-chip[data-tv-selected]:not([data-tv-focused]) {
     background-color: hsl(var(--primary) / 0.7);
     color: hsl(var(--primary-foreground));
     font-weight: 600;
+    border-color: hsl(var(--primary) / 0.45);
   }
 
   .tv-ui [data-tv-item].tv-focus-chip[data-tv-selected][data-tv-focused],
   .tv-ui [data-tv-item].tv-focus-chip[data-tv-focused] {
     background-color: hsl(var(--primary));
     color: hsl(var(--primary-foreground));
-    box-shadow: var(--tv-focus-ring-compact-strong);
+    border-color: hsl(var(--accent));
+    box-shadow: none;
     transform: none;
     font-weight: 600;
   }
@@ -172,23 +177,28 @@
   /* —— List / episode cards —— */
   .tv-ui [data-tv-item].tv-focus-card {
     background-color: hsl(var(--muted) / 0.25);
+    border: 2px solid transparent;
+    box-shadow: none;
   }
 
   .tv-ui [data-tv-item].tv-focus-card[data-tv-selected]:not([data-tv-focused]) {
     background-color: hsl(var(--primary) / 0.85);
     color: hsl(var(--primary-foreground));
+    border-color: hsl(var(--primary) / 0.55);
   }
 
   .tv-ui [data-tv-item].tv-focus-card[data-tv-focused] {
     background-color: hsl(var(--primary) / 0.18);
-    box-shadow: var(--tv-focus-ring-compact);
+    border-color: hsl(var(--primary));
+    box-shadow: none;
     transform: none;
   }
 
   .tv-ui [data-tv-item].tv-focus-card[data-tv-selected][data-tv-focused] {
     background-color: hsl(var(--primary));
     color: hsl(var(--primary-foreground));
-    box-shadow: var(--tv-focus-ring-compact-strong);
+    border-color: hsl(var(--accent));
+    box-shadow: none;
     transform: none;
   }
 
@@ -200,10 +210,11 @@
     margin-block: 0.1875rem;
   }
 
-  /* Primary-filled action buttons keep their fill; focus adds ring on top */
+  /* Primary-filled action buttons keep their fill; focus adds border on top */
   .tv-ui [data-tv-item].tv-focus-button.bg-primary[data-tv-focused],
   .tv-ui [data-tv-item].tv-focus-card.bg-primary[data-tv-focused] {
-    box-shadow: var(--tv-focus-ring-compact-strong);
+    border-color: hsl(var(--accent));
+    box-shadow: none;
     transform: none;
   }
 
@@ -224,9 +235,8 @@
     padding-bottom: 0.125rem;
   }
 
-  .tv-ui .tv-row-section:has([data-tv-focused]) h2,
-  .tv-ui .tv-row-section:has(:focus) h2 {
-    color: hsl(var(--foreground));
+  .tv-ui .tv-row-section h2 {
+    color: hsl(var(--muted-foreground));
   }
 
   .tv-ui .tv-poster-art {
@@ -372,35 +382,59 @@
   .tv-ui [data-tv-watch-controls] [data-tv-item] {
     background-color: rgba(255, 255, 255, 0.12);
     color: white;
-    transition:
-      background-color 150ms ease-out,
-      box-shadow 150ms ease-out,
-      transform 150ms ease-out;
+    border: 2px solid transparent;
+    box-shadow: none;
+    transition: background-color 75ms ease-out, border-color 75ms ease-out;
   }
 
   .tv-ui [data-tv-watch-controls] [data-tv-watch-scrub] {
     background-color: rgba(255, 255, 255, 0.2);
+    border-color: transparent;
   }
 
   .tv-ui [data-tv-watch-controls] [data-tv-item][data-tv-focused]:not([data-tv-watch-scrub]) {
     background-color: hsl(var(--primary) / 0.45);
-    box-shadow: var(--tv-focus-ring-compact-strong);
+    border-color: hsl(var(--primary));
+    box-shadow: none;
     transform: none;
+  }
+
+  .tv-ui [data-tv-watch-menu] [data-tv-vertical] {
+    padding-block: 0.25rem;
+    scroll-padding-block: 0.75rem;
   }
 
   .tv-ui [data-tv-watch-menu] [data-tv-item].tv-focus-card {
     background-color: hsl(var(--muted) / 0.35);
     color: white;
+    border: 2px solid transparent;
+    box-shadow: none;
   }
 
   .tv-ui [data-tv-watch-menu] [data-tv-item].tv-focus-card[data-tv-selected]:not([data-tv-focused]) {
     background-color: hsl(var(--primary) / 0.75);
     color: hsl(var(--primary-foreground));
+    border-color: hsl(var(--primary) / 0.55);
   }
 
-  .tv-ui [data-tv-watch-menu] [data-tv-item][data-tv-focused] {
-    box-shadow: var(--tv-focus-ring-compact);
+  .tv-ui [data-tv-watch-menu] [data-tv-item].tv-focus-card[data-tv-focused] {
+    background-color: hsl(var(--primary) / 0.22);
+    border-color: hsl(var(--primary));
+    box-shadow: none;
     transform: none;
+  }
+
+  .tv-ui [data-tv-watch-menu] [data-tv-item].tv-focus-card[data-tv-selected][data-tv-focused] {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border-color: hsl(var(--accent));
+    box-shadow: none;
+    transform: none;
+  }
+
+  .tv-ui [data-tv-watch-menu] [data-tv-item].tv-focus-button[data-tv-focused] {
+    border-color: hsl(var(--primary));
+    box-shadow: none;
   }
 
   .tv-ui [data-tv-watch-scrub][data-tv-focused] {

@@ -1353,7 +1353,7 @@ export function TvWatchView() {
       {subtitleMenuOpen && (
         <div
           data-tv-watch-menu=""
-          className="absolute inset-x-0 bottom-0 z-40 max-h-[50vh] overflow-y-auto border-t border-white/10 bg-background/95 px-6 py-4 backdrop-blur-xl"
+          className="absolute inset-x-0 bottom-0 z-40 max-h-[50vh] overflow-y-auto border-t border-white/10 bg-background px-6 py-4"
         >
           <h2 className="mb-3 text-base font-bold text-white">Subtitles</h2>
           <div
@@ -1414,7 +1414,7 @@ export function TvWatchView() {
       {qualityMenuOpen && (
         <div
           data-tv-watch-menu=""
-          className="absolute inset-x-0 bottom-0 z-40 border-t border-white/10 bg-background/95 px-6 py-4 backdrop-blur-xl"
+          className="absolute inset-x-0 bottom-0 z-40 border-t border-white/10 bg-background px-6 py-4"
         >
           <h2 className="mb-3 text-base font-bold text-white">Quality</h2>
           <div

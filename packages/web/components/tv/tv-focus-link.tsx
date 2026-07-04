@@ -6,11 +6,11 @@ import { forwardRef, type ComponentProps } from "react";
 
 /** Side rail nav icons */
 export const tvNavItemClassName =
-  "tv-focus-nav rounded-lg outline-none ring-0 shadow-none transition-colors duration-75 ease-out";
+  "tv-focus-nav rounded-lg border-2 border-transparent outline-none ring-0 shadow-none transition-colors duration-75 ease-out";
 
 /** Standard TV buttons (back, pagination, play controls on light bg) */
 export const tvFocusRingClassName =
-  "tv-focus-button rounded-lg outline-none ring-0 shadow-none transition-colors duration-75 ease-out";
+  "tv-focus-button rounded-lg border-2 border-transparent outline-none ring-0 shadow-none transition-colors duration-75 ease-out";
 
 /** Poster tiles — focus styling lives on the art via globals.css */
 export const tvPosterLinkClassName =
@@ -18,11 +18,11 @@ export const tvPosterLinkClassName =
 
 /** List rows, episode cards, menu items */
 export const tvCardLinkClassName =
-  "tv-focus-card block outline-none rounded-lg ring-0 shadow-none transition-colors duration-75 ease-out";
+  "tv-focus-card block rounded-lg border-2 border-transparent outline-none ring-0 shadow-none transition-colors duration-75 ease-out";
 
 /** Filter / season tabs — selected state via data-tv-selected */
 export const tvChipClassName =
-  "tv-focus-chip shrink-0 snap-center rounded-lg outline-none ring-0 shadow-none transition-colors duration-75 ease-out";
+  "tv-focus-chip shrink-0 snap-center rounded-lg border-2 border-transparent outline-none ring-0 shadow-none transition-colors duration-75 ease-out";
 
 function focusSelectedProps(selected?: boolean) {
   return selected ? ({ "data-tv-selected": "" as const }) : {};
