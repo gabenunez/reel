@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.52 — 2026-07-04
+
+### Fix
+- **In-app update lock** — use the same config directory for the update lock file as logs and progress, fixing ENOENT on legacy `~/.config/reel` installs
+
 ## 0.1.51 — 2026-07-04
 
 ### TV

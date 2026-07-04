@@ -181,9 +181,18 @@ build_app() {
 }
 
 stop_running_reel() {
-  local pid=""
-  if [[ -f "${HOME}/.config/media-app/reel.pid" ]]; then
-    pid="$(cat "${HOME}/.config/media-app/reel.pid" 2>/dev/null || true)"
+  local config_dir pid_file pid
+  config_dir="$(media_config_dir)"
+  pid_file="$config_dir/reel.pid"
+  pid=""
+  if [[ -f "$pid_file" ]]; then
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+  elif [[ -f "${HOME}/.config/media-app/reel.pid" ]]; then
+    pid_file="${HOME}/.config/media-app/reel.pid"
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+  elif [[ -f "${HOME}/.config/reel/reel.pid" ]]; then
+    pid_file="${HOME}/.config/reel/reel.pid"
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
   fi
   if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
     media_ok "Stopping MEDIA! (pid $pid)..."
@@ -192,7 +201,7 @@ stop_running_reel() {
   fi
   pkill -f "node packages/server/dist/index.js" 2>/dev/null || true
   sleep 1
-  rm -f "${HOME}/.config/media-app/reel.pid"
+  rm -f "${HOME}/.config/media-app/reel.pid" "${HOME}/.config/reel/reel.pid"
 }
 
 restart_service() {
@@ -213,34 +222,38 @@ restart_service() {
     media_ok "Restarting via ~/.startup/reel..."
     stop_running_reel
     "${HOME}/.startup/reel"
-  elif [[ -f "${HOME}/.config/media-app/reel.pid" ]]; then
-    media_ok "Restarting MEDIA! process..."
-    local pid
-    pid="$(cat "${HOME}/.config/media-app/reel.pid" 2>/dev/null || true)"
-    if [[ -n "$pid" ]]; then
-      kill "$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
-    fi
-    sleep 2
-    rm -f "${HOME}/.config/media-app/reel.pid"
-    local install_dir
-    install_dir="$(detect_install_dir)"
-    export PATH="${HOME}/node/bin:${PATH:-}"
-    cd "$install_dir"
-    nohup node packages/server/dist/index.js >> "${HOME}/.config/media-app/reel.log" 2>&1 &
-    echo $! > "${HOME}/.config/media-app/reel.pid"
-    media_ok "MEDIA! restarted (pid $(cat "${HOME}/.config/media-app/reel.pid"))"
   else
-    media_warn "No systemd service found — restart manually with: pnpm start"
+    local config_dir pid_file install_dir
+    config_dir="$(media_config_dir)"
+    mkdir -p "$config_dir"
+    pid_file="$config_dir/reel.pid"
+    if [[ -f "$pid_file" ]] || [[ -f "${HOME}/.config/media-app/reel.pid" ]] || [[ -f "${HOME}/.config/reel/reel.pid" ]]; then
+      media_ok "Restarting MEDIA! process..."
+      stop_running_reel
+      install_dir="$(detect_install_dir)"
+      export PATH="${HOME}/node/bin:${PATH:-}"
+      cd "$install_dir"
+      nohup node packages/server/dist/index.js >> "$config_dir/reel.log" 2>&1 &
+      echo $! > "$pid_file"
+      media_ok "MEDIA! restarted (pid $(cat "$pid_file"))"
+    else
+      media_warn "No systemd service found — restart manually with: pnpm start"
+    fi
   fi
 }
 
 main() {
+  local config_dir
+  config_dir="$(media_config_dir)"
+
   cleanup_update_lock() {
+    rm -f "$config_dir/updating.lock" 2>/dev/null || true
     rm -f "${HOME}/.config/media-app/updating.lock" 2>/dev/null || true
+    rm -f "${HOME}/.config/reel/updating.lock" 2>/dev/null || true
   }
 
   on_update_error() {
-    media_progress "failed" "Update failed — see ~/.config/media-app/update.log for details"
+    media_progress "failed" "Update failed — see $config_dir/update.log for details"
     cleanup_update_lock
     exit 1
   }

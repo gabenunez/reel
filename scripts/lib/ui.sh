@@ -63,17 +63,28 @@ media_version_label() {
   fi
 }
 
+media_config_dir() {
+  if [[ -d "${HOME}/.config/media-app" ]]; then
+    printf '%s' "${HOME}/.config/media-app"
+  elif [[ -d "${HOME}/.config/reel" ]]; then
+    printf '%s' "${HOME}/.config/reel"
+  else
+    printf '%s' "${HOME}/.config/media-app"
+  fi
+}
+
 media_progress() {
   local phase="$1"
   local message="$2"
-  local progress_dir="${HOME}/.config/reel"
+  local progress_dir
+  progress_dir="$(media_config_dir)"
   local tag="${MEDIA_RELEASE_TAG:-}"
   local lock_file="$progress_dir/updating.lock"
   local started_ms=""
+  mkdir -p "$progress_dir"
   if [[ -f "$lock_file" ]]; then
     started_ms="$(head -1 "$lock_file" | tr -d '[:space:]')"
   fi
-  mkdir -p "$progress_dir"
   node -e "
     const fs = require('fs');
     const startedMs = process.argv[5];

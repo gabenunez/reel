@@ -455,7 +455,7 @@ export function getUpdateProgress(): UpdateProgress | null {
 }
 
 function getUpdateLockPath(): string {
-  return path.join(os.homedir(), ".config/media-app/updating.lock");
+  return path.join(getConfigDir(), "updating.lock");
 }
 
 export function isUpdateInProgress(): boolean {
