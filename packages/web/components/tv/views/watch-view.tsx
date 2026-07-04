@@ -52,6 +52,7 @@ export function TvWatchView() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const playButtonRef = useRef<HTMLButtonElement>(null);
+  const focusSinkRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const hlsStartOffsetRef = useRef(0);
   const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -68,6 +69,10 @@ export function TvWatchView() {
     hideControlsTimer.current = setTimeout(() => {
       setShowControls(false);
     }, TV_CONTROLS_AUTO_HIDE_MS);
+  }, []);
+
+  const releaseWatchFocus = useCallback(() => {
+    focusSinkRef.current?.focus({ preventScroll: true });
   }, []);
 
   const [quality, setQuality] = useState<StreamQuality>("original");
@@ -842,11 +847,10 @@ export function TvWatchView() {
       }
 
       if (e.key === "ArrowUp") {
+        e.preventDefault();
         if (controlsVisible) {
-          e.preventDefault();
           setShowControls(false);
           closeMenus();
-          active?.blur();
         }
         return;
       }
@@ -887,6 +891,12 @@ export function TvWatchView() {
     cancelCountdown,
   ]);
 
+  useEffect(() => {
+    if (!controlsVisible && !panelOpen) {
+      releaseWatchFocus();
+    }
+  }, [controlsVisible, panelOpen, releaseWatchFocus]);
+
   if (!fileId || Number.isNaN(fileId)) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black">
@@ -911,10 +921,17 @@ export function TvWatchView() {
       onMouseMove={() => revealControls(true)}
       onClick={() => revealControls(true)}
     >
+      <div
+        ref={focusSinkRef}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0 outline-none focus:outline-none"
+      />
       {!usesNativePlayer && (
       <video
         ref={videoRef}
-        className="media-subtitles absolute inset-0 h-full w-full object-contain"
+        tabIndex={-1}
+        className="media-subtitles absolute inset-0 h-full w-full object-contain outline-none focus:outline-none"
         controls={false}
         playsInline
         poster={posterUrl ?? undefined}

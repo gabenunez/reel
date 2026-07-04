@@ -265,6 +265,16 @@
     padding-right: env(safe-area-inset-right, 0);
   }
 
+  .tv-ui [data-tv-watch-player],
+  .tv-ui [data-tv-watch-player]:focus,
+  .tv-ui [data-tv-watch-player]:focus-visible,
+  .tv-ui [data-tv-watch-player] video,
+  .tv-ui [data-tv-watch-player] video:focus,
+  .tv-ui [data-tv-watch-player] video:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
   .tv-ui [data-tv-grid] [data-tv-item] {
     --tw-ring-offset-width: 0px;
   }

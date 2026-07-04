@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.58 — 2026-07-04
+
+### TV
+- **Watch player** — pressing Up no longer shows a focus border around the video when hiding controls
+
 ## 0.1.57 — 2026-07-04
 
 ### UI
