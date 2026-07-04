@@ -102,7 +102,7 @@ export function SubtitleSearchDialog({
           <div className="min-w-0">
             <h3 className="text-xl font-bold text-white">Search subtitles</h3>
             <p className="mt-1 truncate text-sm text-muted-foreground">
-              {contextTitle || "OpenSubtitles.com"} — matched to your file hash
+              {contextTitle || "OpenSubtitles.com"} · matched to your file hash
             </p>
           </div>
           <TvFocusButton
@@ -209,7 +209,7 @@ export function SubtitleSearchDialog({
           <div>
             <h3 className="text-lg font-semibold">Search subtitles</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {contextTitle || "OpenSubtitles.com"} — matched to your file hash
+              {contextTitle || "OpenSubtitles.com"} · matched to your file hash
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>

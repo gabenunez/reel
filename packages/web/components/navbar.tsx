@@ -54,21 +54,19 @@ export function Navbar() {
   const settingsActive = isNavActive(pathname, "/settings");
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/60 bg-background/75 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 overflow-visible border-b border-border/60 bg-background/75 backdrop-blur-xl">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent"
       />
 
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:h-16 sm:gap-4 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:h-[4.5rem] sm:gap-4 sm:px-6">
         <Link
           href="/"
-          className="group flex shrink-0 items-center gap-2.5 rounded-lg outline-none ring-primary/40 focus-visible:ring-2"
+          aria-label="MEDIA! home"
+          className="group -my-1 flex shrink-0 items-center rounded-lg outline-none ring-primary/40 focus-visible:ring-2 sm:-my-1.5"
         >
-          <MediaIcon className="h-9 w-9 transition-transform group-hover:-rotate-6" />
-          <div className="leading-none">
-            <span className="block text-base font-semibold tracking-tight">MEDIA!</span>
-          </div>
+          <MediaIcon className="h-20 w-20 transition-transform group-hover:-rotate-6 sm:h-24 sm:w-24" />
         </Link>
 
         <div className="hidden min-w-0 flex-1 md:block md:max-w-md lg:max-w-xl">

@@ -3,10 +3,18 @@ import Link from "next/link";
 /** Prerendered static hero copy — baked into the static export shell. */
 export function HomeHeroStatic() {
   return (
-    <div>
-      <h1 className="mb-4 text-5xl font-black sm:text-7xl">MEDIA!</h1>
-      <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-        Your personal library for movies and TV, played locally on your network.
+    <div className="max-w-3xl">
+      <h1 className="flex flex-col items-start gap-1 sm:gap-1.5">
+        <span className="text-lg font-medium text-primary/65 sm:text-xl">
+          This is your
+        </span>
+        <span className="text-[2.65rem] font-black leading-none tracking-tight sm:text-6xl lg:text-[4.5rem] bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          MEDIA!
+        </span>
+      </h1>
+
+      <p className="mt-4 max-w-lg text-base leading-relaxed text-muted-foreground sm:mt-5 sm:text-lg">
+        Your movies and TV, streamed from your own drives on your network.
       </p>
     </div>
   );

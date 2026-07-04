@@ -328,7 +328,7 @@ export function buildPlaybackTitle(
 
       const episodeName =
         episode.title?.trim() || `Episode ${episode.episodeNumber}`;
-      return `${media.title} — ${episodeName} (S${season.seasonNumber}E${episode.episodeNumber})`;
+      return `${media.title}: ${episodeName} (S${season.seasonNumber}E${episode.episodeNumber})`;
     }
   }
 

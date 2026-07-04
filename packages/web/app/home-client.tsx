@@ -103,7 +103,7 @@ function HomeDesktopClient() {
 
   return (
     <div className="pb-16">
-      <section className="relative mb-12 overflow-hidden border-b border-border/70 px-4 py-10 sm:px-6 sm:py-12">
+      <section className="relative mb-12 overflow-hidden border-b border-border/70 px-4 py-12 sm:px-6 sm:py-14">
         <div className="relative mx-auto grid max-w-7xl gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(320px,0.7fr)] lg:items-center">
           <div>
             {isScanning && (

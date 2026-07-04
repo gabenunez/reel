@@ -95,7 +95,7 @@ export function SettingsClient() {
         result.skipped > 0 ? `${result.skipped} skipped` : null,
         result.unmatched > 0 ? `${result.unmatched} unmatched` : null,
       ].filter(Boolean);
-      setPlexMessage(`Import complete — ${parts.join(", ")}.`);
+      setPlexMessage(`Import complete: ${parts.join(", ")}.`);
       await loadPlexPreview(plexPath.trim() || undefined);
     } catch (err) {
       setPlexMessage(err instanceof Error ? err.message : "Import failed");
@@ -232,7 +232,7 @@ export function SettingsClient() {
                 id="plex-db-path"
                 value={plexPath}
                 onChange={(e) => setPlexPath(e.target.value)}
-                placeholder="Optional — auto-detect when empty"
+                placeholder="Optional (auto-detect when empty)"
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
@@ -261,7 +261,7 @@ export function SettingsClient() {
                   label="Can import"
                   ok={plexPreview.matchableEntries > 0}
                   okText={`${plexPreview.matchableEntries} matched in MEDIA!`}
-                  failText="No matching files yet — scan libraries first"
+                  failText="No matching files yet. Scan libraries first"
                 />
                 <StatusRow
                   label="Resume points"
@@ -349,7 +349,7 @@ export function SettingsClient() {
               </p>
             ) : (
               <p className="mb-3 text-sm text-muted-foreground">
-                No password set — open to anyone on this network.
+                No password set. Open to anyone on this network.
               </p>
             )}
 
@@ -441,7 +441,7 @@ export function SettingsClient() {
                   label="FFmpeg"
                   ok={settings?.ffmpegAvailable ?? false}
                   okText="Available"
-                  failText="Not found — install ffmpeg"
+                  failText="Not found. Install ffmpeg"
                 />
                 <StatusRow
                   label="TMDB API"
@@ -500,7 +500,7 @@ function StatusRow({
       )}
       <div className="min-w-0 text-sm">
         <span className="font-medium">{label}</span>
-        <span className="text-muted-foreground"> — {ok ? okText : failText}</span>
+        <span className="text-muted-foreground"> · {ok ? okText : failText}</span>
       </div>
     </div>
   );

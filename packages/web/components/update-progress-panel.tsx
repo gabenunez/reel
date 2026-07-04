@@ -96,7 +96,7 @@ export function UpdateProgressPanel({ progress, className }: UpdateProgressPanel
       {progress.phase === "restarting" ? (
         <p className="mt-4 text-xs text-muted-foreground">
           MEDIA! is restarting now. This page will reconnect automatically when the server
-          is back — usually within a minute.
+          is back, usually within a minute.
         </p>
       ) : progress.phase !== "failed" && progress.phase !== "complete" ? (
         <p className="mt-4 text-xs text-muted-foreground">

@@ -112,7 +112,7 @@ export function UpdateManager() {
               <div className="rounded-md border border-accent/30 bg-accent/10 px-4 py-4">
                 <p className="font-medium">
                   Update available: v{status.latestVersion}
-                  {status.latestReleaseName ? ` — ${status.latestReleaseName}` : ""}
+                  {status.latestReleaseName ? `: ${status.latestReleaseName}` : ""}
                 </p>
                 <ReleaseNotes notes={status.releaseNotes ?? null} maxLines={4} className="mt-3 bg-background/60" />
                 <div className="mt-4 flex flex-wrap gap-2">

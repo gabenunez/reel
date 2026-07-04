@@ -9,13 +9,13 @@ export function MediaIcon({ className }: { className?: string }) {
       className={cn("shrink-0", className)}
       aria-hidden
     >
-      <rect width="32" height="32" rx="7" fill="#0c1415" />
+      <rect x="6" y="6" width="20" height="20" rx="5" fill="#0c1415" />
       <text
         x="16"
-        y="21"
+        y="19.5"
         textAnchor="middle"
         fill="#2fffe5"
-        fontSize="11"
+        fontSize="11.5"
         fontWeight="900"
         fontFamily="system-ui, sans-serif"
       >

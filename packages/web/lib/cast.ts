@@ -122,7 +122,7 @@ export interface CastMediaOptions {
 
 const CAST_ERROR_HINTS: Record<string, string> = {
   load_media_failed:
-    "Your TV couldn't load this video. If you're using a password on MEDIA!, try again after this update — or try a lower quality / Original in the player first.",
+    "Your TV couldn't load this video. If you're using a password on MEDIA!, try again after this update, or try a lower quality / Original in the player first.",
   cancel: "Cast cancelled.",
   receiver_unavailable: "No Chromecast device was found.",
   timeout: "Cast timed out. Try again.",
@@ -155,7 +155,7 @@ function validateCastMediaUrl(url: string): void {
     parsed.hostname.endsWith(".localhost")
   ) {
     throw new Error(
-      "Cast URL is localhost — your TV can't reach that. Restart MEDIA! and try again.",
+      "Cast URL is localhost. Your TV can't reach that. Restart MEDIA! and try again.",
     );
   }
 }

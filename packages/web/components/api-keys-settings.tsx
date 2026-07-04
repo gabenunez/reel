@@ -31,10 +31,10 @@ export function ApiKeysSettings({ settings, onChange }: ApiKeysSettingsProps) {
       const result = await api.updateMetadata(tmdbKey);
       if (result.metadataRefresh?.updated) {
         setTmdbMessage(
-          `Saved — updated metadata for ${result.metadataRefresh.updated} title${result.metadataRefresh.updated === 1 ? "" : "s"}`,
+          `Saved. Updated metadata for ${result.metadataRefresh.updated} title${result.metadataRefresh.updated === 1 ? "" : "s"}`,
         );
       } else if (result.tmdbConfigured) {
-        setTmdbMessage("Saved — run Scan on your libraries to fetch metadata");
+        setTmdbMessage("Saved. Run Scan on your libraries to fetch metadata");
       } else {
         setTmdbMessage("Key cleared");
       }
@@ -73,7 +73,7 @@ export function ApiKeysSettings({ settings, onChange }: ApiKeysSettingsProps) {
       setFanartMessage(
         result.fanartConfigured
           ? result.themesSynced
-            ? `Saved — checked themes in ${result.themesSynced} librar${result.themesSynced === 1 ? "y" : "ies"}`
+            ? `Saved. Checked themes in ${result.themesSynced} librar${result.themesSynced === 1 ? "y" : "ies"}`
             : "Saved"
           : "Key cleared",
       );
