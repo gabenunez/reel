@@ -75,7 +75,7 @@ export function TvShell({ children }: { children: React.ReactNode }) {
 
   return (
     <TvSpatialNav>
-      <div className="tv-ui flex min-h-screen">
+      <div className="tv-ui flex h-screen max-h-screen overflow-hidden">
         {!hideNav && (
           <aside className="flex w-[4.25rem] shrink-0 flex-col items-center border-r border-border/50 bg-background/95 py-5 min-h-screen">
             <div className="mb-6 flex h-9 w-9 items-center justify-center" aria-hidden="true">

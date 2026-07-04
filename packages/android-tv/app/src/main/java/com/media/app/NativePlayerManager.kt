@@ -45,12 +45,12 @@ class NativePlayerManager(
         val loadControl =
             DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
-                    15_000,
-                    60_000,
-                    2_500,
+                    30_000,
+                    120_000,
                     5_000,
+                    15_000,
                 )
-                .setBackBuffer(30_000, true)
+                .setBackBuffer(60_000, true)
                 .build()
         val exoPlayer =
             ExoPlayer.Builder(playerView.context)

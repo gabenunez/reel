@@ -19,7 +19,7 @@ object AuthSession {
 
     fun requestHeaders(token: String?): Map<String, String> {
         if (token.isNullOrBlank()) return emptyMap()
-        return mapOf("Cookie" to "media_session=$token")
+        return mapOf("Cookie" to "media_session=$token; reel_session=$token")
     }
 
     private fun parseSessionFromCookie(cookieHeader: String?): String? {
@@ -27,10 +27,12 @@ object AuthSession {
 
         for (part in cookieHeader.split(";")) {
             val trimmed = part.trim()
-            if (trimmed.startsWith("media_session=")) {
-                val value = trimmed.removePrefix("media_session=").trim()
-                if (value.isNotEmpty() && value != "deleted") {
-                    return value
+            for (prefix in listOf("media_session=", "reel_session=")) {
+                if (trimmed.startsWith(prefix)) {
+                    val value = trimmed.removePrefix(prefix).trim()
+                    if (value.isNotEmpty() && value != "deleted") {
+                        return value
+                    }
                 }
             }
         }

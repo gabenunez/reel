@@ -54,6 +54,17 @@
     visibility: hidden;
   }
 
+  html.tv-mode {
+    overflow: hidden;
+    height: 100%;
+  }
+
+  html.tv-mode body {
+    overflow: hidden;
+    height: 100%;
+    min-height: 100%;
+  }
+
   html.tv-mode [data-web-only] {
     display: none !important;
   }
@@ -82,6 +93,9 @@
 
   .tv-ui {
     scroll-behavior: smooth;
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
     --tv-focus-glow:
       0 0 0 2px hsl(var(--background)),
       0 0 0 4px hsl(var(--primary)),
@@ -263,6 +277,29 @@
   .tv-ui main {
     padding-left: 0;
     padding-right: env(safe-area-inset-right, 0);
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .tv-ui main::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .tv-ui .tv-scroll-row,
+  .tv-ui [data-tv-scroll-row] {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .tv-ui .tv-scroll-row::-webkit-scrollbar,
+  .tv-ui [data-tv-scroll-row]::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 
   .tv-ui [data-tv-watch-player],

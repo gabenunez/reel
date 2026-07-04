@@ -17,7 +17,10 @@ class AuthenticatedHttpDataSourceFactory(
     override fun createDataSource(): HttpDataSource {
         val dataSource = upstream.createDataSource()
         if (!sessionToken.isNullOrBlank()) {
-            dataSource.setRequestProperty("Cookie", "media_session=$sessionToken")
+            dataSource.setRequestProperty(
+                "Cookie",
+                "media_session=$sessionToken; reel_session=$sessionToken",
+            )
         }
         return dataSource
     }

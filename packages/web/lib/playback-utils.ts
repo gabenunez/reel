@@ -6,6 +6,7 @@ import {
   isHlsVideoCopySupported,
   normalizeCodecName,
   pickTranscodeQualityForPlayback,
+  resolveNativeTvPlaybackMode,
   resolveOriginalPlaybackMode,
 } from "@media-app/shared";
 
@@ -54,9 +55,13 @@ function effectiveOriginalPlaybackMode(
     transcodingEnabled: streamInfo.transcodingEnabled,
   });
 
-  // Native ExoPlayer decodes source resolution — direct play and remux stay at original quality.
+  // Native ExoPlayer decodes HEVC, AC3, DTS, etc. — direct play at source resolution.
   if (nativeTvPlayerAvailable()) {
-    return mode;
+    return resolveNativeTvPlaybackMode({
+      audioCodec: streamInfo.audioCodec,
+      videoCodec: streamInfo.videoCodec,
+      transcodingEnabled: streamInfo.transcodingEnabled,
+    });
   }
 
   if (mode === "direct" && !browserSupportsDirectPlayVideo(streamInfo.videoCodec)) {

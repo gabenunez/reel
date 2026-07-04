@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.59 — 2026-07-04
+
+### TV
+- **Scrollbars** — hide page and row scrollbars in TV mode; lock layout to viewport height
+- **4K playback** — use ExoPlayer direct play for HEVC/AC3/DTS (legacy `ReelAndroid` bridge supported); avoid defaulting to 4K server transcode
+- **Android TV app** — larger ExoPlayer buffers for high-bitrate streams; accept legacy session cookies
+
 ## 0.1.58 — 2026-07-04
 
 ### TV

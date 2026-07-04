@@ -18,9 +18,21 @@ export interface NativePlaybackState {
   ready: boolean;
 }
 
+type AndroidBridge = NonNullable<Window["MediaAndroid"]>;
+
+interface NativePlayerBridge {
+  onState?: (state: NativePlaybackState) => void;
+  onError?: () => void;
+  onEnded?: () => void;
+}
+
+function getAndroidBridge(): AndroidBridge | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window.MediaAndroid ?? window.ReelAndroid;
+}
+
 export function nativeTvPlayerAvailable(): boolean {
-  if (typeof window === "undefined") return false;
-  return typeof window.MediaAndroid?.play === "function";
+  return typeof getAndroidBridge()?.play === "function";
 }
 
 export function toAbsoluteMediaUrl(path: string): string {
@@ -32,23 +44,23 @@ export function toAbsoluteMediaUrl(path: string): string {
 }
 
 export function startNativePlayback(request: NativePlaybackRequest): void {
-  window.MediaAndroid?.play?.(JSON.stringify(request));
+  getAndroidBridge()?.play?.(JSON.stringify(request));
 }
 
 export function pauseNativePlayback(): void {
-  window.MediaAndroid?.pause?.();
+  getAndroidBridge()?.pause?.();
 }
 
 export function resumeNativePlayback(): void {
-  window.MediaAndroid?.resume?.();
+  getAndroidBridge()?.resume?.();
 }
 
 export function seekNativePlayback(positionMs: number): void {
-  window.MediaAndroid?.seekTo?.(positionMs);
+  getAndroidBridge()?.seekTo?.(positionMs);
 }
 
 export function stopNativePlayback(): void {
-  window.MediaAndroid?.stop?.();
+  getAndroidBridge()?.stop?.();
 }
 
 export function registerNativePlayerHandlers(handlers: {
@@ -56,20 +68,24 @@ export function registerNativePlayerHandlers(handlers: {
   onError?: () => void;
   onEnded?: () => void;
 }): () => void {
-  window.__mediaNativePlayer = {
+  const bridge: NativePlayerBridge = {
     onState: (state: NativePlaybackState) => handlers.onState?.(state),
     onError: () => handlers.onError?.(),
     onEnded: () => handlers.onEnded?.(),
   };
 
+  window.__mediaNativePlayer = bridge;
+  window.__reelNativePlayer = bridge;
+
   return () => {
     delete window.__mediaNativePlayer;
+    delete window.__reelNativePlayer;
   };
 }
 
 export function notifyAndroidLogout() {
   if (typeof window === "undefined") return;
-  window.MediaAndroid?.logout();
+  getAndroidBridge()?.logout();
 }
 
 declare global {
@@ -82,11 +98,11 @@ declare global {
       seekTo: (positionMs: number) => void;
       stop: () => void;
     };
-    __mediaNativePlayer?: {
-      onState?: (state: NativePlaybackState) => void;
-      onError?: () => void;
-      onEnded?: () => void;
-    };
+    /** Legacy Android TV shell before MEDIA! rebrand. */
+    ReelAndroid?: Window["MediaAndroid"];
+    /** Legacy callback target for older TV APKs. */
+    __reelNativePlayer?: NativePlayerBridge;
+    __mediaNativePlayer?: NativePlayerBridge;
   }
 }
 
