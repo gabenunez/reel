@@ -146,7 +146,7 @@ prepare_install_dir() {
 sync_source() {
   step "Installing MEDIA!"
 
-  MEDIA_REPO="${MEDIA_REPO:-https://github.com/gabenunez/reel.git}"
+  MEDIA_REPO="${MEDIA_REPO:-https://github.com/gabenunez/media-app.git}"
   MEDIA_BRANCH="${MEDIA_BRANCH:-main}"
   local source_dir="${REEL_SOURCE_DIR:-}"
 
@@ -310,7 +310,7 @@ print_success() {
   echo -e "    3. Upload movies/TV and trigger a library scan"
   echo ""
   echo -e "  ${BOLD}Useful commands:${RESET}"
-  echo -e "    ${DIM}curl -fsSL https://raw.githubusercontent.com/gabenunez/reel/main/update.sh | bash${RESET}  — update MEDIA!"
+  echo -e "    ${DIM}curl -fsSL https://raw.githubusercontent.com/gabenunez/media-app/main/update.sh | bash${RESET}  — update MEDIA!"
   echo -e "    ${DIM}sudo systemctl status reel${RESET}   — check status"
   echo -e "    ${DIM}sudo systemctl restart reel${RESET}  — restart after config changes"
   echo -e "    ${DIM}sudo journalctl -u reel -f${RESET}  — live logs"

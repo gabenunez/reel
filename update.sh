@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # MEDIA! one-line updater
 #
-#   curl -fsSL https://raw.githubusercontent.com/gabenunez/reel/main/update.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/gabenunez/media-app/main/update.sh | bash
 #
 # Options (env vars):
 #   MEDIA_INSTALL_DIR=/opt/media-app
@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-MEDIA_REPO="${MEDIA_REPO:-https://github.com/gabenunez/reel.git}"
+MEDIA_REPO="${MEDIA_REPO:-https://github.com/gabenunez/media-app.git}"
 MEDIA_BRANCH="${MEDIA_BRANCH:-main}"
 MEDIA_INSTALL_DIR="${MEDIA_INSTALL_DIR:-/opt/media-app}"
 

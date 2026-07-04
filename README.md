@@ -2,14 +2,14 @@
 
 Self-hosted movies and TV. One Node app, SQLite, FFmpeg for transcoding.
 
-**[github.com/gabenunez/reel](https://github.com/gabenunez/reel)**
+**[github.com/gabenunez/media-app](https://github.com/gabenunez/media-app)**
 
 ## Install
 
 **Linux VPS**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gabenunez/reel/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/gabenunez/media-app/main/install.sh | bash
 ```
 
 Open `http://YOUR_SERVER:8096/settings` and add library folders.
@@ -17,7 +17,7 @@ Open `http://YOUR_SERVER:8096/settings` and add library folders.
 **From source**
 
 ```bash
-git clone https://github.com/gabenunez/reel.git && cd reel
+git clone https://github.com/gabenunez/media-app.git && cd media-app
 pnpm install && pnpm build && pnpm start
 ```
 

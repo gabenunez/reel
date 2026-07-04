@@ -1,4 +1,4 @@
-export const GITHUB_REPO = "gabenunez/reel";
+export const GITHUB_REPO = "gabenunez/media-app";
 
 export function normalizeVersion(version: string): string {
   return version.trim().replace(/^v/i, "");

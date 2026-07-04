@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=lib/ui.sh
 source "$ROOT/scripts/lib/ui.sh"
 
-MEDIA_REPO="${MEDIA_REPO:-https://github.com/gabenunez/reel.git}"
+MEDIA_REPO="${MEDIA_REPO:-https://github.com/gabenunez/media-app.git}"
 MEDIA_BRANCH="${MEDIA_BRANCH:-main}"
 
 detect_install_dir() {

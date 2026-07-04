@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # MEDIA! one-line VPS installer
 #
-#   curl -fsSL https://raw.githubusercontent.com/gabenunez/reel/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/gabenunez/media-app/main/install.sh | bash
 #
 # Options (env vars):
-#   MEDIA_REPO=https://github.com/gabenunez/reel.git
+#   MEDIA_REPO=https://github.com/gabenunez/media-app.git
 #   MEDIA_BRANCH=main
 #   MEDIA_INSTALL_DIR=/opt/media-app
 #   REEL_PORT=8096
@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-MEDIA_REPO="${MEDIA_REPO:-https://github.com/gabenunez/reel.git}"
+MEDIA_REPO="${MEDIA_REPO:-https://github.com/gabenunez/media-app.git}"
 MEDIA_BRANCH="${MEDIA_BRANCH:-main}"
 MEDIA_INSTALL_DIR="${MEDIA_INSTALL_DIR:-/opt/media-app}"
 
