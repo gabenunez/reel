@@ -57,6 +57,9 @@ export function normalizeCodecName(codec?: string | null): string | null {
   if (name.includes("dts")) {
     return "dts";
   }
+  if (name.includes("opus")) {
+    return "opus";
+  }
   if (name.startsWith("pcm")) {
     return "pcm";
   }
@@ -149,14 +152,42 @@ export function resolveOriginalPlaybackMode(options: {
   return "transcode";
 }
 
+/** Containers that stream reliably as progressive HTTP without remux. */
+const FASTSTART_FRIENDLY_CONTAINER_EXTS = new Set([".mp4", ".m4v", ".mov"]);
+
+export function containerPrefersHlsRemux(fileName?: string | null): boolean {
+  if (!fileName?.trim()) return false;
+  const ext = fileName.toLowerCase().slice(fileName.lastIndexOf("."));
+  return ext.length > 1 && !FASTSTART_FRIENDLY_CONTAINER_EXTS.has(ext);
+}
+
 export function pickTranscodeQualityForPlayback(
   available: StreamQuality[],
+  sourceHeight?: number | null,
 ): TranscodeQuality {
   const transcodeTiers = available.filter(
     (quality): quality is TranscodeQuality => quality !== "original",
   );
 
-  for (const quality of ["2160p", "1080p", "720p", "480p"] as const) {
+  // Prefer a tier close to source resolution — avoids upscaling SD/DVD content.
+  const sourceTier: TranscodeQuality | null =
+    sourceHeight == null
+      ? null
+      : sourceHeight >= 2160
+        ? "2160p"
+        : sourceHeight >= 1080
+          ? "1080p"
+          : sourceHeight >= 720
+            ? "720p"
+            : "480p";
+
+  const searchOrder: TranscodeQuality[] = sourceTier
+    ? ([sourceTier, "1080p", "720p", "480p", "2160p"] as const).filter(
+        (q, i, arr) => arr.indexOf(q) === i,
+      )
+    : (["2160p", "1080p", "720p", "480p"] as const);
+
+  for (const quality of searchOrder) {
     if (transcodeTiers.includes(quality)) return quality;
   }
 

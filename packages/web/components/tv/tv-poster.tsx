@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { api, type MediaItem } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { TvFocusLink } from "@/components/tv/tv-focus-link";
@@ -13,15 +14,18 @@ interface TvPosterProps {
   linkClassName?: string;
   progress?: number;
   subtitle?: string;
+  /** Load immediately — use for the first visible row only. */
+  priority?: boolean;
 }
 
-export function TvPoster({
+export const TvPoster = memo(function TvPoster({
   item,
   href,
   className,
   linkClassName,
   progress,
   subtitle,
+  priority = false,
 }: TvPosterProps) {
   const imageUrl = api.imageUrl(item.posterPath);
   const linkHref = href ?? routes.media(item.id);
@@ -40,10 +44,10 @@ export function TvPoster({
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={imageUrl}
-                srcSet={`${imageUrl} 1x, ${imageUrl} 2x`}
                 alt=""
-                loading="eager"
+                loading={priority ? "eager" : "lazy"}
                 decoding="async"
+                fetchPriority={priority ? "high" : "auto"}
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -75,4 +79,4 @@ export function TvPoster({
       </TvFocusLink>
     </div>
   );
-}
+});

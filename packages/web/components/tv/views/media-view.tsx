@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2, Play } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, type MediaItem } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { TvFocusButton, TvFocusLink } from "@/components/tv/tv-focus-link";
 import { TvFavoriteButton } from "@/components/tv/tv-favorite-button";
 import { TvPageHeader, TvSectionLabel } from "@/components/tv/tv-page-header";
-import { tvScrollRowClassName } from "@/components/tv/tv-row";
+import { TvPoster } from "@/components/tv/tv-poster";
+import { TvRow, tvScrollRowClassName } from "@/components/tv/tv-row";
 import { ThemeMusicProvider, ThemeMusicWaveform } from "@/components/theme-music-player";
 import { formatDuration, getPlaybackButtonLabel } from "@/lib/utils";
 import { resolveNextEpisodeTarget } from "@/lib/playback-utils";
@@ -52,6 +53,7 @@ export function TvMediaView() {
   const searchParams = useSearchParams();
   const mediaId = parseInt(searchParams.get("id") ?? "", 10);
   const [media, setMedia] = useState<MediaDetail | null>(null);
+  const [related, setRelated] = useState<MediaItem[]>([]);
   const [selectedSeason, setSelectedSeason] = useState(0);
   const [loading, setLoading] = useState(true);
   const nextEpisodeIdRef = useRef<number | null>(null);
@@ -62,10 +64,11 @@ export function TvMediaView() {
     if (!mediaId || Number.isNaN(mediaId)) return;
     setLoading(true);
     setSelectedSeason(0);
+    setRelated([]);
     nextEpisodeIdRef.current = null;
-    api
-      .getMedia(mediaId)
-      .then((data) => {
+
+    Promise.all([
+      api.getMedia(mediaId).then((data) => {
         const nextMedia = data as unknown as MediaDetail;
         setMedia(nextMedia);
         if (nextMedia.type === "tv" && nextMedia.seasons?.length) {
@@ -76,7 +79,9 @@ export function TvMediaView() {
           setSelectedSeason(0);
           nextEpisodeIdRef.current = null;
         }
-      })
+      }),
+      api.getRelatedMedia(mediaId).then((data) => setRelated(data.items)),
+    ])
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [mediaId]);
@@ -330,6 +335,21 @@ export function TvMediaView() {
             })}
           </div>
         </section>
+      )}
+
+      {related.length > 0 && (
+        <TvRow
+          title={
+            media.type === "movie"
+              ? "More films in your library"
+              : "More series in your library"
+          }
+          className="mt-2"
+        >
+          {related.map((item) => (
+            <TvPoster key={item.id} item={item} />
+          ))}
+        </TvRow>
       )}
     </div>
   );

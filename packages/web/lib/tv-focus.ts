@@ -1,12 +1,29 @@
 /** Shared TV focus helpers for spatial nav and page views. */
 
+const TV_SCROLL_BEHAVIOR: ScrollBehavior = "auto";
+
+function isRowVisibleInMain(row: HTMLElement): boolean {
+  const main = document.querySelector("main");
+  if (!main) return true;
+
+  const mainRect = main.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  const margin = 24;
+
+  return (
+    rowRect.top >= mainRect.top - margin &&
+    rowRect.bottom <= mainRect.bottom + margin
+  );
+}
+
 export function scrollItemIntoView(
   el: HTMLElement,
-  behavior: ScrollBehavior = "smooth",
+  behavior: ScrollBehavior = TV_SCROLL_BEHAVIOR,
 ) {
   const horizontalRow = el.closest<HTMLElement>(
     "[data-tv-scroll-row]:not([data-tv-vertical])",
   );
+
   if (horizontalRow) {
     const rowRect = horizontalRow.getBoundingClientRect();
     const elRect = el.getBoundingClientRect();
@@ -15,18 +32,23 @@ export function scrollItemIntoView(
       (elRect.left - rowRect.left) -
       (rowRect.width - elRect.width) / 2;
     horizontalRow.scrollTo({ left: Math.max(0, targetLeft), behavior });
+
+    if (!isRowVisibleInMain(horizontalRow)) {
+      horizontalRow.scrollIntoView({ behavior, block: "nearest", inline: "nearest" });
+    }
+    return;
   }
 
   el.scrollIntoView({
     behavior,
-    block: "center",
+    block: "nearest",
     inline: "nearest",
   });
 }
 
 export function focusTvItem(
   el: HTMLElement,
-  scrollBehavior: ScrollBehavior = "smooth",
+  scrollBehavior: ScrollBehavior = TV_SCROLL_BEHAVIOR,
 ) {
   document.querySelectorAll<HTMLElement>("[data-tv-focused]").forEach((node) => {
     node.removeAttribute("data-tv-focused");

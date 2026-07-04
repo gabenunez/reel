@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.63 — 2026-07-04
+
+### Playback
+- **Seamless streaming** — MKV/WebM remux with annex-B bitstream filters and cleaner timestamps; HLS waits for two segments before start; transcode uses `veryfast` + `genpts`; pick transcode tier near source resolution; larger read buffers and HLS buffers
+- **Android TV native** — remux MKV/WebM to HLS for smoother ExoPlayer playback; explicit MIME types for container formats; native error fallback to remux before transcode
+
+### TV
+- **Home screen** — smoother navigation: instant scroll, lighter poster effects, lazy-loaded images, layout containment
+- **Title pages** — related movies/series row (genre-matched, same as desktop)
+- **Watch player** — scrubber position preserved when changing subtitles or quality; focus returns to controls after closing menus; poster/scrub layout dock fix
+
+### Tooling
+- **Playback audit** — `scripts/audit-playback.mjs` classifies library files by direct/remux/transcode compatibility
+
 ## 0.1.62 — 2026-07-04
 
 ### TV

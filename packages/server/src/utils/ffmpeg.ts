@@ -338,6 +338,8 @@ export function startHlsTranscode(
     "-map",
     "0:v:0",
     ...audioMapArgs(audioStreamIndex),
+    "-fflags",
+    "+genpts",
     "-vf",
     `scale=-2:${height}`,
     "-c:v",
@@ -349,9 +351,7 @@ export function startHlsTranscode(
     "-pix_fmt",
     "yuv420p",
     "-preset",
-    "ultrafast",
-    "-tune",
-    "zerolatency",
+    "veryfast",
     "-threads",
     "0",
     "-crf",
@@ -414,13 +414,17 @@ export function startHlsTranscode(
   return session;
 }
 
+function needsAnnexBBitstream(ext: string): boolean {
+  return ext !== ".ts" && ext !== ".m2ts" && ext !== ".mts";
+}
+
 function hlsVideoCopyArgs(videoCodec?: string | null, filePath?: string): string[] {
   const normalized = videoCodec?.toLowerCase().split(".")[0]?.split("_")[0];
   const ext = filePath?.toLowerCase().slice(filePath.lastIndexOf(".")) ?? "";
 
   if (normalized === "h264" || normalized === "avc1") {
     const args = ["-c:v", "copy"];
-    if (ext === ".mp4" || ext === ".m4v" || ext === ".mov") {
+    if (needsAnnexBBitstream(ext)) {
       args.push("-bsf:v", "h264_mp4toannexb");
     }
     return args;
@@ -428,7 +432,7 @@ function hlsVideoCopyArgs(videoCodec?: string | null, filePath?: string): string
 
   if (normalized === "hevc" || normalized === "h265") {
     const args = ["-c:v", "copy"];
-    if (ext === ".mp4" || ext === ".m4v" || ext === ".mov") {
+    if (needsAnnexBBitstream(ext)) {
       args.push("-bsf:v", "hevc_mp4toannexb");
     }
     return args;
@@ -469,6 +473,7 @@ export function startHlsRemux(
     args.push("-ss", String(startSeconds));
   }
   args.push("-i", filePath, "-map", "0:v:0", ...audioMapArgs(audioStreamIndex));
+  args.push("-fflags", "+genpts", "-avoid_negative_ts", "make_zero");
   args.push(...hlsVideoCopyArgs(videoCodec, filePath));
   args.push(
     "-c:a",
@@ -479,6 +484,8 @@ export function startHlsRemux(
     "2",
     "-ar",
     "48000",
+    "-threads",
+    "0",
     "-f",
     "hls",
     "-hls_time",
@@ -775,15 +782,20 @@ setInterval(() => {
 export async function waitForFirstSegment(
   outputDir: string,
   timeoutMs = 90_000,
+  minSegments = 2,
 ): Promise<boolean> {
   const start = Date.now();
 
   while (Date.now() - start < timeoutMs) {
-    const segments = listHlsSegments(outputDir);
-    if (
-      segments.length > 0 &&
-      fs.statSync(path.join(outputDir, segments[0])).size > 0
-    ) {
+    const segments = listHlsSegments(outputDir).filter((name) => {
+      try {
+        return fs.statSync(path.join(outputDir, name)).size > 0;
+      } catch {
+        return false;
+      }
+    });
+
+    if (segments.length >= minSegments) {
       return true;
     }
 

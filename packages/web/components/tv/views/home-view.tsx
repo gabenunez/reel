@@ -58,6 +58,14 @@ export function TvHomeView() {
     libraries.length > 0 ||
     decks.length > 0;
 
+  const firstRowKey = continueWatching.length
+    ? "continue"
+    : favorites.length
+      ? "favorites"
+      : recentlyAdded.length
+        ? "recent"
+        : null;
+
   return (
     <div className="py-5">
       {continueWatching.length > 0 && (
@@ -67,9 +75,10 @@ export function TvHomeView() {
           seeAllLabel="Continue Watching"
           seeAllDetail="All in progress"
         >
-          {continueWatching.map((item) => (
+          {continueWatching.map((item, index) => (
             <TvPoster
               key={item.id}
+              priority={firstRowKey === "continue" && index < 6}
               item={{
                 id: item.mediaId,
                 libraryId: 0,
@@ -96,8 +105,8 @@ export function TvHomeView() {
           seeAllLabel="Favorites"
           seeAllDetail={`${favorites.length}+ saved`}
         >
-          {favorites.map((item) => (
-            <TvPoster key={item.id} item={item} />
+          {favorites.map((item, index) => (
+            <TvPoster key={item.id} item={item} priority={firstRowKey === "favorites" && index < 6} />
           ))}
         </TvRow>
       )}
@@ -109,15 +118,15 @@ export function TvHomeView() {
           seeAllLabel="Recently Added"
           seeAllDetail="Full list"
         >
-          {recentlyAdded.map((item) => (
-            <TvPoster key={item.id} item={item} />
+          {recentlyAdded.map((item, index) => (
+            <TvPoster key={item.id} item={item} priority={firstRowKey === "recent" && index < 6} />
           ))}
         </TvRow>
       )}
 
       {(decks.length > 0 || libraries.length > 0 || continueWatching.length > 0 || recentlyAdded.length > 0) && (
         <section className="tv-row-section mb-5">
-          <h2 className="mb-2 px-8 text-base font-semibold tracking-tight text-muted-foreground transition-colors duration-200">
+          <h2 className="mb-2 px-8 text-base font-semibold tracking-tight text-muted-foreground">
             Browse
           </h2>
           <div

@@ -3,7 +3,7 @@ import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import mime from "mime-types";
 import type { AppConfig } from "@media-app/shared";
-import { getAvailableQualities, isBrowserDirectPlayAudioSupported, isBrowserDirectPlayVideoSupported, parseHlsQuality, parseTranscodeQuality, resolveOriginalPlaybackMode } from "@media-app/shared";
+import { getAvailableQualities, isBrowserDirectPlayAudioSupported, isBrowserDirectPlayVideoSupported, parseHlsQuality, parseTranscodeQuality, resolveNativeTvPlaybackMode, resolveOriginalPlaybackMode } from "@media-app/shared";
 import type { DatabaseInstance } from "../db/index.js";
 import type { SubtitleService } from "../services/subtitles.js";
 import { subtitleHasContent } from "../utils/subtitle-content.js";
@@ -65,7 +65,7 @@ type StreamFile = {
   audioCodec?: string | null;
 };
 
-const STREAM_READ_HIGH_WATER_MARK = 1024 * 1024;
+const STREAM_READ_HIGH_WATER_MARK = 2 * 1024 * 1024;
 
 function parseStartSeconds(value?: string): number {
   if (!value) return 0;
@@ -277,6 +277,11 @@ export async function streamRoutes(
           metadata.videoCodec,
         ),
         originalPlaybackMode: resolveOriginalPlaybackMode({
+          audioCodec: metadata.audioCodec,
+          videoCodec: metadata.videoCodec,
+          transcodingEnabled: config.transcoding.enabled,
+        }),
+        nativeTvPlaybackMode: resolveNativeTvPlaybackMode({
           audioCodec: metadata.audioCodec,
           videoCodec: metadata.videoCodec,
           transcodingEnabled: config.transcoding.enabled,

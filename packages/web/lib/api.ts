@@ -255,6 +255,7 @@ export interface StreamInfo {
   directPlayAudioSupported: boolean;
   directPlayVideoSupported?: boolean;
   originalPlaybackMode?: "direct" | "remux" | "transcode" | "unsupported";
+  nativeTvPlaybackMode?: "direct" | "remux" | "transcode" | "unsupported";
   thumbnailsReady?: boolean;
   posterPath?: string | null;
   mediaId?: number | null;

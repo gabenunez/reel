@@ -1,12 +1,10 @@
 "use client";
 
-import { focusTvItem, scrollItemIntoView } from "@/lib/tv-focus";
+import { focusTvItem } from "@/lib/tv-focus";
 import { useEffect, type ReactNode } from "react";
 
-const NAV_COOLDOWN_MS = 90;
-const NAV_REPEAT_COOLDOWN_MS = 45;
-
-let currentScrollBehavior: ScrollBehavior = "smooth";
+const NAV_COOLDOWN_MS = 80;
+const NAV_REPEAT_COOLDOWN_MS = 40;
 
 function isTvFocusable(el: HTMLElement) {
   return (
@@ -40,7 +38,7 @@ function isScrollRow(row: Element) {
 }
 
 function focusItem(el: HTMLElement) {
-  focusTvItem(el, currentScrollBehavior);
+  focusTvItem(el);
 }
 
 function estimateGridColumns(items: HTMLElement[]): number {
@@ -371,8 +369,6 @@ export function TvSpatialNav({ children }: { children: ReactNode }) {
       if (now - lastMoveAt < cooldown) return;
       lastMoveAt = now;
 
-      currentScrollBehavior = e.repeat ? "instant" : "smooth";
-
       if (e.key === "ArrowRight") {
         moveHorizontal(active, "right");
         return;
@@ -398,7 +394,6 @@ export function TvSpatialNav({ children }: { children: ReactNode }) {
         if (node !== target) node.removeAttribute("data-tv-focused");
       });
       target.setAttribute("data-tv-focused", "");
-      requestAnimationFrame(() => scrollItemIntoView(target, "smooth"));
     }
 
     window.addEventListener("keydown", onKeyDown);

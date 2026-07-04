@@ -28,7 +28,7 @@ export function TvRow({
 }: TvRowProps) {
   return (
     <section className={cn("tv-row-section mb-5", className)}>
-      <h2 className="mb-2 px-8 text-base font-semibold tracking-tight text-muted-foreground transition-colors duration-200">
+      <h2 className="mb-2 px-8 text-base font-semibold tracking-tight text-muted-foreground">
         {title}
       </h2>
       <div

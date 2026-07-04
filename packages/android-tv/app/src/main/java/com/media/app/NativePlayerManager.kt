@@ -168,6 +168,8 @@ class NativePlayerManager(
                     .build(),
             )
 
+        mimeTypeForUrl(request.url)?.let { builder.setMimeType(it) }
+
         if (!request.subtitleUrl.isNullOrBlank()) {
             builder.setSubtitleConfigurations(
                 listOf(
@@ -180,6 +182,20 @@ class NativePlayerManager(
         }
 
         return builder.build()
+    }
+
+    private fun mimeTypeForUrl(url: String): String? {
+        val path = url.substringBefore('?').substringBefore('#').lowercase()
+        return when {
+            path.endsWith(".mkv") -> MimeTypes.VIDEO_MATROSKA
+            path.endsWith(".webm") -> MimeTypes.VIDEO_WEBM
+            path.endsWith(".mp4") || path.endsWith(".m4v") -> MimeTypes.VIDEO_MP4
+            path.endsWith(".mov") -> MimeTypes.VIDEO_MP4
+            path.endsWith(".ts") || path.endsWith(".m2ts") || path.endsWith(".mts") ->
+                MimeTypes.VIDEO_MP2T
+            path.contains(".m3u8") -> MimeTypes.APPLICATION_M3U8
+            else -> null
+        }
     }
 
     private fun emitState() {

@@ -27,6 +27,7 @@ import {
 import { SubtitleSearchDialog } from "@/components/subtitle-search-dialog";
 import { NextEpisodeCountdownOverlay } from "@/components/next-episode-countdown";
 import { PlaybackPosterBackdrop } from "@/components/playback-poster-backdrop";
+import { SeekPreviewTooltip } from "@/components/seek-preview-tooltip";
 import { TvFocusButton, TvFocusLink } from "@/components/tv/tv-focus-link";
 import { focusTvItem } from "@/lib/tv-focus";
 import { cn, formatDuration } from "@/lib/utils";
@@ -42,6 +43,7 @@ import {
   toAbsoluteMediaUrl,
 } from "@/lib/android-bridge";
 import { useNextEpisodeCountdown } from "@/lib/use-next-episode-countdown";
+import { useSeekThumbnails } from "@/lib/use-seek-thumbnails";
 
 export function TvWatchView() {
   const router = useRouter();
@@ -63,6 +65,11 @@ export function TvWatchView() {
   const seekToAbsoluteRef = useRef<(seconds: number) => void>(() => {});
   const tryFallbackQualityRef = useRef<() => boolean>(() => false);
   const usingHlsRef = useRef(false);
+  const menuReturnFocusRef = useRef<HTMLElement | null>(null);
+  const progressRef = useRef(0);
+  const currentTimeRef = useRef(0);
+  const nativeSubtitleInitializedRef = useRef(false);
+  const activeSubtitleRef = useRef<number | null>(null);
 
   const TV_CONTROLS_AUTO_HIDE_MS = 3_000;
 
@@ -82,6 +89,8 @@ export function TvWatchView() {
   const [streamStartSeconds, setStreamStartSeconds] = useState<number | null>(null);
   const [sourceDurationMs, setSourceDurationMs] = useState(0);
   const [streamGeneration, setStreamGeneration] = useState(0);
+  const [forceRemux, setForceRemux] = useState(false);
+  const nativeRemuxFallbackRef = useRef(false);
   const [availableQualities, setAvailableQualities] = useState<StreamQuality[]>([
     "original",
     "480p",
@@ -113,6 +122,7 @@ export function TvWatchView() {
   const [subtitleSearchOpen, setSubtitleSearchOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [playbackHasBegun, setPlaybackHasBegun] = useState(false);
+  const [scrubPreviewPercent, setScrubPreviewPercent] = useState<number | null>(null);
 
   const {
     subtitles,
@@ -122,9 +132,15 @@ export function TvWatchView() {
     opensubtitlesConfigured,
   } = useSubtitleTracks(fileId, type, videoRef, streamGeneration);
 
+  const { thumbnails, lookupCue } = useSeekThumbnails(
+    fileId,
+    type === "movie" ? "movie" : "episode",
+    Boolean(fileId && !Number.isNaN(fileId)),
+  );
+
   const playbackStream = useMemo(
-    () => resolvePlaybackStream(quality, streamInfo),
-    [quality, streamInfo],
+    () => resolvePlaybackStream(quality, streamInfo, { forceRemux }),
+    [quality, streamInfo, forceRemux],
   );
   const usingHlsPlayback = playbackStream.usingHls;
   usingHlsRef.current = usingHlsPlayback;
@@ -160,10 +176,27 @@ export function TvWatchView() {
 
   useDocumentTitle(title || null);
 
+  const rememberMenuFocus = useCallback(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active.hasAttribute("data-tv-item")) {
+      menuReturnFocusRef.current = active;
+    }
+  }, []);
+
   const closeMenus = useCallback(() => {
     setSubtitleMenuOpen(false);
     setQualityMenuOpen(false);
     setPanelOpen(false);
+
+    requestAnimationFrame(() => {
+      const target = menuReturnFocusRef.current;
+      menuReturnFocusRef.current = null;
+      if (!target?.isConnected) return;
+      focusTvItem(target);
+      if (target.hasAttribute("data-tv-watch-scrub")) {
+        setScrubPreviewPercent(progressRef.current);
+      }
+    });
   }, []);
 
   const revealControls = useCallback(
@@ -283,6 +316,17 @@ export function TvWatchView() {
       },
       onError: () => {
         setBuffering(false);
+        if (
+          usesNativePlayer &&
+          !nativeRemuxFallbackRef.current &&
+          !usingHlsRef.current &&
+          streamInfo?.transcodingEnabled
+        ) {
+          nativeRemuxFallbackRef.current = true;
+          setForceRemux(true);
+          setStreamGeneration((g) => g + 1);
+          return;
+        }
         if (tryFallbackQualityRef.current()) return;
         setError("Playback failed. Try a lower quality from the settings menu.");
       },
@@ -305,6 +349,11 @@ export function TvWatchView() {
   useEffect(() => {
     setStreamStartSeconds(null);
     setStreamGeneration(0);
+    setForceRemux(false);
+    nativeRemuxFallbackRef.current = false;
+    nativeSubtitleInitializedRef.current = false;
+    activeSubtitleRef.current = null;
+    menuReturnFocusRef.current = null;
     setShowControls(true);
     setPlaybackHasBegun(false);
   }, [fileId, type]);
@@ -402,13 +451,13 @@ export function TvWatchView() {
       return;
     }
 
-    const playback = resolvePlaybackStream(quality, streamInfo);
+    const playback = resolvePlaybackStream(quality, streamInfo, { forceRemux });
     if (!playback.usingHls && playback.audioCompatNotice) {
       return;
     }
 
     const startAt = streamStartSeconds ?? initialResumeSeconds ?? 0;
-    const stream = resolvePlaybackStream(quality, streamInfo);
+    const stream = resolvePlaybackStream(quality, streamInfo, { forceRemux });
     const usingHls = stream.usingHls;
 
     if (usesNativePlayer) {
@@ -549,8 +598,69 @@ export function TvWatchView() {
     updateBufferedPosition,
     title,
     sourceDurationMs,
+    usesNativePlayer,
+    forceRemux,
+  ]);
+
+  useEffect(() => {
+    if (!usesNativePlayer || !streamInfo || initialResumeSeconds === null || !fileId) {
+      return;
+    }
+
+    if (!nativeSubtitleInitializedRef.current) {
+      nativeSubtitleInitializedRef.current = true;
+      activeSubtitleRef.current = activeSubtitle;
+      return;
+    }
+
+    if (activeSubtitleRef.current === activeSubtitle) return;
+    activeSubtitleRef.current = activeSubtitle;
+
+    const stream = resolvePlaybackStream(quality, streamInfo, { forceRemux });
+    const usingHls = stream.usingHls;
+    const relativeTime = currentTimeRef.current;
+    const absoluteTime = usingHls
+      ? hlsStartOffsetRef.current + relativeTime
+      : relativeTime;
+
+    const relativeUrl = api.streamUrl(
+      fileId,
+      type === "movie" ? "movie" : "episode",
+      quality,
+      undefined,
+      streamGeneration,
+      stream.hlsQuality,
+    );
+
+    startNativePlayback({
+      url: toAbsoluteMediaUrl(relativeUrl),
+      title: title || "MEDIA!",
+      fileId,
+      itemType: type === "movie" ? "movie" : "episode",
+      startSeconds: usingHls ? 0 : absoluteTime,
+      durationMs: sourceDurationMs || streamInfo.durationMs || 0,
+      isHls: usingHls,
+      subtitleUrl:
+        activeSubtitle != null
+          ? toAbsoluteMediaUrl(api.subtitleUrl(activeSubtitle))
+          : undefined,
+    });
+
+    if (usingHls && relativeTime > 0) {
+      seekNativePlayback(relativeTime * 1000);
+    }
+  }, [
     activeSubtitle,
     usesNativePlayer,
+    streamInfo,
+    initialResumeSeconds,
+    fileId,
+    type,
+    quality,
+    forceRemux,
+    streamGeneration,
+    title,
+    sourceDurationMs,
   ]);
 
   useEffect(() => {
@@ -568,6 +678,8 @@ export function TvWatchView() {
     optimisticAbsoluteSeconds !== null ? optimisticAbsoluteSeconds : absoluteCurrentTime;
   const progress =
     absoluteDurationMs > 0 ? (displayedAbsoluteTime * 1000) / absoluteDurationMs * 100 : 0;
+  progressRef.current = progress;
+  currentTimeRef.current = currentTime;
   const toTimelinePercent = (seconds: number) =>
     absoluteDurationMs > 0
       ? Math.min(100, Math.max(0, ((seconds * 1000) / absoluteDurationMs) * 100))
@@ -791,6 +903,16 @@ export function TvWatchView() {
           ? `Starting ${(playbackStream.hlsQuality ?? quality).toUpperCase()} stream...`
           : "Loading video...";
   const controlsVisible = showControls || panelOpen;
+  const showTransportControls = playbackHasBegun && !showPosterBackdrop;
+  const timelinePreviewPercent = scrubPreviewPercent ?? progress;
+  const timelinePreviewMs =
+    totalDurationSeconds > 0
+      ? (timelinePreviewPercent / 100) * totalDurationSeconds * 1000
+      : 0;
+  const showScrubPreview =
+    showTransportControls &&
+    scrubPreviewPercent !== null &&
+    totalDurationSeconds > 0;
 
   const controlButtonClassName =
     "tv-watch-control flex items-center justify-center rounded-lg text-white";
@@ -848,11 +970,25 @@ export function TvWatchView() {
       if (active?.hasAttribute("data-tv-watch-scrub")) {
         if (e.key === "ArrowLeft" || e.key === "MediaRewind") {
           e.preventDefault();
+          if (totalDurationSeconds > 0) {
+            const next = Math.max(
+              0,
+              (optimisticAbsoluteSeconds ?? displayedAbsoluteTime) - 30,
+            );
+            setScrubPreviewPercent((next / totalDurationSeconds) * 100);
+          }
           skipRelative(-30);
           return;
         }
         if (e.key === "ArrowRight" || e.key === "MediaFastForward") {
           e.preventDefault();
+          if (totalDurationSeconds > 0) {
+            const next = Math.min(
+              totalDurationSeconds,
+              (optimisticAbsoluteSeconds ?? displayedAbsoluteTime) + 30,
+            );
+            setScrubPreviewPercent((next / totalDurationSeconds) * 100);
+          }
           skipRelative(30);
           return;
         }
@@ -907,6 +1043,9 @@ export function TvWatchView() {
     controlsVisible,
     countdown,
     cancelCountdown,
+    totalDurationSeconds,
+    optimisticAbsoluteSeconds,
+    displayedAbsoluteTime,
   ]);
 
   useEffect(() => {
@@ -936,162 +1075,192 @@ export function TvWatchView() {
       data-tv-watch-player=""
       data-native-video={usesNativePlayer ? "" : undefined}
       className={cn(
-        "fixed inset-0 z-40 bg-black",
+        "fixed inset-0 z-40 flex flex-col bg-black",
         usesNativePlayer && playbackHasBegun && "bg-transparent",
       )}
       onMouseMove={() => revealControls(true)}
       onClick={() => revealControls(true)}
     >
-      <PlaybackPosterBackdrop posterUrl={posterUrl} visible={showPosterBackdrop} />
-      <div
-        ref={focusSinkRef}
-        tabIndex={-1}
-        aria-hidden="true"
-        className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0 outline-none focus:outline-none"
-      />
-      {!usesNativePlayer && (
-      <video
-        ref={videoRef}
-        tabIndex={-1}
-        className="media-subtitles absolute inset-0 z-[2] h-full w-full object-contain outline-none focus:outline-none"
-        controls={false}
-        playsInline
-        preload={streamInfo ? "auto" : "metadata"}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (panelOpen) {
-            closeMenus();
-            return;
-          }
-          togglePlay();
-        }}
-      />
-      )}
-
-      {showLoadingOverlay && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
-          <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-background/80 px-5 py-4 text-lg text-white">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            {loadingMessage}
-          </div>
-        </div>
-      )}
-
-      {countdown && countdownLabel && (
-        <NextEpisodeCountdownOverlay
-          countdown={countdown}
-          label={countdownLabel}
-          tv
-          onCancel={() => {
-            cancelCountdown();
-            router.push(backHref);
-          }}
-          onPlayNow={playNextEpisodeNow}
-        />
-      )}
-
-      {error && (
+      {/* Video stage — poster and video stay above the control dock */}
+      <div className="relative min-h-0 flex-1">
+        <PlaybackPosterBackdrop posterUrl={posterUrl} visible={showPosterBackdrop} />
         <div
-          data-tv-watch-error=""
-          className="absolute inset-0 z-30 flex items-center justify-center bg-black/85 px-8"
+          ref={focusSinkRef}
+          tabIndex={-1}
+          aria-hidden="true"
+          className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0 outline-none focus:outline-none"
+        />
+        {!usesNativePlayer && (
+          <video
+            ref={videoRef}
+            tabIndex={-1}
+            className="media-subtitles absolute inset-0 z-[2] h-full w-full object-contain outline-none focus:outline-none"
+            controls={false}
+            playsInline
+            preload={streamInfo ? "auto" : "metadata"}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (panelOpen) {
+                closeMenus();
+                return;
+              }
+              togglePlay();
+            }}
+          />
+        )}
+
+        {showLoadingOverlay && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
+            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-background/80 px-5 py-4 text-lg text-white">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              {loadingMessage}
+            </div>
+          </div>
+        )}
+
+        {countdown && countdownLabel && (
+          <NextEpisodeCountdownOverlay
+            countdown={countdown}
+            label={countdownLabel}
+            tv
+            onCancel={() => {
+              cancelCountdown();
+              router.push(backHref);
+            }}
+            onPlayNow={playNextEpisodeNow}
+          />
+        )}
+
+        {error && (
+          <div
+            data-tv-watch-error=""
+            className="absolute inset-0 z-30 flex items-center justify-center bg-black/85 px-8"
+          >
+            <div className="max-w-lg text-center">
+              <p className="mb-6 text-lg text-red-400">{error}</p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {transcodingEnabled &&
+                  nextFallbackQuality(quality, availableQualities) && (
+                    <TvFocusButton
+                      onClick={() => {
+                        const next = nextFallbackQuality(quality, availableQualities);
+                        if (next) changeQuality(next);
+                      }}
+                      className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
+                    >
+                      Try {qualityLabel(nextFallbackQuality(quality, availableQualities)!, sourceHeight)}
+                    </TvFocusButton>
+                  )}
+                <TvFocusLink
+                  href={backHref}
+                  className="inline-flex rounded-xl border border-white/20 px-6 py-3 font-semibold text-white"
+                >
+                  Go back
+                </TvFocusLink>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Top chrome overlays the video stage only */}
+        <div
+          className={cn(
+            "absolute inset-x-0 top-0 z-20 transition-opacity duration-300 pointer-events-none",
+            controlsVisible ? "opacity-100" : "opacity-0",
+          )}
         >
-          <div className="max-w-lg text-center">
-            <p className="mb-6 text-lg text-red-400">{error}</p>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              {transcodingEnabled &&
-                nextFallbackQuality(quality, availableQualities) && (
-                  <TvFocusButton
-                    onClick={() => {
-                      const next = nextFallbackQuality(quality, availableQualities);
-                      if (next) changeQuality(next);
-                    }}
-                    className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
-                  >
-                    Try {qualityLabel(nextFallbackQuality(quality, availableQualities)!, sourceHeight)}
-                  </TvFocusButton>
-                )}
+          <div className="pointer-events-auto bg-gradient-to-b from-black/85 to-transparent px-6 pb-6 pt-6">
+            <div
+              data-tv-row=""
+              data-tv-content-row=""
+              data-tv-watch-controls=""
+              className="flex items-center gap-3 py-1"
+            >
               <TvFocusLink
                 href={backHref}
-                className="inline-flex rounded-xl border border-white/20 px-6 py-3 font-semibold text-white"
+                variant="nav"
+                className={cn("h-11 w-11 backdrop-blur", controlButtonClassName)}
+                aria-label="Back"
               >
-                Go back
+                <ChevronLeft className="h-5 w-5" />
               </TvFocusLink>
+              <div className="min-w-0">
+                <p className="truncate text-lg font-bold text-white">{title || "Playing"}</p>
+                <p className="text-xs text-white/70">
+                  {qualityLabel(quality, sourceHeight)}
+                  {activeSubtitle !== null && " · Subtitles on"}
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
+      {/* Bottom dock — scrub, preview, and transport never overlap the poster */}
       <div
         className={cn(
-          "absolute inset-0 z-20 flex flex-col justify-between transition-opacity duration-300 pointer-events-none",
-          controlsVisible ? "opacity-100" : "opacity-0",
+          "relative z-20 shrink-0 overflow-hidden transition-all duration-300",
+          !showTransportControls && "pointer-events-none max-h-0 opacity-0",
+          showTransportControls && controlsVisible
+            ? "max-h-[280px] opacity-100"
+            : "pointer-events-none max-h-0 opacity-0",
         )}
         {...(!controlsVisible && !panelOpen ? { inert: true } : {})}
       >
-        <div className="pointer-events-auto bg-gradient-to-b from-black/85 to-transparent px-6 pb-6 pt-6">
-          <div
-            data-tv-row=""
-            data-tv-content-row=""
-            data-tv-watch-controls=""
-            className="flex items-center gap-3 py-1"
-          >
-            <TvFocusLink
-              href={backHref}
-              variant="nav"
-              className={cn("h-11 w-11 backdrop-blur", controlButtonClassName)}
-              aria-label="Back"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </TvFocusLink>
-            <div className="min-w-0">
-              <p className="truncate text-lg font-bold text-white">{title || "Playing"}</p>
-              <p className="text-xs text-white/70">
-                {qualityLabel(quality, sourceHeight)}
-                {activeSubtitle !== null && " · Subtitles on"}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="pointer-events-auto bg-gradient-to-t from-black/90 via-black/50 to-transparent px-6 pb-6 pt-10">
+        <div className="pointer-events-auto border-t border-white/10 bg-gradient-to-t from-black via-black/95 to-black/80 px-6 pb-6 pt-4">
           <div
             data-tv-row=""
             data-tv-content-row=""
             data-tv-watch-controls=""
             className="mb-3 py-1"
           >
-            <TvFocusButton
-              variant="nav"
-              data-tv-watch-scrub=""
-              aria-label="Progress"
-              onClick={() => revealControls(false)}
-              className="relative h-2 w-full overflow-visible rounded-full bg-white/20 p-0"
-            >
-              {bufferedRanges.map((range, index) => {
-                const left = toTimelinePercent(range.start);
-                const width = Math.max(0, toTimelinePercent(range.end) - left);
-                if (width <= 0) return null;
-                return (
-                  <div
-                    key={index}
-                    className="pointer-events-none absolute inset-y-0 rounded-full bg-white/45"
-                    style={{ left: `${left}%`, width: `${width}%` }}
+            <div className="relative">
+              {showScrubPreview && (
+                <div className="mb-3 flex h-[92px] items-end justify-center">
+                  <SeekPreviewTooltip
+                    variant="inline"
+                    percent={timelinePreviewPercent}
+                    timeMs={timelinePreviewMs}
+                    cue={lookupCue(timelinePreviewMs)}
+                    spriteUrl={thumbnails?.spriteUrl ?? null}
                   />
-                );
-              })}
-              <div
-                className={cn(
-                  "pointer-events-none absolute inset-y-0 left-0 bg-primary",
-                  progress >= 99.5 ? "rounded-full" : "rounded-l-full",
-                  optimisticAbsoluteSeconds === null && "transition-[width] duration-150",
-                )}
-                style={{ width: `${Math.min(100, progress)}%` }}
-              />
-              <div
-                className="pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-primary"
-                style={{ left: `${Math.min(100, progress)}%` }}
-              />
-            </TvFocusButton>
+                </div>
+              )}
+              <TvFocusButton
+                variant="nav"
+                data-tv-watch-scrub=""
+                aria-label="Progress"
+                onClick={() => revealControls(false)}
+                onFocus={() => setScrubPreviewPercent(progress)}
+                onBlur={() => setScrubPreviewPercent(null)}
+                className="relative h-2 w-full overflow-visible rounded-full bg-white/20 p-0"
+              >
+                {bufferedRanges.map((range, index) => {
+                  const left = toTimelinePercent(range.start);
+                  const width = Math.max(0, toTimelinePercent(range.end) - left);
+                  if (width <= 0) return null;
+                  return (
+                    <div
+                      key={index}
+                      className="pointer-events-none absolute inset-y-0 rounded-full bg-white/45"
+                      style={{ left: `${left}%`, width: `${width}%` }}
+                    />
+                  );
+                })}
+                <div
+                  className={cn(
+                    "pointer-events-none absolute inset-y-0 left-0 bg-primary",
+                    progress >= 99.5 ? "rounded-full" : "rounded-l-full",
+                    optimisticAbsoluteSeconds === null && "transition-[width] duration-150",
+                  )}
+                  style={{ width: `${Math.min(100, progress)}%` }}
+                />
+                <div
+                  className="pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-primary"
+                  style={{ left: `${Math.min(100, progress)}%` }}
+                />
+              </TvFocusButton>
+            </div>
           </div>
 
           <div className="flex items-center justify-between gap-3">
@@ -1137,7 +1306,10 @@ export function TvWatchView() {
                 variant="nav"
                 onClick={() => {
                   setQualityMenuOpen(false);
-                  setSubtitleMenuOpen((open) => !open);
+                  setSubtitleMenuOpen((open) => {
+                    if (!open) rememberMenuFocus();
+                    return !open;
+                  });
                   revealControls(false);
                 }}
                 className={cn(
@@ -1154,7 +1326,10 @@ export function TvWatchView() {
                 variant="nav"
                 onClick={() => {
                   setSubtitleMenuOpen(false);
-                  setQualityMenuOpen((open) => !open);
+                  setQualityMenuOpen((open) => {
+                    if (!open) rememberMenuFocus();
+                    return !open;
+                  });
                   revealControls(false);
                 }}
                 disabled={!transcodingEnabled && quality === "original"}
@@ -1216,7 +1391,10 @@ export function TvWatchView() {
               <TvFocusButton
                 variant="card"
                 onClick={() => {
-                  closeMenus();
+                  rememberMenuFocus();
+                  setSubtitleMenuOpen(false);
+                  setQualityMenuOpen(false);
+                  setPanelOpen(false);
                   setSubtitleSearchOpen(true);
                 }}
                 className="rounded-xl bg-muted/40 px-4 py-3 text-left text-base text-primary"
@@ -1264,14 +1442,26 @@ export function TvWatchView() {
       <SubtitleSearchDialog
         tv
         open={subtitleSearchOpen}
-        onClose={() => setSubtitleSearchOpen(false)}
+        onClose={() => {
+          setSubtitleSearchOpen(false);
+          requestAnimationFrame(() => {
+            const target = menuReturnFocusRef.current;
+            menuReturnFocusRef.current = null;
+            if (target?.isConnected) focusTvItem(target);
+          });
+        }}
         fileId={fileId}
         type={type}
         opensubtitlesConfigured={opensubtitlesConfigured}
         onDownloaded={(track) => {
           setActiveSubtitle(track.id);
-          closeMenus();
           void refreshSubtitles(track);
+          setSubtitleSearchOpen(false);
+          requestAnimationFrame(() => {
+            const target = menuReturnFocusRef.current;
+            menuReturnFocusRef.current = null;
+            if (target?.isConnected) focusTvItem(target);
+          });
         }}
       />
     </div>

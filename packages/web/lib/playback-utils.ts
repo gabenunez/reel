@@ -2,6 +2,7 @@ import type { StreamQuality } from "@/lib/api";
 import type { StreamInfo } from "@/lib/api";
 import { nativeTvPlayerAvailable } from "@/lib/android-bridge";
 import {
+  containerPrefersHlsRemux,
   isBrowserDirectPlayVideoSupported,
   isHlsVideoCopySupported,
   normalizeCodecName,
@@ -48,6 +49,7 @@ function browserSupportsDirectPlayVideo(videoCodec?: string | null): boolean {
 
 function effectiveOriginalPlaybackMode(
   streamInfo: StreamInfo,
+  options?: { forceRemux?: boolean },
 ): ReturnType<typeof resolveOriginalPlaybackMode> {
   const mode = resolveOriginalPlaybackMode({
     audioCodec: streamInfo.audioCodec,
@@ -57,11 +59,32 @@ function effectiveOriginalPlaybackMode(
 
   // Native ExoPlayer decodes HEVC, AC3, DTS, etc. — direct play at source resolution.
   if (nativeTvPlayerAvailable()) {
-    return resolveNativeTvPlaybackMode({
+    const nativeMode = resolveNativeTvPlaybackMode({
       audioCodec: streamInfo.audioCodec,
       videoCodec: streamInfo.videoCodec,
       transcodingEnabled: streamInfo.transcodingEnabled,
     });
+
+    if (
+      options?.forceRemux &&
+      nativeMode === "direct" &&
+      streamInfo.transcodingEnabled &&
+      isHlsVideoCopySupported(streamInfo.videoCodec)
+    ) {
+      return "remux";
+    }
+
+    // MKV/WebM/etc. remux to HLS plays more smoothly than progressive HTTP on TV.
+    if (
+      nativeMode === "direct" &&
+      containerPrefersHlsRemux(streamInfo.fileName) &&
+      streamInfo.transcodingEnabled &&
+      isHlsVideoCopySupported(streamInfo.videoCodec)
+    ) {
+      return "remux";
+    }
+
+    return nativeMode;
   }
 
   if (mode === "direct" && !browserSupportsDirectPlayVideo(streamInfo.videoCodec)) {
@@ -90,6 +113,7 @@ function effectiveOriginalPlaybackMode(
 export function resolvePlaybackStream(
   quality: StreamQuality,
   streamInfo: StreamInfo | null,
+  options?: { forceRemux?: boolean },
 ): {
   usingHls: boolean;
   hlsQuality?: PlaybackHlsQuality;
@@ -99,7 +123,9 @@ export function resolvePlaybackStream(
     return { usingHls: true, hlsQuality: quality, audioCompatNotice: null };
   }
 
-  const mode = streamInfo ? effectiveOriginalPlaybackMode(streamInfo) : "direct";
+  const mode = streamInfo
+    ? effectiveOriginalPlaybackMode(streamInfo, options)
+    : "direct";
 
   if (mode === "direct" || !streamInfo) {
     return { usingHls: false, audioCompatNotice: null };
@@ -122,7 +148,10 @@ export function resolvePlaybackStream(
     const fallback =
       networkQuality && networkQuality !== "original"
         ? networkQuality
-        : pickTranscodeQualityForPlayback(streamInfo.availableQualities);
+        : pickTranscodeQualityForPlayback(
+            streamInfo.availableQualities,
+            streamInfo.height,
+          );
     return {
       usingHls: true,
       hlsQuality: fallback,
@@ -159,7 +188,10 @@ export function resolveInitialStreamQuality(streamInfo: StreamInfo): {
         quality:
           networkQuality && networkQuality !== "original"
             ? networkQuality
-            : pickTranscodeQualityForPlayback(streamInfo.availableQualities),
+            : pickTranscodeQualityForPlayback(
+                streamInfo.availableQualities,
+                streamInfo.height,
+              ),
         error: null,
       };
     }
@@ -495,7 +527,7 @@ export function createPlaybackHls(
 
   return new HlsConstructor({
     backBufferLength: tv ? 60 : 90,
-    maxBufferLength: tv ? 120 : 30,
+    maxBufferLength: tv ? 120 : 60,
     maxMaxBufferLength: tv ? 300 : 600,
     maxBufferSize: tv ? 200 * 1000 * 1000 : 60 * 1000 * 1000,
     maxBufferHole: 0.5,
