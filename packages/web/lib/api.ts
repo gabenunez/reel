@@ -103,6 +103,31 @@ export interface AppSettings {
   browseShortcuts: BrowseShortcut[];
 }
 
+export interface PlexImportPreview {
+  detected: boolean;
+  dbPath: string | null;
+  candidates: string[];
+  plexEntries: number;
+  resumeEntries: number;
+  watchedEntries: number;
+  matchableEntries: number;
+  reelMovieFiles: number;
+  reelEpisodes: number;
+  warning?: string;
+}
+
+export interface PlexImportResult {
+  success: boolean;
+  dbPath: string;
+  imported: number;
+  updated: number;
+  skipped: number;
+  unmatched: number;
+  samples: {
+    unmatchedTitles: string[];
+  };
+}
+
 export interface UpdateStatus {
   currentVersion: string;
   latestVersion: string | null;
@@ -308,6 +333,15 @@ export const api = {
       method: "POST",
     }),
   getSettings: () => fetchApi<AppSettings>("/api/settings"),
+  previewPlexImport: (path?: string) =>
+    fetchApi<PlexImportPreview>(
+      `/api/settings/plex-import${path ? `?path=${encodeURIComponent(path)}` : ""}`,
+    ),
+  importPlexWatchProgress: (data?: { plexDbPath?: string; overwrite?: boolean }) =>
+    fetchApi<PlexImportResult>("/api/settings/plex-import", {
+      method: "POST",
+      body: JSON.stringify(data ?? {}),
+    }),
   browse: (path?: string) =>
     fetchApi<BrowseResult>(
       `/api/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`,

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.41 — 2026-07-03
+
+### TV
+- **Living room UI** — Plex-style spatial navigation, focus styling, side rail, and smooth horizontal row scrolling
+- **Watch player** — TV remote controls, skip buttons, buffered progress, subtitles/quality menus, and larger subtitle cues
+- **Page access** — See-all tiles and browse shortcuts to Continue Watching, Recently Added, Favorites, libraries, and decks
+- **Android TV** — QR pairing setup flow and session bridge for the TV WebView app
+
+### Import
+- **Plex watch history** — Detect local Plex library database and import resume points and watched state into Reel (Settings → Import from Plex)
+
 ## 0.1.40 — 2026-07-03
 
 ### Subtitles

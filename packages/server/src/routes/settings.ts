@@ -17,6 +17,11 @@ import {
   listDecksWithCounts,
   resolveDeckPaths,
 } from "../services/decks.js";
+import {
+  detectPlexLibraryDatabase,
+  importPlexWatchProgress,
+  previewPlexImport,
+} from "../services/plex-import.js";
 
 export async function settingsRoutes(
   app: FastifyInstance,
@@ -335,4 +340,38 @@ export async function settingsRoutes(
     const result = await scanner.refreshMetadata();
     return { success: true, ...result };
   });
+
+  app.get<{ Querystring: { path?: string } }>(
+    "/api/settings/plex-import",
+    async (request) => {
+      return previewPlexImport(db, request.query.path);
+    },
+  );
+
+  app.post<{ Body: { plexDbPath?: string; overwrite?: boolean } }>(
+    "/api/settings/plex-import",
+    async (request, reply) => {
+      const customPath = request.body?.plexDbPath?.trim();
+      if (customPath) {
+        const detection = detectPlexLibraryDatabase(customPath);
+        if (!detection.detected) {
+          return reply.status(400).send({
+            error: "The provided path is not a readable Plex library database.",
+          });
+        }
+      }
+
+      try {
+        const result = await importPlexWatchProgress(db, {
+          plexDbPath: customPath || undefined,
+          overwrite: request.body?.overwrite ?? false,
+        });
+        return result;
+      } catch (err) {
+        return reply.status(400).send({
+          error: err instanceof Error ? err.message : "Plex import failed",
+        });
+      }
+    },
+  );
 }

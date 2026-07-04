@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   CheckCircle2,
   Database,
+  History,
   Loader2,
   Lock,
   LogOut,
@@ -12,7 +13,7 @@ import {
   Music2,
   Subtitles,
 } from "lucide-react";
-import { api, type AppSettings } from "@/lib/api";
+import { api, type AppSettings, type PlexImportPreview } from "@/lib/api";
 import { useAuth } from "@/components/auth-gate";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,6 +46,12 @@ export function SettingsClient() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [plexPreview, setPlexPreview] = useState<PlexImportPreview | null>(null);
+  const [plexPath, setPlexPath] = useState("");
+  const [plexOverwrite, setPlexOverwrite] = useState(false);
+  const [plexLoading, setPlexLoading] = useState(false);
+  const [plexImporting, setPlexImporting] = useState(false);
+  const [plexMessage, setPlexMessage] = useState<string | null>(null);
 
   const loadSettings = useCallback((options?: { silent?: boolean }) => {
     if (!options?.silent) {
@@ -62,6 +69,50 @@ export function SettingsClient() {
     const interval = setInterval(() => loadSettings({ silent: true }), 5000);
     return () => clearInterval(interval);
   }, [loadSettings]);
+
+  const loadPlexPreview = useCallback(async (path?: string) => {
+    setPlexLoading(true);
+    setPlexMessage(null);
+    try {
+      const preview = await api.previewPlexImport(path);
+      setPlexPreview(preview);
+      if (preview.dbPath && !path) {
+        setPlexPath(preview.dbPath);
+      }
+    } catch (err) {
+      setPlexMessage(err instanceof Error ? err.message : "Failed to detect Plex");
+      setPlexPreview(null);
+    } finally {
+      setPlexLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPlexPreview();
+  }, [loadPlexPreview]);
+
+  const handleImportPlex = async () => {
+    setPlexImporting(true);
+    setPlexMessage(null);
+    try {
+      const result = await api.importPlexWatchProgress({
+        plexDbPath: plexPath.trim() || undefined,
+        overwrite: plexOverwrite,
+      });
+      const parts = [
+        `${result.imported} imported`,
+        result.updated > 0 ? `${result.updated} updated` : null,
+        result.skipped > 0 ? `${result.skipped} skipped` : null,
+        result.unmatched > 0 ? `${result.unmatched} unmatched` : null,
+      ].filter(Boolean);
+      setPlexMessage(`Import complete — ${parts.join(", ")}.`);
+      await loadPlexPreview(plexPath.trim() || undefined);
+    } catch (err) {
+      setPlexMessage(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setPlexImporting(false);
+    }
+  };
 
   const handleScan = async (libraryId: number) => {
     setScanning(libraryId);
@@ -243,6 +294,135 @@ export function SettingsClient() {
           )}
         </CardContent>
       </Card>
+
+      <SettingsSection
+        icon={History}
+        title="Import from Plex"
+        description="Detect a local Plex Media Server library database and copy resume points and watched state into Reel."
+      >
+        {initialLoad ? (
+          <SettingsCardSkeleton lines={4} />
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
+              {plexPreview?.detected ? (
+                <>
+                  <p className="font-medium text-foreground">Plex library database detected</p>
+                  <p className="mt-1 break-all font-mono text-xs">{plexPreview.dbPath}</p>
+                </>
+              ) : (
+                <p>{plexPreview?.warning ?? "Scanning for Plex…"}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="plex-db-path">
+                Plex database path
+              </label>
+              <Input
+                id="plex-db-path"
+                value={plexPath}
+                onChange={(e) => setPlexPath(e.target.value)}
+                placeholder="Optional — auto-detect when empty"
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Usually{" "}
+                <span className="font-mono">
+                  …/Plex Media Server/Plug-in Support/Databases/com.plexapp.plugins.library.db
+                </span>
+                . Stop Plex before importing.
+              </p>
+            </div>
+
+            {plexLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Checking Plex database…
+              </div>
+            ) : plexPreview?.detected ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                <StatusRow
+                  label="Plex entries"
+                  ok
+                  okText={`${plexPreview.plexEntries} with play history`}
+                  failText=""
+                />
+                <StatusRow
+                  label="Can import"
+                  ok={plexPreview.matchableEntries > 0}
+                  okText={`${plexPreview.matchableEntries} matched in Reel`}
+                  failText="No matching files yet — scan libraries first"
+                />
+                <StatusRow
+                  label="Resume points"
+                  ok={plexPreview.resumeEntries > 0}
+                  okText={`${plexPreview.resumeEntries} in Plex`}
+                  failText="None found"
+                />
+                <StatusRow
+                  label="Reel library"
+                  ok={plexPreview.reelMovieFiles + plexPreview.reelEpisodes > 0}
+                  okText={`${plexPreview.reelMovieFiles} movies / ${plexPreview.reelEpisodes} episodes`}
+                  failText="No scanned media yet"
+                />
+              </div>
+            ) : null}
+
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={plexOverwrite}
+                onChange={(e) => setPlexOverwrite(e.target.checked)}
+                className="rounded border-border"
+              />
+              Overwrite existing Reel progress when Plex is newer or further along
+            </label>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={plexLoading}
+                onClick={() => void loadPlexPreview(plexPath.trim() || undefined)}
+              >
+                {plexLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Refresh detection"
+                )}
+              </Button>
+              <Button
+                type="button"
+                disabled={
+                  plexImporting ||
+                  plexLoading ||
+                  !plexPreview?.detected ||
+                  plexPreview.matchableEntries === 0
+                }
+                onClick={() => void handleImportPlex()}
+              >
+                {plexImporting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Importing…
+                  </>
+                ) : (
+                  "Import watch history"
+                )}
+              </Button>
+            </div>
+
+            {plexPreview?.warning && plexPreview.detected && (
+              <p className="text-xs text-muted-foreground">{plexPreview.warning}</p>
+            )}
+
+            {plexMessage && (
+              <p className="text-sm text-muted-foreground">{plexMessage}</p>
+            )}
+          </div>
+        )}
+      </SettingsSection>
 
       <SettingsSection
         icon={Lock}
