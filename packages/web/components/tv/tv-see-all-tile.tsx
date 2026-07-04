@@ -22,7 +22,7 @@ export function TvSeeAllTile({ href, label, detail, className }: TvSeeAllTilePro
         aria-label={label}
         className="group w-[7.5rem]"
       >
-        <div className="tv-poster-art relative flex aspect-[2/3] flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border border-dashed border-primary/35 bg-primary/5">
+        <div className="tv-poster-art relative flex aspect-[2/3] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-primary/35 bg-primary/5">
           <LayoutGrid className="h-8 w-8 text-primary" />
         </div>
         <p className="tv-poster-title mt-2 line-clamp-2 text-sm font-semibold leading-snug">

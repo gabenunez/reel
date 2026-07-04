@@ -3,6 +3,9 @@ import type { StreamQuality, TranscodeQuality } from "./stream-quality.js";
 /** Codecs browsers can reliably decode in a direct progressive file stream. */
 const BROWSER_DIRECT_PLAY_AUDIO_CODECS = new Set(["aac", "mp3", "mp4a"]);
 
+/** Video codecs that HTML5 video can decode in a progressive MP4 stream. */
+const BROWSER_DIRECT_PLAY_VIDEO_CODECS = new Set(["h264", "avc1"]);
+
 const HLS_VIDEO_COPY_CODECS = new Set(["h264", "avc1", "hevc", "h265"]);
 
 export type OriginalPlaybackMode = "direct" | "remux" | "transcode" | "unsupported";
@@ -36,6 +39,15 @@ export function normalizeCodecName(codec?: string | null): string | null {
   if (name.startsWith("pcm")) {
     return "pcm";
   }
+  if (name === "mp4v" || name === "mpeg4" || name === "m4v" || name.startsWith("msmpeg4")) {
+    return "mpeg4";
+  }
+  if (name === "h264" || name === "avc1" || name.includes("avc")) {
+    return "h264";
+  }
+  if (name === "hevc" || name === "h265" || name.includes("hevc")) {
+    return "hevc";
+  }
 
   return name.split(/[._-]/)[0] ?? name;
 }
@@ -45,6 +57,13 @@ export function isBrowserDirectPlayAudioSupported(audioCodec?: string | null): b
   const normalized = normalizeCodecName(audioCodec);
   if (!normalized) return false;
   return BROWSER_DIRECT_PLAY_AUDIO_CODECS.has(normalized);
+}
+
+/** Whether the browser can decode this video track in a direct file stream. */
+export function isBrowserDirectPlayVideoSupported(videoCodec?: string | null): boolean {
+  const normalized = normalizeCodecName(videoCodec);
+  if (!normalized) return false;
+  return BROWSER_DIRECT_PLAY_VIDEO_CODECS.has(normalized);
 }
 
 /** Whether H.264/HEVC video can be segment-copied into browser HLS without re-encoding. */
@@ -59,7 +78,10 @@ export function resolveOriginalPlaybackMode(options: {
   videoCodec?: string | null;
   transcodingEnabled: boolean;
 }): OriginalPlaybackMode {
-  if (isBrowserDirectPlayAudioSupported(options.audioCodec)) {
+  const audioOk = isBrowserDirectPlayAudioSupported(options.audioCodec);
+  const videoOk = isBrowserDirectPlayVideoSupported(options.videoCodec);
+
+  if (audioOk && videoOk) {
     return "direct";
   }
   if (!options.transcodingEnabled) {
@@ -74,10 +96,13 @@ export function resolveOriginalPlaybackMode(options: {
 export function pickTranscodeQualityForPlayback(
   available: StreamQuality[],
 ): TranscodeQuality {
+  const transcodeTiers = available.filter(
+    (quality): quality is TranscodeQuality => quality !== "original",
+  );
+
   for (const quality of ["720p", "1080p", "480p"] as const) {
-    if (available.includes(quality)) return quality;
+    if (transcodeTiers.includes(quality)) return quality;
   }
 
-  const fallback = available.find((quality) => quality !== "original");
-  return (fallback as TranscodeQuality | undefined) ?? "720p";
+  return transcodeTiers[0] ?? "480p";
 }

@@ -11,6 +11,7 @@ import {
   getVideoBufferedRanges,
   getVideoSeekableEnd,
   PROGRESS_SAVE_MS,
+  resolveInitialStreamQuality,
   resolvePlaybackStream,
   startDirectPlaybackWithResume,
   type PlaybackMediaDetail,
@@ -22,7 +23,7 @@ import {
   qualityLabel,
 } from "@/lib/watch-helpers";
 import { SubtitleSearchDialog } from "@/components/subtitle-search-dialog";
-import { TvFocusButton, TvFocusLink, tvNavItemClassName } from "@/components/tv/tv-focus-link";
+import { TvFocusButton, TvFocusLink } from "@/components/tv/tv-focus-link";
 import { focusTvItem } from "@/lib/tv-focus";
 import { cn, formatDuration } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -208,17 +209,11 @@ export function TvWatchView() {
         setSourceHeight(info.height ?? null);
         setSourceDurationMs(info.durationMs ?? 0);
         setTranscodingEnabled(info.transcodingEnabled);
-        setQuality("original");
 
-        const playback = resolvePlaybackStream("original", info);
-        if (!playback.usingHls && playback.audioCompatNotice) {
-          const fallback = nextFallbackQuality("original", info.availableQualities);
-          if (fallback && info.transcodingEnabled) {
-            setQuality(fallback);
-            setError(null);
-          } else {
-            setError(playback.audioCompatNotice);
-          }
+        const initial = resolveInitialStreamQuality(info);
+        setQuality(initial.quality);
+        if (initial.error) {
+          setError(initial.error);
         } else {
           setError(null);
         }
@@ -568,7 +563,7 @@ export function TvWatchView() {
   const controlsVisible = showControls || panelOpen || !isPlaying;
 
   const controlButtonClassName =
-    "flex items-center justify-center rounded-lg bg-white/10 text-white transition-[background-color,transform] duration-150 ease-out";
+    "tv-watch-control flex items-center justify-center rounded-lg text-white";
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -800,10 +795,7 @@ export function TvWatchView() {
               data-tv-watch-scrub=""
               aria-label="Progress"
               onClick={() => revealControls(false)}
-              className={cn(
-                "relative h-3 w-full overflow-hidden rounded-full bg-white/20 p-0 transition-[box-shadow,transform] duration-150",
-                tvNavItemClassName,
-              )}
+              className="relative h-3 w-full overflow-hidden rounded-full bg-white/20 p-0"
             >
               {bufferedRanges.map((range, index) => {
                 const left = toTimelinePercent(range.start);
@@ -922,16 +914,12 @@ export function TvWatchView() {
           >
             <TvFocusButton
               variant="card"
+              selected={activeSubtitle === null}
               onClick={() => {
                 setActiveSubtitle(null);
                 closeMenus();
               }}
-              className={cn(
-                "rounded-xl px-4 py-3 text-left text-base",
-                activeSubtitle === null
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/40 text-white",
-              )}
+              className="rounded-xl px-4 py-3 text-left text-base"
             >
               Off
             </TvFocusButton>
@@ -939,16 +927,12 @@ export function TvWatchView() {
               <TvFocusButton
                 key={sub.id}
                 variant="card"
+                selected={activeSubtitle === sub.id}
                 onClick={() => {
                   setActiveSubtitle(sub.id);
                   closeMenus();
                 }}
-                className={cn(
-                  "rounded-xl px-4 py-3 text-left text-base",
-                  activeSubtitle === sub.id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted/40 text-white",
-                )}
+                className="rounded-xl px-4 py-3 text-left text-base"
               >
                 {formatSubtitleLabel(sub)}
               </TvFocusButton>
@@ -990,14 +974,10 @@ export function TvWatchView() {
               <TvFocusButton
                 key={option}
                 variant="card"
+                selected={quality === option}
                 disabled={option !== "original" && !transcodingEnabled}
                 onClick={() => changeQuality(option)}
-                className={cn(
-                  "rounded-xl px-4 py-3 text-left text-base disabled:opacity-40",
-                  quality === option
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted/40 text-white",
-                )}
+                className="rounded-xl px-4 py-3 text-left text-base disabled:opacity-40"
               >
                 {qualityLabel(option, sourceHeight)}
               </TvFocusButton>

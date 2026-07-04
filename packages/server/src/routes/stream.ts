@@ -3,7 +3,7 @@ import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import mime from "mime-types";
 import type { AppConfig } from "@reel/shared";
-import { getAvailableQualities, isBrowserDirectPlayAudioSupported, parseHlsQuality, resolveOriginalPlaybackMode } from "@reel/shared";
+import { getAvailableQualities, isBrowserDirectPlayAudioSupported, isBrowserDirectPlayVideoSupported, parseHlsQuality, parseTranscodeQuality, resolveOriginalPlaybackMode } from "@reel/shared";
 import type { DatabaseInstance } from "../db/index.js";
 import type { SubtitleService } from "../services/subtitles.js";
 import { subtitleHasContent } from "../utils/subtitle-content.js";
@@ -203,6 +203,9 @@ export async function streamRoutes(
         directPlayAudioSupported: isBrowserDirectPlayAudioSupported(
           metadata.audioCodec,
         ),
+        directPlayVideoSupported: isBrowserDirectPlayVideoSupported(
+          metadata.videoCodec,
+        ),
         originalPlaybackMode: resolveOriginalPlaybackMode({
           audioCodec: metadata.audioCodec,
           videoCodec: metadata.videoCodec,
@@ -301,15 +304,10 @@ export async function streamRoutes(
 
       const sourceHeight = await resolveSourceHeight(file);
 
-      if (hlsQuality !== "remux") {
-        const available = getAvailableQualities(sourceHeight).filter(
-          (q) => q !== "original",
-        );
-        if (!available.includes(hlsQuality)) {
-          return reply.status(400).send({
-            error: `${hlsQuality} is not available for this video`,
-          });
-        }
+      if (hlsQuality !== "remux" && !parseTranscodeQuality(hlsQuality)) {
+        return reply.status(400).send({
+          error: `${hlsQuality} is not a valid transcode quality`,
+        });
       }
 
       const startSeconds = parseStartSeconds(request.query.start);

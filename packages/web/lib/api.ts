@@ -246,6 +246,7 @@ export interface StreamInfo {
   availableQualities: StreamQuality[];
   transcodingEnabled: boolean;
   directPlayAudioSupported: boolean;
+  directPlayVideoSupported?: boolean;
   originalPlaybackMode?: "direct" | "remux" | "transcode" | "unsupported";
   watchProgress?: {
     positionMs: number;

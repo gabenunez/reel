@@ -213,19 +213,15 @@ export function TvMediaView() {
             data-tv-row=""
             data-tv-content-row=""
             data-tv-scroll-row=""
-            className={cn(tvScrollRowClassName, "mb-5 gap-2 px-6 py-1")}
+            className={cn(tvScrollRowClassName, "mb-5 gap-2 px-6")}
           >
             {seasons.map((season, idx) => (
               <TvFocusButton
                 key={season.id}
-                variant="card"
+                variant="chip"
+                selected={selectedSeason === idx}
                 onClick={() => setSelectedSeason(idx)}
-                className={cn(
-                  "shrink-0 snap-center px-4 py-2 text-sm font-medium transition-[background-color,transform] duration-150 ease-out",
-                  selectedSeason === idx
-                    ? "bg-primary text-primary-foreground scale-105"
-                    : "bg-muted/60 text-foreground",
-                )}
+                className="px-4 py-2 text-sm"
               >
                 {season.name ?? `Season ${season.seasonNumber}`}
               </TvFocusButton>
@@ -260,7 +256,7 @@ export function TvMediaView() {
                   key={ep.id}
                   href={routes.watch("episode", ep.id, media.id)}
                   variant="card"
-                  className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5"
+                  className="flex items-center gap-3 px-3 py-2.5"
                 >
                   <div className="relative h-[3.75rem] w-[6.75rem] shrink-0 overflow-hidden rounded-md bg-muted">
                     {ep.stillPath ? (

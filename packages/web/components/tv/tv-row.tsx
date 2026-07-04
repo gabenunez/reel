@@ -7,7 +7,7 @@ import { TvFocusButton } from "@/components/tv/tv-focus-link";
 import { TvSeeAllTile } from "@/components/tv/tv-see-all-tile";
 
 const tvScrollRowClassName =
-  "tv-scroll-row scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-8 py-2";
+  "tv-scroll-row scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-8 pt-4 pb-3";
 
 interface TvRowProps {
   title: string;

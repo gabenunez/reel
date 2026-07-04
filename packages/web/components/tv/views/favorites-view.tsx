@@ -82,13 +82,9 @@ export function TvFavoritesView() {
           <TvFocusLink
             key={option.id}
             href={routes.favorites(option.id === "all" ? undefined : option.id)}
-            variant="card"
-            className={cn(
-              "shrink-0 snap-center px-4 py-2 text-sm font-semibold transition-[background-color,transform] duration-150",
-              filter === option.id
-                ? "bg-primary text-primary-foreground scale-105"
-                : "bg-muted/60 text-foreground",
-            )}
+            variant="chip"
+            selected={filter === option.id}
+            className="px-4 py-2 text-sm font-semibold"
           >
             {option.label}
           </TvFocusLink>

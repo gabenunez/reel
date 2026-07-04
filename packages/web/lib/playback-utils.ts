@@ -1,6 +1,8 @@
 import type { StreamQuality } from "@/lib/api";
 import type { StreamInfo } from "@/lib/api";
 import {
+  isBrowserDirectPlayVideoSupported,
+  isHlsVideoCopySupported,
   normalizeCodecName,
   pickTranscodeQualityForPlayback,
   resolveOriginalPlaybackMode,
@@ -21,6 +23,23 @@ function browserSupportsHevcPlayback(): boolean {
   return codecs.some((codec) => video.canPlayType(codec) !== "");
 }
 
+function browserSupportsDirectPlayVideo(videoCodec?: string | null): boolean {
+  if (!isBrowserDirectPlayVideoSupported(videoCodec)) return false;
+  if (typeof document === "undefined") return true;
+
+  const normalized = normalizeCodecName(videoCodec);
+  if (normalized === "hevc" || normalized === "h265") {
+    return browserSupportsHevcPlayback();
+  }
+
+  if (normalized === "h264" || normalized === "avc1") {
+    const video = document.createElement("video");
+    return video.canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"') !== "";
+  }
+
+  return false;
+}
+
 function effectiveOriginalPlaybackMode(
   streamInfo: StreamInfo,
 ): ReturnType<typeof resolveOriginalPlaybackMode> {
@@ -29,6 +48,12 @@ function effectiveOriginalPlaybackMode(
     videoCodec: streamInfo.videoCodec,
     transcodingEnabled: streamInfo.transcodingEnabled,
   });
+
+  if (mode === "direct" && !browserSupportsDirectPlayVideo(streamInfo.videoCodec)) {
+    if (!streamInfo.transcodingEnabled) return "unsupported";
+    if (isHlsVideoCopySupported(streamInfo.videoCodec)) return "remux";
+    return "transcode";
+  }
 
   if (mode !== "remux") return mode;
 
@@ -62,6 +87,8 @@ export function resolvePlaybackStream(
   }
 
   const codec = streamInfo.audioCodec?.toUpperCase() ?? "this format";
+  const videoCodec = streamInfo.videoCodec?.toUpperCase() ?? "this format";
+  const videoSupported = isBrowserDirectPlayVideoSupported(streamInfo.videoCodec);
 
   if (mode === "remux") {
     return {
@@ -82,8 +109,37 @@ export function resolvePlaybackStream(
 
   return {
     usingHls: false,
-    audioCompatNotice: `${codec} audio can't play in the browser. Enable transcoding on the server or choose a lower quality.`,
+    audioCompatNotice: !videoSupported
+      ? `${videoCodec} video can't play in the browser. Enable transcoding on the server or choose a lower quality.`
+      : `${codec} audio can't play in the browser. Enable transcoding on the server or choose a lower quality.`,
   };
+}
+
+/** Pick the quality setting to use when opening the player for this file. */
+export function resolveInitialStreamQuality(streamInfo: StreamInfo): {
+  quality: StreamQuality;
+  error: string | null;
+} {
+  const playback = resolvePlaybackStream("original", streamInfo);
+
+  if (playback.usingHls) {
+    if (playback.hlsQuality && playback.hlsQuality !== "remux") {
+      return { quality: playback.hlsQuality, error: null };
+    }
+    return { quality: "original", error: null };
+  }
+
+  if (playback.audioCompatNotice) {
+    if (streamInfo.transcodingEnabled) {
+      return {
+        quality: pickTranscodeQualityForPlayback(streamInfo.availableQualities),
+        error: null,
+      };
+    }
+    return { quality: "original", error: playback.audioCompatNotice };
+  }
+
+  return { quality: "original", error: null };
 }
 
 export interface TvEpisodeSummary {

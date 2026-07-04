@@ -87,10 +87,9 @@ export function TvPagination({ page, totalPages, onPageChange, className }: TvPa
       )}
     >
       <TvFocusButton
-        variant="nav"
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-4 py-2 text-sm font-medium disabled:opacity-40"
+        className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium disabled:opacity-40"
       >
         <ChevronLeft className="h-4 w-4" /> Prev
       </TvFocusButton>
@@ -98,10 +97,9 @@ export function TvPagination({ page, totalPages, onPageChange, className }: TvPa
         {page} / {totalPages}
       </span>
       <TvFocusButton
-        variant="nav"
         disabled={page >= totalPages}
         onClick={() => onPageChange(page + 1)}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-4 py-2 text-sm font-medium disabled:opacity-40"
+        className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium disabled:opacity-40"
       >
         Next <ChevronRight className="h-4 w-4" />
       </TvFocusButton>

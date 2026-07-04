@@ -34,23 +34,25 @@ export function TvPoster({
         aria-label={item.title}
         className={cn("group w-[7.5rem]", linkClassName)}
       >
-        <div className="tv-poster-art poster-shadow relative aspect-[2/3] overflow-hidden rounded-lg bg-muted">
-          {imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={imageUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="signal-grid flex h-full flex-col items-center justify-center gap-2 p-3 text-center text-sm text-muted-foreground">
-              {item.type === "movie" ? (
-                <Clapperboard className="h-8 w-8 text-primary" />
-              ) : (
-                <Tv className="h-8 w-8 text-primary" />
-              )}
-            </div>
-          )}
+        <div className="tv-poster-art poster-shadow relative aspect-[2/3] rounded-lg bg-muted">
+          <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
+            {imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imageUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="signal-grid flex h-full flex-col items-center justify-center gap-2 p-3 text-center text-sm text-muted-foreground">
+                {item.type === "movie" ? (
+                  <Clapperboard className="h-8 w-8 text-primary" />
+                ) : (
+                  <Tv className="h-8 w-8 text-primary" />
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="tv-poster-play absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 ease-out">
             <Play className="h-9 w-9 fill-white text-white drop-shadow-md" />

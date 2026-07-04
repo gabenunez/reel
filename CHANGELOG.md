@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.42 — 2026-07-04
+
+### Playback
+- **MPEG-4 support** — detect non-browser video codecs (e.g. mpeg4 + aac) and route to HLS transcode instead of failed direct play
+- **Sub-SD transcode** — allow 480p transcode for sources under 480p tall; remove server quality gate that returned HTTP 400
+- **Auto quality** — player picks the correct transcode tier on open for incompatible originals
+
+### TV
+- **Focus visibility** — stronger glow rings, clearer selected vs focused states for nav, chips, cards, and player controls
+- **Poster focus** — fix focus borders clipped at the top of scroll rows
+
 ## 0.1.41 — 2026-07-03
 
 ### TV

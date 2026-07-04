@@ -4,27 +4,39 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { forwardRef, type ComponentProps } from "react";
 
-/** Side rail nav — soft highlight, no outer ring. */
+/** Side rail nav icons */
 export const tvNavItemClassName =
-  "rounded-lg outline-none ring-0 shadow-none transition-[background-color,transform,color] duration-150 ease-out focus:ring-0 focus-visible:ring-0 data-[tv-focused]:ring-0 data-[tv-focused]:scale-105 data-[tv-focused]:bg-muted/80 data-[tv-focused]:text-foreground";
+  "tv-focus-nav rounded-lg outline-none ring-0 shadow-none transition-[background-color,transform,box-shadow,color] duration-150 ease-out";
 
-/** Ring highlight for compact buttons in panels. */
+/** Standard TV buttons (back, pagination, play controls on light bg) */
 export const tvFocusRingClassName =
-  "rounded-lg outline-none transition-shadow focus:ring-2 focus:ring-primary/70 focus:ring-offset-1 focus:ring-offset-background focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-1 focus-visible:ring-offset-background data-[tv-focused]:ring-2 data-[tv-focused]:ring-primary/70 data-[tv-focused]:ring-offset-1 data-[tv-focused]:ring-offset-background";
+  "tv-focus-button rounded-lg outline-none ring-0 shadow-none transition-[background-color,transform,box-shadow,color] duration-150 ease-out";
 
-/** Poster tiles — focus styling lives on the art via globals.css, not rings/borders. */
+/** Poster tiles — focus styling lives on the art via globals.css */
 export const tvPosterLinkClassName =
-  "tv-poster-link block shrink-0 outline-none ring-0 shadow-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 focus-visible:shadow-none data-[tv-focused]:outline-none data-[tv-focused]:ring-0 data-[tv-focused]:shadow-none";
+  "tv-poster-link block shrink-0 outline-none ring-0 shadow-none";
 
-/** Wide list/card links — subtle fill on focus, no outer ring. */
+/** List rows, episode cards, menu items */
 export const tvCardLinkClassName =
-  "tv-focus-card block outline-none rounded-lg transition-colors focus:ring-0 focus-visible:ring-0 data-[tv-focused]:ring-0";
+  "tv-focus-card block outline-none rounded-lg ring-0 shadow-none transition-[background-color,transform,box-shadow,color] duration-150 ease-out";
+
+/** Filter / season tabs — selected state via data-tv-selected */
+export const tvChipClassName =
+  "tv-focus-chip shrink-0 snap-center rounded-lg outline-none ring-0 shadow-none transition-[background-color,transform,box-shadow,color] duration-150 ease-out";
+
+function focusSelectedProps(selected?: boolean) {
+  return selected ? ({ "data-tv-selected": "" as const }) : {};
+}
 
 export function TvFocusLink({
   className,
   variant = "default",
+  selected,
   ...props
-}: ComponentProps<typeof Link> & { variant?: "default" | "poster" | "card" | "nav" }) {
+}: ComponentProps<typeof Link> & {
+  variant?: "default" | "poster" | "card" | "nav" | "chip";
+  selected?: boolean;
+}) {
   return (
     <Link
       data-tv-item=""
@@ -36,9 +48,12 @@ export function TvFocusLink({
             ? tvCardLinkClassName
             : variant === "nav"
               ? tvNavItemClassName
-              : tvFocusRingClassName,
+              : variant === "chip"
+                ? tvChipClassName
+                : tvFocusRingClassName,
         className,
       )}
+      {...focusSelectedProps(selected)}
       {...props}
     />
   );
@@ -46,8 +61,11 @@ export function TvFocusLink({
 
 export const TvFocusButton = forwardRef<
   HTMLButtonElement,
-  ComponentProps<"button"> & { variant?: "default" | "card" | "nav" }
->(function TvFocusButton({ className, variant = "default", ...props }, ref) {
+  ComponentProps<"button"> & {
+    variant?: "default" | "card" | "nav" | "chip";
+    selected?: boolean;
+  }
+>(function TvFocusButton({ className, variant = "default", selected, ...props }, ref) {
   return (
     <button
       ref={ref}
@@ -59,9 +77,12 @@ export const TvFocusButton = forwardRef<
           ? tvCardLinkClassName
           : variant === "nav"
             ? tvNavItemClassName
-            : tvFocusRingClassName,
+            : variant === "chip"
+              ? tvChipClassName
+              : tvFocusRingClassName,
         className,
       )}
+      {...focusSelectedProps(selected)}
       {...props}
     />
   );

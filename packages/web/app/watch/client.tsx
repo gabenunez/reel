@@ -22,7 +22,13 @@ import {
 } from "lucide-react";
 import { api, type StreamInfo, type StreamQuality } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { getVideoBufferedRanges, getVideoSeekableEnd, resolvePlaybackStream, startDirectPlaybackWithResume } from "@/lib/playback-utils";
+import {
+  getVideoBufferedRanges,
+  getVideoSeekableEnd,
+  resolveInitialStreamQuality,
+  resolvePlaybackStream,
+  startDirectPlaybackWithResume,
+} from "@/lib/playback-utils";
 import { cn, formatDuration } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CastButton } from "@/components/cast-button";
@@ -295,14 +301,10 @@ function WatchDesktopClient() {
         setSourceHeight(info.height ?? null);
         setSourceDurationMs(info.durationMs ?? 0);
         setTranscodingEnabled(info.transcodingEnabled);
-        setQuality("original");
 
-        const playback = resolvePlaybackStream("original", info);
-        if (!playback.usingHls && playback.audioCompatNotice) {
-          setError(playback.audioCompatNotice);
-        } else {
-          setError(null);
-        }
+        const initial = resolveInitialStreamQuality(info);
+        setQuality(initial.quality);
+        setError(initial.error);
 
         const positionMs = info.watchProgress?.positionMs ?? 0;
         const durationMs =

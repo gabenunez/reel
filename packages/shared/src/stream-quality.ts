@@ -62,7 +62,9 @@ export function getAvailableQualities(sourceHeight?: number | null): StreamQuali
   if (!sourceHeight) {
     return ["original", "480p", "720p", "1080p"];
   }
-  if (sourceHeight >= 480) qualities.push("480p");
+  // Always offer 480p transcode for sub-SD sources (e.g. 368p phone rips) — output
+  // height is capped to source via effectiveTranscodeHeight().
+  if (sourceHeight > 0) qualities.push("480p");
   if (sourceHeight >= 720) qualities.push("720p");
   if (sourceHeight >= 1080) qualities.push("1080p");
   return qualities;

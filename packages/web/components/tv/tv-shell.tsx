@@ -30,12 +30,11 @@ function TvNavButton({
       aria-current={active ? "page" : undefined}
       aria-label={label}
       title={label}
+      {...(active ? { "data-tv-nav-active": "" as const } : {})}
       className={cn(
-        "flex h-11 w-11 items-center justify-center rounded-lg transition-[background-color,transform,color] duration-150 ease-out",
+        "flex h-11 w-11 items-center justify-center",
         tvNavItemClassName,
-        active
-          ? "bg-primary text-primary-foreground scale-105"
-          : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+        !active && "text-muted-foreground",
       )}
     >
       {children}
@@ -52,7 +51,7 @@ function TvLogoutButton({ onLogout }: { onLogout: () => void }) {
       aria-label="Sign out"
       onClick={onLogout}
       className={cn(
-        "flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-[background-color,transform,color] duration-150 ease-out hover:bg-muted/70 hover:text-foreground",
+        "flex h-11 w-11 items-center justify-center text-muted-foreground",
         tvNavItemClassName,
       )}
     >
