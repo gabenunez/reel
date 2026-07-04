@@ -71,6 +71,92 @@
     display: none;
   }
 
+  .tv-ui {
+    scroll-behavior: smooth;
+  }
+
+  .tv-ui .tv-scroll-row {
+    scroll-padding-inline: 2rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tv-ui .tv-row-section:has([data-tv-focused]) h2,
+  .tv-ui .tv-row-section:has(:focus) h2 {
+    color: hsl(var(--foreground));
+  }
+
+  .tv-ui .tv-poster-art {
+    transform: scale(1);
+    transform-origin: center center;
+    will-change: transform;
+    transition:
+      transform 180ms cubic-bezier(0.2, 0, 0.2, 1),
+      box-shadow 180ms cubic-bezier(0.2, 0, 0.2, 1);
+  }
+
+  .tv-ui a.tv-poster-link[data-tv-focused] .tv-poster-art,
+  .tv-ui a.tv-poster-link:focus .tv-poster-art,
+  .tv-ui a.tv-poster-link:focus-visible .tv-poster-art {
+    transform: scale(1.08);
+    box-shadow:
+      0 0 0 3px hsl(var(--primary)),
+      0 16px 36px rgba(0, 0, 0, 0.55);
+  }
+
+  .tv-ui [data-tv-item].tv-focus-card {
+    transition:
+      background-color 150ms ease-out,
+      transform 150ms cubic-bezier(0.2, 0, 0.2, 1);
+  }
+
+  .tv-ui [data-tv-item].tv-focus-card[data-tv-focused],
+  .tv-ui [data-tv-item].tv-focus-card:focus {
+    background-color: hsl(var(--primary) / 0.12);
+    transform: scale(1.02);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tv-ui .tv-poster-art,
+    .tv-ui .tv-scroll-row {
+      transition: none;
+      scroll-behavior: auto;
+    }
+
+    .tv-ui a.tv-poster-link[data-tv-focused] .tv-poster-art,
+    .tv-ui a.tv-poster-link:focus .tv-poster-art {
+      transform: none;
+    }
+  }
+
+  .tv-ui a.tv-poster-link,
+  .tv-ui a.tv-poster-link:focus,
+  .tv-ui a.tv-poster-link:focus-visible,
+  .tv-ui a.tv-poster-link[data-tv-focused] {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  .tv-ui a.tv-poster-link[data-tv-focused] .tv-poster-play,
+  .tv-ui a.tv-poster-link:focus .tv-poster-play,
+  .tv-ui a.tv-poster-link:focus-visible .tv-poster-play {
+    opacity: 1;
+  }
+
+  .tv-ui a.tv-poster-link[data-tv-focused] .tv-poster-title,
+  .tv-ui a.tv-poster-link:focus .tv-poster-title,
+  .tv-ui a.tv-poster-link:focus-visible .tv-poster-title {
+    color: hsl(var(--foreground));
+  }
+
+  .tv-ui main {
+    padding-left: 0;
+    padding-right: env(safe-area-inset-right, 0);
+  }
+
+  .tv-ui [data-tv-grid] [data-tv-item] {
+    --tw-ring-offset-width: 0px;
+  }
+
   .signal-grid {
     background-image:
       linear-gradient(90deg, rgba(46, 255, 229, 0.12) 1px, transparent 1px),
@@ -111,5 +197,25 @@
     font-family: var(--subtitle-cue-font, system-ui, sans-serif);
     text-shadow: var(--subtitle-cue-shadow, none);
     line-height: 1.35;
+  }
+
+  .tv-ui video.reel-subtitles::cue {
+    font-size: 1.45em;
+    line-height: 1.4;
+  }
+
+  .tv-ui [data-tv-watch-controls] [data-tv-item][data-tv-focused],
+  .tv-ui [data-tv-watch-controls] [data-tv-item]:focus {
+    transform: scale(1.06);
+  }
+
+  .tv-ui [data-tv-watch-menu] [data-tv-item][data-tv-focused],
+  .tv-ui [data-tv-watch-menu] [data-tv-item]:focus {
+    transform: scale(1.01);
+  }
+
+  .tv-ui [data-tv-watch-scrub][data-tv-focused],
+  .tv-ui [data-tv-watch-scrub]:focus {
+    box-shadow: 0 0 0 3px hsl(var(--primary));
   }
 }

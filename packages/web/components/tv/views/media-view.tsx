@@ -2,15 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChevronLeft, Loader2, Play } from "lucide-react";
+import { Loader2, Play } from "lucide-react";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { TvFocusButton, TvFocusLink } from "@/components/tv/tv-focus-link";
 import { TvFavoriteButton } from "@/components/tv/tv-favorite-button";
+import { TvPageHeader, TvSectionLabel } from "@/components/tv/tv-page-header";
+import { tvScrollRowClassName } from "@/components/tv/tv-row";
 import { ThemeMusicProvider, ThemeMusicWaveform } from "@/components/theme-music-player";
-import { ThemeMusicMuteButton } from "@/components/theme-music-settings";
 import { formatDuration, getPlaybackButtonLabel } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { focusFirstContentItem } from "@/lib/tv-focus";
+import { cn } from "@/lib/utils";
 
 interface Episode {
   id: number;
@@ -65,42 +68,45 @@ export function TvMediaView() {
 
   useEffect(() => {
     if (loading || !media) return;
-    const first = document.querySelector<HTMLElement>("[data-tv-item]");
-    first?.focus();
+    focusFirstContentItem();
   }, [loading, media, selectedSeason]);
 
   if (!mediaId || Number.isNaN(mediaId)) {
     return (
-      <div className="px-8 py-24 text-center">
-        <p className="mb-6 text-lg text-muted-foreground">Invalid media</p>
-        <TvFocusLink
-          href={routes.home()}
-          className="inline-flex rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
-        >
-          Back to home
-        </TvFocusLink>
+      <div className="px-6 py-16 text-center">
+        <p className="mb-4 text-muted-foreground">Invalid media</p>
+        <div data-tv-row="" data-tv-content-row="" className="flex justify-center">
+          <TvFocusLink
+            href={routes.home()}
+            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+          >
+            Back to home
+          </TvFocusLink>
+        </div>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Loader2 className="h-9 w-9 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!media) {
     return (
-      <div className="px-8 py-24 text-center">
-        <p className="mb-6 text-lg text-muted-foreground">Not found</p>
-        <TvFocusLink
-          href={routes.home()}
-          className="inline-flex rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
-        >
-          Back to home
-        </TvFocusLink>
+      <div className="px-6 py-16 text-center">
+        <p className="mb-4 text-muted-foreground">Not found</p>
+        <div data-tv-row="" data-tv-content-row="" className="flex justify-center">
+          <TvFocusLink
+            href={routes.home()}
+            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+          >
+            Back to home
+          </TvFocusLink>
+        </div>
       </div>
     );
   }
@@ -116,152 +122,186 @@ export function TvMediaView() {
         media.watchProgress?.durationMs ?? movieFile.durationMs,
       )
     : "Play";
+  const typeLabel = media.type === "movie" ? "Movie" : "Series";
+  const metaLabel = [typeLabel, media.year].filter(Boolean).join(" · ");
 
   const page = (
-    <div>
-      {media.hasThemeMusic && (
-        <ThemeMusicMuteButton className="fixed top-6 right-6 z-50" />
-      )}
-      <section className="relative overflow-hidden border-b border-border/70">
-        {backdropUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={backdropUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        )}
-        {!backdropUrl && <div className="signal-grid absolute inset-0" />}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/85 to-background/30" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/75 to-transparent" />
-        {media.hasThemeMusic && (
-          <ThemeMusicWaveform className="absolute inset-x-0 bottom-0 h-40 w-full [mask-image:linear-gradient(to_top,black_20%,transparent)]" />
-        )}
+    <div className="pb-6">
+      {/* Hero — compact cinematic strip, not a full desktop detail page */}
+      <section className="relative mb-5 overflow-hidden">
+        <div className="relative h-[30vh] min-h-[220px] max-h-[320px]">
+          {backdropUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={backdropUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          ) : (
+            <div className="signal-grid absolute inset-0" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/50 to-transparent" />
+          {media.hasThemeMusic && (
+            <ThemeMusicWaveform className="absolute inset-x-0 bottom-0 h-20 w-full [mask-image:linear-gradient(to_top,black_15%,transparent)]" />
+          )}
+        </div>
 
-        <div className="relative z-10 px-8 pb-10 pt-8">
-          <TvFocusLink
-            href={routes.home()}
-            className="mb-8 inline-flex h-14 items-center gap-2 rounded-xl bg-background/60 px-5 text-base font-medium backdrop-blur"
-          >
-            <ChevronLeft className="h-6 w-6" /> Back
-          </TvFocusLink>
-
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-end">
-            <div className="w-44 shrink-0 lg:w-52">
+        <div className="relative z-10 -mt-[5.5rem] px-6 sm:-mt-24">
+          <div className="flex gap-4 sm:gap-5">
+            <div className="w-[6.5rem] shrink-0 sm:w-28">
               {posterUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={posterUrl}
-                  alt={media.title}
-                  className="w-full rounded-xl border border-white/10 poster-shadow"
+                  alt=""
+                  className="aspect-[2/3] w-full rounded-md poster-shadow"
                 />
               ) : (
-                <div className="signal-grid aspect-[2/3] rounded-xl border border-border bg-muted" />
+                <div className="signal-grid aspect-[2/3] w-full rounded-md bg-muted" />
               )}
             </div>
 
-            <div className="max-w-4xl flex-1">
-              <p className="mb-2 text-sm uppercase tracking-wide text-primary">
-                {media.type === "movie" ? "Movie" : "Series"}
-                {media.year ? ` · ${media.year}` : ""}
+            <div className="flex min-w-0 flex-1 flex-col justify-end pb-1">
+              <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-primary">
+                {metaLabel}
               </p>
-              <h1 className="mb-4 text-4xl font-black sm:text-5xl">{media.title}</h1>
+              <h1 className="mb-2 line-clamp-2 text-xl font-black leading-tight sm:text-2xl">
+                {media.title}
+              </h1>
               {media.overview && (
-                <p className="mb-6 max-w-3xl text-lg leading-relaxed text-muted-foreground line-clamp-4">
+                <p className="mb-3 line-clamp-2 text-sm leading-snug text-muted-foreground">
                   {media.overview}
                 </p>
               )}
 
-              <div data-tv-row="" className="flex flex-wrap items-center gap-4">
-                {media.type === "movie" && movieFile && (
+              {media.type === "movie" && movieFile && (
+                <div
+                  data-tv-row=""
+                  data-tv-content-row=""
+                  className="flex flex-wrap items-center gap-2 py-0.5"
+                >
                   <TvFocusLink
                     href={routes.watch("movie", movieFile.id, media.id)}
-                    className="inline-flex items-center gap-3 rounded-xl bg-primary px-8 py-4 text-lg font-semibold text-primary-foreground"
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
                   >
-                    <Play className="h-6 w-6 fill-current" /> {moviePlaybackLabel}
+                    <Play className="h-4 w-4 fill-current" />
+                    {moviePlaybackLabel}
                   </TvFocusLink>
-                )}
-                <TvFavoriteButton mediaId={media.id} initialFavorite={media.isFavorite} />
-              </div>
+                  <TvFavoriteButton
+                    mediaId={media.id}
+                    initialFavorite={media.isFavorite}
+                    className="!gap-2 !px-4 !py-2.5 !text-sm"
+                  />
+                </div>
+              )}
+
+              {media.type === "tv" && (
+                <div data-tv-row="" data-tv-content-row="" className="py-0.5">
+                  <TvFavoriteButton
+                    mediaId={media.id}
+                    initialFavorite={media.isFavorite}
+                    className="!gap-2 !px-4 !py-2.5 !text-sm"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
       </section>
 
       {media.type === "tv" && seasons.length > 0 && (
-        <section className="px-8 py-8">
+        <section className="px-6">
+          <TvSectionLabel>Seasons</TvSectionLabel>
           <div
             data-tv-row=""
-            className="scrollbar-hide mb-8 flex gap-3 overflow-x-auto pb-2"
+            data-tv-content-row=""
+            data-tv-scroll-row=""
+            className={cn(tvScrollRowClassName, "mb-5 gap-2 px-6 py-1")}
           >
             {seasons.map((season, idx) => (
               <TvFocusButton
                 key={season.id}
+                variant="card"
                 onClick={() => setSelectedSeason(idx)}
-                className={
+                className={cn(
+                  "shrink-0 snap-center px-4 py-2 text-sm font-medium transition-[background-color,transform] duration-150 ease-out",
                   selectedSeason === idx
-                    ? "shrink-0 rounded-xl bg-primary px-5 py-3 text-base font-semibold text-primary-foreground"
-                    : "shrink-0 rounded-xl border border-border bg-card px-5 py-3 text-base font-medium"
-                }
+                    ? "bg-primary text-primary-foreground scale-105"
+                    : "bg-muted/60 text-foreground",
+                )}
               >
                 {season.name ?? `Season ${season.seasonNumber}`}
               </TvFocusButton>
             ))}
           </div>
 
-          <div className="space-y-3">
+          <TvSectionLabel>
+            Episodes
+            {episodes.length > 0 ? ` · ${episodes.length}` : ""}
+          </TvSectionLabel>
+          <div
+            data-tv-row=""
+            data-tv-content-row=""
+            data-tv-vertical=""
+            className="flex flex-col gap-1.5"
+          >
             {episodes.map((ep) => {
               const episodeActionLabel = getPlaybackButtonLabel(
                 ep.watchProgress?.positionMs,
                 ep.watchProgress?.durationMs ?? ep.durationMs,
               );
+              const progressPct =
+                ep.watchProgress && ep.watchProgress.positionMs > 0
+                  ? Math.min(
+                      100,
+                      (ep.watchProgress.positionMs / (ep.durationMs ?? 1)) * 100,
+                    )
+                  : 0;
 
               return (
-                <div key={ep.id} data-tv-row="" className="flex">
-                  <TvFocusLink
-                    href={routes.watch("episode", ep.id, media.id)}
-                    className="flex w-full items-center gap-5 rounded-xl border border-border/80 bg-card/70 p-4"
-                  >
-                    <div className="relative flex h-20 w-36 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-                      {ep.stillPath ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={api.imageUrl(ep.stillPath) ?? ""}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="font-mono text-2xl font-bold text-muted-foreground">
-                          {String(ep.episodeNumber).padStart(2, "0")}
-                        </span>
-                      )}
-                      {ep.watchProgress && ep.watchProgress.positionMs > 0 && (
-                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/30">
-                          <div
-                            className="h-full bg-accent"
-                            style={{
-                              width: `${Math.min(100, (ep.watchProgress.positionMs / (ep.durationMs ?? 1)) * 100)}%`,
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-lg font-semibold">
-                        <span className="mr-2 font-mono text-sm text-primary">
-                          E{String(ep.episodeNumber).padStart(2, "0")}
-                        </span>
-                        {ep.title ?? `Episode ${ep.episodeNumber}`}
+                <TvFocusLink
+                  key={ep.id}
+                  href={routes.watch("episode", ep.id, media.id)}
+                  variant="card"
+                  className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5"
+                >
+                  <div className="relative h-[3.75rem] w-[6.75rem] shrink-0 overflow-hidden rounded-md bg-muted">
+                    {ep.stillPath ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={api.imageUrl(ep.stillPath) ?? ""}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center font-mono text-base font-bold text-muted-foreground">
+                        {String(ep.episodeNumber).padStart(2, "0")}
+                      </div>
+                    )}
+                    {progressPct > 0 && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/25">
+                        <div className="h-full bg-accent" style={{ width: `${progressPct}%` }} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
+                      <span className="mr-1.5 font-mono text-xs text-primary">
+                        {String(ep.episodeNumber).padStart(2, "0")}
+                      </span>
+                      {ep.title ?? `Episode ${ep.episodeNumber}`}
+                    </p>
+                    {ep.overview && (
+                      <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                        {ep.overview}
                       </p>
-                      {ep.overview && (
-                        <p className="mt-1 line-clamp-2 text-base text-muted-foreground">
-                          {ep.overview}
-                        </p>
-                      )}
-                    </div>
-                    <span className="shrink-0 font-mono text-sm text-muted-foreground">
-                      {episodeActionLabel === "Play" && ep.durationMs
-                        ? formatDuration(ep.durationMs)
-                        : episodeActionLabel}
-                    </span>
-                  </TvFocusLink>
-                </div>
+                    )}
+                  </div>
+
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    {episodeActionLabel === "Play" && ep.durationMs
+                      ? formatDuration(ep.durationMs)
+                      : episodeActionLabel}
+                  </span>
+                </TvFocusLink>
               );
             })}
           </div>

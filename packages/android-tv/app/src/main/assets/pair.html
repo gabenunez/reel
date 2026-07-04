@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Connect Reel TV</title>
+  <link rel="stylesheet" href="/pair.css" />
+</head>
+<body>
+  <main>
+    <div class="brand">
+      <div class="logo">Reel</div>
+      <p class="subtitle">Connect your Android TV</p>
+    </div>
+
+    <form id="pairForm">
+      <label>
+        <span>Server address</span>
+        <input id="host" name="host" type="text" inputmode="url" autocomplete="off" placeholder="185.162.184.10 or reel.example.com" required />
+      </label>
+
+      <label>
+        <span>Port</span>
+        <input id="port" name="port" type="number" inputmode="numeric" value="8096" required />
+      </label>
+
+      <label id="passwordField">
+        <span>Password</span>
+        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Only if your server requires one" />
+      </label>
+
+      <p id="error" class="error" hidden></p>
+
+      <button id="submit" type="submit">Connect TV</button>
+    </form>
+
+    <p class="hint">Your phone must be on the same Wi‑Fi network as your TV.</p>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token") || "";
+    const form = document.getElementById("pairForm");
+    const errorEl = document.getElementById("error");
+    const submitBtn = document.getElementById("submit");
+
+    function showError(message) {
+      errorEl.textContent = message;
+      errorEl.hidden = !message;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      showError("");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Connecting…";
+
+      try {
+        const response = await fetch("/api/connect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token,
+            host: document.getElementById("host").value.trim(),
+            port: document.getElementById("port").value.trim(),
+            password: document.getElementById("password").value,
+          }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Could not connect");
+        }
+
+        document.querySelector("main").innerHTML = `
+          <div class="success">
+            <div class="logo">Reel</div>
+            <h1>TV connected</h1>
+            <p>You can close this page and start watching on your TV.</p>
+          </div>
+        `;
+      } catch (err) {
+        showError(err.message || "Could not connect");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Connect TV";
+      }
+    });
+  </script>
+</body>
+</html>

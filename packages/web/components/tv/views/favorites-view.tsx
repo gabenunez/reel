@@ -6,8 +6,12 @@ import { Loader2 } from "lucide-react";
 import { api, type MediaItem } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { TvFocusLink } from "@/components/tv/tv-focus-link";
+import { TvPageHeader, TvPagination, TvSectionLabel } from "@/components/tv/tv-page-header";
+import { TvGrid, tvScrollRowClassName } from "@/components/tv/tv-row";
 import { TvPoster } from "@/components/tv/tv-poster";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { focusFirstContentItem } from "@/lib/tv-focus";
+import { cn } from "@/lib/utils";
 
 type FavoriteFilter = "all" | "movie" | "tv";
 
@@ -18,38 +22,56 @@ export function TvFavoritesView() {
     filterParam === "movie" || filterParam === "tv" ? filterParam : "all";
 
   const [items, setItems] = useState<MediaItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useDocumentTitle("Favorites");
 
   useEffect(() => {
-    setLoading(true);
-    api
-      .getFavorites(1, filter === "all" ? undefined : filter)
-      .then((data) => setItems(data.items))
-      .catch(console.warn)
-      .finally(() => setLoading(false));
+    setPage(1);
   }, [filter]);
 
   useEffect(() => {
+    setLoading(true);
+    api
+      .getFavorites(page, filter === "all" ? undefined : filter)
+      .then((data) => {
+        setItems(data.items);
+        setTotalPages(data.totalPages);
+        setTotalItems(data.total ?? data.items.length);
+      })
+      .catch(console.warn)
+      .finally(() => setLoading(false));
+  }, [filter, page]);
+
+  useEffect(() => {
     if (loading) return;
-    const first = document.querySelector<HTMLElement>("[data-tv-item]");
-    first?.focus();
-  }, [loading, filter]);
+    focusFirstContentItem();
+  }, [loading, filter, page]);
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Loader2 className="h-9 w-9 animate-spin text-primary" />
       </div>
     );
   }
 
-  return (
-    <div className="px-8 py-8">
-      <h1 className="mb-6 text-3xl font-black tracking-tight sm:text-4xl">Favorites</h1>
+  const trailing =
+    totalPages > 1 ? `Page ${page} of ${totalPages}` : undefined;
 
-      <div data-tv-row="" className="mb-8 flex flex-wrap gap-3">
+  return (
+    <div className="px-6 py-5">
+      <TvPageHeader backHref={routes.home()} title="Favorites" trailing={trailing} />
+
+      <div
+        data-tv-row=""
+        data-tv-content-row=""
+        data-tv-scroll-row=""
+        className={cn(tvScrollRowClassName, "mb-4 gap-2 px-0 py-1")}
+      >
         {(
           [
             { id: "all", label: "All" },
@@ -60,11 +82,13 @@ export function TvFavoritesView() {
           <TvFocusLink
             key={option.id}
             href={routes.favorites(option.id === "all" ? undefined : option.id)}
-            className={
+            variant="card"
+            className={cn(
+              "shrink-0 snap-center px-4 py-2 text-sm font-semibold transition-[background-color,transform] duration-150",
               filter === option.id
-                ? "rounded-xl bg-primary px-6 py-3 text-lg font-semibold text-primary-foreground"
-                : "rounded-xl border border-border bg-muted/60 px-6 py-3 text-lg font-semibold text-foreground"
-            }
+                ? "bg-primary text-primary-foreground scale-105"
+                : "bg-muted/60 text-foreground",
+            )}
           >
             {option.label}
           </TvFocusLink>
@@ -72,24 +96,32 @@ export function TvFavoritesView() {
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-xl border border-border/70 px-8 py-16 text-center">
-          <p className="mb-6 text-lg text-muted-foreground">No favorites yet.</p>
+        <div
+          data-tv-row=""
+          data-tv-content-row=""
+          className="rounded-lg bg-muted/20 px-6 py-12 text-center"
+        >
+          <p className="mb-4 text-muted-foreground">No favorites yet.</p>
           <TvFocusLink
             href={routes.home()}
-            className="inline-flex rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
+            variant="card"
+            className="inline-flex rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
           >
             Back to home
           </TvFocusLink>
         </div>
       ) : (
-        <div
-          data-tv-row=""
-          className="grid grid-cols-3 gap-6 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6"
-        >
-          {items.map((item) => (
-            <TvPoster key={item.id} item={item} />
-          ))}
-        </div>
+        <>
+          <TvSectionLabel>
+            {totalItems > 0 ? `${totalItems} saved` : `${items.length} saved`}
+          </TvSectionLabel>
+          <TvGrid className="mb-4">
+            {items.map((item) => (
+              <TvPoster key={item.id} item={item} linkClassName="w-full" className="min-w-0" />
+            ))}
+          </TvGrid>
+          <TvPagination page={page} totalPages={totalPages} onPageChange={setPage} />
+        </>
       )}
     </div>
   );

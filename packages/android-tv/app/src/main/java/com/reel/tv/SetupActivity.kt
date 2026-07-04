@@ -5,11 +5,11 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import java.net.HttpURLConnection
-import java.net.URL
+import fi.iki.elonen.NanoHTTPD
 import java.util.concurrent.Executors
 
 class SetupActivity : AppCompatActivity() {
@@ -18,6 +18,12 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var portInput: EditText
     private lateinit var statusText: TextView
     private lateinit var connectButton: Button
+    private lateinit var qrCodeImage: ImageView
+    private lateinit var pairingUrlText: TextView
+    private lateinit var pairingStatusText: TextView
+
+    private var pairingServer: PairingServer? = null
+    private var pairingToken: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,26 +39,69 @@ class SetupActivity : AppCompatActivity() {
         portInput = findViewById(R.id.portInput)
         statusText = findViewById(R.id.statusText)
         connectButton = findViewById(R.id.connectButton)
+        qrCodeImage = findViewById(R.id.qrCodeImage)
+        pairingUrlText = findViewById(R.id.pairingUrlText)
+        pairingStatusText = findViewById(R.id.pairingStatusText)
 
-        connectButton.setOnClickListener { attemptConnect() }
+        connectButton.setOnClickListener { attemptManualConnect() }
         hostInput.setOnEditorActionListener { _, _, _ ->
-            attemptConnect()
+            attemptManualConnect()
             true
         }
         portInput.setOnEditorActionListener { _, _, _ ->
-            attemptConnect()
+            attemptManualConnect()
             true
         }
 
+        startPairingServer()
         hostInput.requestFocus()
     }
 
     override fun onDestroy() {
+        stopPairingServer()
         executor.shutdownNow()
         super.onDestroy()
     }
 
-    private fun attemptConnect() {
+    private fun startPairingServer() {
+        pairingToken = PairingServer.createToken()
+        val localIp = NetworkUtils.getLocalIpAddress()
+
+        if (localIp == null) {
+            pairingStatusText.setText(R.string.pairing_unavailable)
+            qrCodeImage.setImageDrawable(null)
+            return
+        }
+
+        val pairingUrl = "http://$localIp:${PairingServer.PORT}/?token=$pairingToken"
+        pairingUrlText.text = pairingUrl
+        QrCodeGenerator.create(pairingUrl, 512)?.let { qrCodeImage.setImageBitmap(it) }
+
+        pairingServer = PairingServer(
+            port = PairingServer.PORT,
+            context = applicationContext,
+            pairingToken = pairingToken,
+            onPaired = { result, serverUrl ->
+                runOnUiThread {
+                    completeConnection(serverUrl, result.sessionToken, fromPairing = true)
+                }
+            },
+        )
+
+        try {
+            pairingServer?.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
+            pairingStatusText.setText(R.string.pairing_waiting)
+        } catch (_: Exception) {
+            pairingStatusText.setText(R.string.pairing_unavailable)
+        }
+    }
+
+    private fun stopPairingServer() {
+        pairingServer?.stop()
+        pairingServer = null
+    }
+
+    private fun attemptManualConnect() {
         val serverUrl = ServerPreferences.normalizeServerUrl(
             hostInput.text.toString(),
             portInput.text.toString(),
@@ -63,18 +112,18 @@ class SetupActivity : AppCompatActivity() {
             return
         }
 
-        setConnecting(true)
+        setManualConnecting(true)
         statusText.text = getString(R.string.connecting)
 
         executor.execute {
-            val error = validateServer(serverUrl)
+            val result = ServerConnector.connect(serverUrl, password = null)
             runOnUiThread {
-                setConnecting(false)
-                if (error == null) {
-                    ServerPreferences.saveServerUrl(this, serverUrl)
-                    statusText.setTextColor(ContextCompat.getColor(this, R.color.reel_primary))
-                    statusText.setText(R.string.connected)
-                    startMainActivity(serverUrl)
+                setManualConnecting(false)
+                if (result.success) {
+                    completeConnection(serverUrl, result.sessionToken, fromPairing = false)
+                } else if (result.passwordRequired) {
+                    statusText.setTextColor(ContextCompat.getColor(this, R.color.reel_error))
+                    statusText.text = getString(R.string.password_use_phone)
                 } else {
                     statusText.setTextColor(ContextCompat.getColor(this, R.color.reel_error))
                     statusText.text = getString(R.string.connection_failed)
@@ -83,28 +132,27 @@ class SetupActivity : AppCompatActivity() {
         }
     }
 
-    private fun validateServer(serverUrl: String): String? {
-        return try {
-            val url = URL("$serverUrl/api/status")
-            val connection = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 8000
-                readTimeout = 8000
-                requestMethod = "GET"
-                instanceFollowRedirects = true
-            }
+    private fun completeConnection(
+        serverUrl: String,
+        sessionToken: String?,
+        fromPairing: Boolean,
+    ) {
+        ServerPreferences.saveServerUrl(this, serverUrl)
+        SessionPreferences.saveSessionToken(this, sessionToken)
 
-            try {
-                val code = connection.responseCode
-                if (code in 200..299) null else "HTTP $code"
-            } finally {
-                connection.disconnect()
-            }
-        } catch (e: Exception) {
-            e.message ?: "error"
+        if (fromPairing) {
+            pairingStatusText.setTextColor(ContextCompat.getColor(this, R.color.reel_primary))
+            pairingStatusText.setText(R.string.connected)
+        } else {
+            statusText.setTextColor(ContextCompat.getColor(this, R.color.reel_primary))
+            statusText.setText(R.string.connected)
         }
+
+        stopPairingServer()
+        startMainActivity(serverUrl)
     }
 
-    private fun setConnecting(connecting: Boolean) {
+    private fun setManualConnecting(connecting: Boolean) {
         connectButton.isEnabled = !connecting
         hostInput.isEnabled = !connecting
         portInput.isEnabled = !connecting

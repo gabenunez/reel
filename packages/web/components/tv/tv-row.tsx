@@ -1,31 +1,50 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TvFocusButton } from "@/components/tv/tv-focus-link";
+import { TvSeeAllTile } from "@/components/tv/tv-see-all-tile";
+
+const tvScrollRowClassName =
+  "tv-scroll-row scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-8 py-2";
 
 interface TvRowProps {
   title: string;
   children: ReactNode;
   className?: string;
-  href?: string;
+  seeAllHref?: string;
+  seeAllLabel?: string;
+  seeAllDetail?: string;
 }
 
-export function TvRow({ title, children, className, href }: TvRowProps) {
+export function TvRow({
+  title,
+  children,
+  className,
+  seeAllHref,
+  seeAllLabel = "See all",
+  seeAllDetail,
+}: TvRowProps) {
   return (
-    <section className={cn("mb-10", className)}>
-      <div className="mb-4 flex items-center justify-between gap-4 px-8">
-        <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
-        {href ? (
-          <a href={href} className="text-sm font-medium text-primary hover:underline">
-            View all
-          </a>
-        ) : null}
-      </div>
+    <section className={cn("tv-row-section mb-5", className)}>
+      <h2 className="mb-2 px-8 text-base font-semibold tracking-tight text-muted-foreground transition-colors duration-200">
+        {title}
+      </h2>
       <div
         data-tv-row=""
-        className="scrollbar-hide flex snap-x snap-mandatory gap-5 overflow-x-auto px-8 pb-2"
+        data-tv-content-row=""
+        data-tv-scroll-row=""
+        className={tvScrollRowClassName}
       >
         {children}
+        {seeAllHref ? (
+          <TvSeeAllTile
+            href={seeAllHref}
+            label={seeAllLabel}
+            detail={seeAllDetail}
+          />
+        ) : null}
       </div>
     </section>
   );
@@ -40,8 +59,10 @@ export function TvGrid({ children, className }: TvGridProps) {
   return (
     <div
       data-tv-row=""
+      data-tv-content-row=""
+      data-tv-grid=""
       className={cn(
-        "grid grid-cols-3 gap-x-6 gap-y-10 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7",
+        "grid grid-cols-4 gap-x-3 gap-y-6 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-6",
         className,
       )}
     >
@@ -49,3 +70,5 @@ export function TvGrid({ children, className }: TvGridProps) {
     </div>
   );
 }
+
+export { tvScrollRowClassName };

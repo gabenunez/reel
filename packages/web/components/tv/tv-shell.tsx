@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { Home, Heart, Search } from "lucide-react";
+import { Home, Heart, LogOut, Search } from "lucide-react";
+import { useAuth } from "@/components/auth-gate";
 import { ReelIcon } from "@/components/reel-icon";
 import { TvSpatialNav } from "@/components/tv/tv-spatial-nav";
+import { tvNavItemClassName } from "@/components/tv/tv-focus-link";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -24,13 +26,16 @@ function TvNavButton({
     <Link
       href={href}
       data-tv-item=""
+      tabIndex={0}
       aria-current={active ? "page" : undefined}
+      aria-label={label}
       title={label}
       className={cn(
-        "flex h-14 w-14 items-center justify-center rounded-xl outline-none transition-all focus-visible:scale-105 focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "flex h-11 w-11 items-center justify-center rounded-lg transition-[background-color,transform,color] duration-150 ease-out",
+        tvNavItemClassName,
         active
-          ? "bg-primary text-primary-foreground"
-          : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+          ? "bg-primary text-primary-foreground scale-105"
+          : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
       )}
     >
       {children}
@@ -38,50 +43,76 @@ function TvNavButton({
   );
 }
 
+function TvLogoutButton({ onLogout }: { onLogout: () => void }) {
+  return (
+    <button
+      type="button"
+      data-tv-item=""
+      title="Sign out"
+      aria-label="Sign out"
+      onClick={onLogout}
+      className={cn(
+        "flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-[background-color,transform,color] duration-150 ease-out hover:bg-muted/70 hover:text-foreground",
+        tvNavItemClassName,
+      )}
+    >
+      <LogOut className="h-5 w-5" />
+    </button>
+  );
+}
+
 export function TvShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const hideHeader = pathname.startsWith("/watch");
+  const { required, authenticated, logout } = useAuth();
+  const hideNav = pathname.startsWith("/watch");
   const homeActive = pathname === "/";
   const favoritesActive = pathname.startsWith("/favorites");
   const searchActive = pathname.startsWith("/search");
+  const showLogout = required && authenticated;
+
+  const handleLogout = () => {
+    void logout();
+  };
 
   return (
     <TvSpatialNav>
-      <div className="tv-ui min-h-screen pb-12">
-        {!hideHeader && (
-          <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur-xl">
-            <div
-              data-tv-row=""
-              className="mx-auto flex h-20 max-w-[1600px] items-center gap-6 px-8"
-            >
-              <Link
-                href={routes.home()}
-                data-tv-item=""
-                className="mr-2 flex shrink-0 items-center gap-3 rounded-xl outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                <ReelIcon className="h-11 w-11" />
-                <span className="text-2xl font-bold tracking-tight">Reel</span>
-              </Link>
-
-              <div className="ml-auto flex items-center gap-3">
-                <TvNavButton href={routes.home()} label="Home" active={homeActive}>
-                  <Home className="h-6 w-6" />
-                </TvNavButton>
-                <TvNavButton
-                  href={routes.favorites()}
-                  label="Favorites"
-                  active={favoritesActive}
-                >
-                  <Heart className="h-6 w-6" />
-                </TvNavButton>
-                <TvNavButton href={routes.search()} label="Search" active={searchActive}>
-                  <Search className="h-6 w-6" />
-                </TvNavButton>
-              </div>
+      <div className="tv-ui flex min-h-screen">
+        {!hideNav && (
+          <aside className="flex w-[4.25rem] shrink-0 flex-col items-center border-r border-border/50 bg-background/95 py-5 min-h-screen">
+            <div className="mb-6 flex h-9 w-9 items-center justify-center" aria-hidden="true">
+              <ReelIcon className="h-9 w-9 opacity-90" />
             </div>
-          </header>
+
+            <nav
+              data-tv-row=""
+              data-tv-nav-row=""
+              data-tv-vertical=""
+              className="flex flex-1 flex-col items-center gap-1.5"
+            >
+              <TvNavButton href={routes.home()} label="Home" active={homeActive}>
+                <Home className="h-5 w-5" />
+              </TvNavButton>
+              <TvNavButton
+                href={routes.favorites()}
+                label="Favorites"
+                active={favoritesActive}
+              >
+                <Heart className="h-5 w-5" />
+              </TvNavButton>
+              <TvNavButton href={routes.search()} label="Search" active={searchActive}>
+                <Search className="h-5 w-5" />
+              </TvNavButton>
+              {showLogout && (
+                <>
+                  <div className="min-h-4 flex-1" aria-hidden="true" />
+                  <TvLogoutButton onLogout={handleLogout} />
+                </>
+              )}
+            </nav>
+          </aside>
         )}
-        <main>{children}</main>
+
+        <main className="min-w-0 flex-1 pb-6">{children}</main>
       </div>
     </TvSpatialNav>
   );

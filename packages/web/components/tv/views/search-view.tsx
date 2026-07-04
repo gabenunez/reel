@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { api, type MediaItem } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { TvFocusLink } from "@/components/tv/tv-focus-link";
+import { TvPageHeader, TvSectionLabel } from "@/components/tv/tv-page-header";
 import { TvGrid } from "@/components/tv/tv-row";
 import { TvPoster } from "@/components/tv/tv-poster";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { focusFirstContentItem } from "@/lib/tv-focus";
 
 export function TvSearchView() {
   useDocumentTitle("Search");
@@ -45,60 +46,54 @@ export function TvSearchView() {
   }, [query]);
 
   useEffect(() => {
-    if (!searched || loading) return;
-    const first = document.querySelector<HTMLElement>("[data-tv-item]");
-    first?.focus();
+    if (!searched || loading || results.length === 0) return;
+    focusFirstContentItem();
   }, [searched, loading, results]);
 
   return (
-    <div className="px-8 py-8">
-      <div className="mb-8">
-        <h1 className="mb-5 text-4xl font-bold">Search</h1>
-        <div className="relative max-w-3xl">
-          <Search className="pointer-events-none absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-muted-foreground" />
+    <div className="px-6 py-5">
+      <TvPageHeader backHref={routes.home()} title="Search" />
+
+      <div data-tv-row="" data-tv-content-row="" className="mb-4 py-0.5">
+        <div className="relative max-w-2xl">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             ref={inputRef}
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search movies and TV shows..."
-            className="h-16 w-full rounded-xl border-2 border-border bg-card pl-14 pr-5 text-xl outline-none focus:border-primary focus:ring-4 focus:ring-primary/30"
+            className="h-11 w-full rounded-lg border border-border bg-card pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
           />
         </div>
       </div>
 
       {loading && (
-        <div className="flex min-h-[30vh] items-center justify-center">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <div className="flex min-h-[20vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       )}
 
       {!loading && searched && results.length === 0 && (
-        <p className="py-16 text-center text-lg text-muted-foreground">No results found.</p>
+        <p className="py-12 text-center text-muted-foreground">No results found.</p>
       )}
 
       {!loading && results.length > 0 && (
-        <TvGrid>
-          {results.map((item) => (
-            <TvPoster key={item.id} item={item} linkClassName="w-full" className="min-w-0" />
-          ))}
-        </TvGrid>
+        <>
+          <TvSectionLabel>{results.length} results</TvSectionLabel>
+          <TvGrid>
+            {results.map((item) => (
+              <TvPoster key={item.id} item={item} linkClassName="w-full" className="min-w-0" />
+            ))}
+          </TvGrid>
+        </>
       )}
 
       {!loading && !searched && (
-        <div className="py-16 text-center text-lg text-muted-foreground">
+        <div className="py-12 text-center text-sm text-muted-foreground">
           Type at least 2 characters to search.
         </div>
       )}
-
-      <div data-tv-row="" className="mt-10">
-        <TvFocusLink
-          href={routes.home()}
-          className="inline-flex rounded-xl border border-border bg-card px-6 py-3 text-base font-medium"
-        >
-          Back to home
-        </TvFocusLink>
-      </div>
     </div>
   );
 }

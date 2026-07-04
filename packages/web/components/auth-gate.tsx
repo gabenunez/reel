@@ -11,6 +11,7 @@ import {
 import { Loader2 } from "lucide-react";
 import { ReelIcon } from "@/components/reel-icon";
 import { api } from "@/lib/api";
+import { notifyAndroidLogout } from "@/lib/android-bridge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await api.logout();
+    notifyAndroidLogout();
     await refresh();
   }, [refresh]);
 

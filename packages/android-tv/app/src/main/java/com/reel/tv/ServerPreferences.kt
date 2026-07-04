@@ -25,6 +25,7 @@ object ServerPreferences {
             .edit()
             .remove(KEY_SERVER_URL)
             .apply()
+        SessionPreferences.clearSessionToken(context)
     }
 
     fun normalizeServerUrl(hostInput: String, portInput: String): String? {

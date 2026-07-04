@@ -2,9 +2,10 @@
 <resources>
     <string name="app_name">Reel</string>
     <string name="setup_title">Connect to Reel</string>
-    <string name="setup_heading">Enter your Reel server</string>
-    <string name="setup_subheading">Use the IP address or hostname of the machine running Reel (default port 8096).</string>
-    <string name="host_hint">192.168.1.50</string>
+    <string name="setup_heading">Connect your TV</string>
+    <string name="setup_subheading">Scan the QR code with your phone to enter your server address and password. Your phone must be on the same Wi‑Fi as this TV.</string>
+    <string name="manual_setup_heading">Or enter manually</string>
+    <string name="host_hint">185.162.184.10</string>
     <string name="port_hint">8096</string>
     <string name="host_label">Server address</string>
     <string name="port_label">Port</string>
@@ -14,4 +15,10 @@
     <string name="connection_failed">Could not reach Reel at that address.</string>
     <string name="invalid_host">Enter a server address.</string>
     <string name="connected">Connected to Reel</string>
+    <string name="qr_code_description">QR code to connect Reel on your phone</string>
+    <string name="pairing_waiting">Waiting for your phone…</string>
+    <string name="pairing_unavailable">QR setup unavailable. Use manual entry on the right.</string>
+    <string name="password_use_phone">This server requires a password. Scan the QR code with your phone to sign in.</string>
+    <string name="account_menu_title">Account</string>
+    <string name="log_out">Sign out</string>
 </resources>

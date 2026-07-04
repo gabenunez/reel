@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, LibraryBig, Loader2 } from "lucide-react";
+import { LibraryBig, Loader2 } from "lucide-react";
 import { api, type MediaItem } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { TvFocusButton, TvFocusLink } from "@/components/tv/tv-focus-link";
+import { TvFocusLink } from "@/components/tv/tv-focus-link";
+import { TvPageHeader, TvPagination, TvSectionLabel } from "@/components/tv/tv-page-header";
 import { TvGrid } from "@/components/tv/tv-row";
 import { TvPoster } from "@/components/tv/tv-poster";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { focusFirstContentItem } from "@/lib/tv-focus";
 
 export function TvLibraryView() {
   const searchParams = useSearchParams();
@@ -17,6 +19,7 @@ export function TvLibraryView() {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("Browse");
 
@@ -45,6 +48,7 @@ export function TvLibraryView() {
         .then((data) => {
           setItems(data.items);
           setTotalPages(data.totalPages);
+          setTotalItems(data.total ?? data.items.length);
         })
         .catch(console.warn)
         .finally(() => setLoading(false));
@@ -57,6 +61,7 @@ export function TvLibraryView() {
       .then((data) => {
         setItems(data.items);
         setTotalPages(data.totalPages);
+        setTotalItems(data.total ?? data.items.length);
       })
       .catch(console.warn)
       .finally(() => setLoading(false));
@@ -64,84 +69,62 @@ export function TvLibraryView() {
 
   useEffect(() => {
     if (loading) return;
-    const first = document.querySelector<HTMLElement>("[data-tv-item]");
-    first?.focus();
+    focusFirstContentItem();
   }, [loading, page]);
 
   if (!isDeck && !isLibrary) {
     return (
-      <div className="px-8 py-24 text-center">
-        <p className="mb-6 text-lg text-muted-foreground">Invalid library or deck</p>
-        <TvFocusLink
-          href={routes.home()}
-          className="inline-flex rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
-        >
-          Back to home
-        </TvFocusLink>
+      <div className="px-6 py-16 text-center">
+        <p className="mb-4 text-muted-foreground">Invalid library or deck</p>
+        <div data-tv-row="" data-tv-content-row="" className="flex justify-center">
+          <TvFocusLink
+            href={routes.home()}
+            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+          >
+            Back to home
+          </TvFocusLink>
+        </div>
       </div>
     );
   }
 
+  const backHref = routes.home();
+  const eyebrow = (
+    <span className="inline-flex items-center gap-1.5">
+      <LibraryBig className="h-3 w-3" />
+      {isDeck ? "Deck" : "Library"}
+    </span>
+  );
+  const trailing =
+    !loading && totalPages > 1 ? `Page ${page} of ${totalPages}` : undefined;
+
   return (
-    <div className="px-8 py-8">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-border/70 pb-6">
-        <div className="flex items-center gap-4">
-          <TvFocusLink
-            href={routes.home()}
-            className="flex h-14 w-14 items-center justify-center rounded-xl bg-muted/60"
-            aria-label="Back"
-          >
-            <ChevronLeft className="h-7 w-7" />
-          </TvFocusLink>
-          <div>
-            <p className="mb-1 flex items-center gap-2 text-sm uppercase tracking-wide text-primary">
-              <LibraryBig className="h-4 w-4" />
-              {isDeck ? "Deck" : "Library"}
-            </p>
-            <h1 className="text-4xl font-bold">{title}</h1>
-          </div>
-        </div>
-        {!loading && totalPages > 1 && (
-          <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
-          </p>
-        )}
-      </div>
+    <div className="px-6 py-5">
+      <TvPageHeader
+        backHref={backHref}
+        title={title}
+        eyebrow={eyebrow}
+        trailing={trailing}
+      />
 
       {loading ? (
-        <div className="flex min-h-[40vh] items-center justify-center">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <div className="flex min-h-[35vh] items-center justify-center">
+          <Loader2 className="h-9 w-9 animate-spin text-primary" />
         </div>
       ) : items.length === 0 ? (
-        <div className="py-20 text-center text-lg text-muted-foreground">
-          No titles here yet.
-        </div>
+        <div className="py-16 text-center text-muted-foreground">No titles here yet.</div>
       ) : (
         <>
-          <TvGrid>
+          <TvSectionLabel>
+            {totalItems > 0 ? `${totalItems} titles` : "Titles"}
+          </TvSectionLabel>
+          <TvGrid className="mb-4">
             {items.map((item) => (
               <TvPoster key={item.id} item={item} linkClassName="w-full" className="min-w-0" />
             ))}
           </TvGrid>
 
-          {totalPages > 1 && (
-            <div data-tv-row="" className="mt-10 flex items-center justify-center gap-4">
-              <TvFocusButton
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-                className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-base font-medium disabled:opacity-40"
-              >
-                <ChevronLeft className="h-5 w-5" /> Previous
-              </TvFocusButton>
-              <TvFocusButton
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-                className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-base font-medium disabled:opacity-40"
-              >
-                Next <ChevronRight className="h-5 w-5" />
-              </TvFocusButton>
-            </div>
-          )}
+          <TvPagination page={page} totalPages={totalPages} onPageChange={setPage} />
         </>
       )}
     </div>

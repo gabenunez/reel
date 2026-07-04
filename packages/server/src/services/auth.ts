@@ -214,7 +214,11 @@ export class AuthService {
 }
 
 export function isPublicPath(pathname: string, passwordRequired: boolean): boolean {
-  if (pathname === "/api/auth/status" || pathname === "/api/auth/login") {
+  if (
+    pathname === "/api/auth/status" ||
+    pathname === "/api/auth/login" ||
+    pathname === "/api/status"
+  ) {
     return true;
   }
 
@@ -225,8 +229,7 @@ export function isPublicPath(pathname: string, passwordRequired: boolean): boole
   if (
     !passwordRequired &&
     (pathname === "/api/settings" ||
-      pathname.startsWith("/api/browse") ||
-      pathname === "/api/status")
+      pathname.startsWith("/api/browse"))
   ) {
     return true;
   }

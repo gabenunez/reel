@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Play } from "lucide-react";
+import { Heart, Layers, Loader2, Play, Sparkles } from "lucide-react";
 import { api, type ContinueWatchingItem, type MediaItem } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { TvFocusLink } from "@/components/tv/tv-focus-link";
 import { TvPoster } from "@/components/tv/tv-poster";
-import { TvRow } from "@/components/tv/tv-row";
+import { TvRow, tvScrollRowClassName } from "@/components/tv/tv-row";
+import { TvBrowseCard } from "@/components/tv/tv-see-all-tile";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { focusPrimaryContentItem } from "@/lib/tv-focus";
 import { LibraryIcon } from "@/components/navbar";
 
 export function TvHomeView() {
@@ -39,11 +40,8 @@ export function TvHomeView() {
 
   useEffect(() => {
     if (!loaded) return;
-    const first = document.querySelector<HTMLElement>("[data-tv-item]");
-    first?.focus();
+    requestAnimationFrame(() => focusPrimaryContentItem());
   }, [loaded]);
-
-  const continueTarget = continueWatching[0] ?? null;
 
   if (!loaded) {
     return (
@@ -61,30 +59,14 @@ export function TvHomeView() {
     decks.length > 0;
 
   return (
-    <div className="py-8">
-      {continueTarget && (
-        <section className="mb-10 px-8">
-          <h1 className="mb-5 text-3xl font-black tracking-tight sm:text-4xl">
-            Continue watching
-          </h1>
-          <div data-tv-row="" className="flex flex-wrap items-center gap-5">
-            <TvFocusLink
-              href={
-                continueTarget.itemType === "movie"
-                  ? routes.watch("movie", continueTarget.itemId, continueTarget.mediaId)
-                  : routes.watch("episode", continueTarget.itemId, continueTarget.mediaId)
-              }
-              className="inline-flex items-center gap-3 rounded-xl bg-primary px-8 py-4 text-lg font-semibold text-primary-foreground"
-            >
-              <Play className="h-6 w-6 fill-current" />
-              Continue {continueTarget.title}
-            </TvFocusLink>
-          </div>
-        </section>
-      )}
-
+    <div className="py-5">
       {continueWatching.length > 0 && (
-        <TvRow title="Continue Watching" href={routes.continueWatching()}>
+        <TvRow
+          title="Continue Watching"
+          seeAllHref={routes.continueWatching()}
+          seeAllLabel="Continue Watching"
+          seeAllDetail="All in progress"
+        >
           {continueWatching.map((item) => (
             <TvPoster
               key={item.id}
@@ -108,7 +90,12 @@ export function TvHomeView() {
       )}
 
       {favorites.length > 0 && (
-        <TvRow title="Favorites" href={routes.favorites()}>
+        <TvRow
+          title="Favorites"
+          seeAllHref={routes.favorites()}
+          seeAllLabel="Favorites"
+          seeAllDetail={`${favorites.length}+ saved`}
+        >
           {favorites.map((item) => (
             <TvPoster key={item.id} item={item} />
           ))}
@@ -116,72 +103,102 @@ export function TvHomeView() {
       )}
 
       {recentlyAdded.length > 0 && (
-        <TvRow title="Recently Added" href={routes.recentlyAdded()}>
+        <TvRow
+          title="Recently Added"
+          seeAllHref={routes.recentlyAdded()}
+          seeAllLabel="Recently Added"
+          seeAllDetail="Full list"
+        >
           {recentlyAdded.map((item) => (
             <TvPoster key={item.id} item={item} />
           ))}
         </TvRow>
       )}
 
-      {(decks.length > 0 || libraries.length > 0) && (
-        <section className="mb-10">
-          <div className="mb-4 flex items-center justify-between gap-4 px-8">
-            <h2 className="text-2xl font-bold tracking-tight">Browse</h2>
-            <a
-              href={routes.browse()}
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              View all
-            </a>
-          </div>
+      {(decks.length > 0 || libraries.length > 0 || continueWatching.length > 0 || recentlyAdded.length > 0) && (
+        <section className="tv-row-section mb-5">
+          <h2 className="mb-2 px-8 text-base font-semibold tracking-tight text-muted-foreground transition-colors duration-200">
+            Browse
+          </h2>
           <div
             data-tv-row=""
-            className="scrollbar-hide flex snap-x gap-4 overflow-x-auto px-8 pb-2"
+            data-tv-content-row=""
+            data-tv-scroll-row=""
+            className={tvScrollRowClassName}
           >
-            <TvFocusLink
+            {continueWatching.length > 0 && (
+              <TvBrowseCard
+                href={routes.continueWatching()}
+                title="Continue Watching"
+                detail={`${continueWatching.length} in progress`}
+                icon={
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/15 text-accent">
+                    <Play className="h-4 w-4 fill-current" />
+                  </div>
+                }
+              />
+            )}
+            {recentlyAdded.length > 0 && (
+              <TvBrowseCard
+                href={routes.recentlyAdded()}
+                title="Recently Added"
+                detail={`${recentlyAdded.length} new titles`}
+                icon={
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                }
+              />
+            )}
+            <TvBrowseCard
               href={routes.favorites()}
-              className="w-64 shrink-0 snap-start rounded-xl border border-border/80 bg-card p-5"
-            >
-              <p className="truncate text-lg font-semibold">Favorites</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Saved titles · {favorites.length} favorited
-              </p>
-            </TvFocusLink>
+              title="Favorites"
+              detail={`${favorites.length} saved`}
+              icon={
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <Heart className="h-4 w-4" />
+                </div>
+              }
+            />
+            <TvBrowseCard
+              href={routes.browse()}
+              title="All collections"
+              detail="Libraries & decks"
+              icon={
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <Layers className="h-4 w-4" />
+                </div>
+              }
+            />
             {decks.map((deck) => (
-              <TvFocusLink
+              <TvBrowseCard
                 key={`deck-${deck.id}`}
                 href={routes.deck(deck.id)}
-                className="w-64 shrink-0 snap-start rounded-xl border border-border/80 bg-card p-5"
-              >
-                <p className="truncate text-lg font-semibold">{deck.name}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Deck · {deck.itemCount ?? 0} titles
-                </p>
-              </TvFocusLink>
+                title={deck.name}
+                detail={`${deck.itemCount ?? 0} titles`}
+              />
             ))}
             {libraries.map((lib) => (
-              <TvFocusLink
+              <TvBrowseCard
                 key={`library-${lib.id}`}
                 href={routes.library(lib.id)}
-                className="w-64 shrink-0 snap-start rounded-xl border border-border/80 bg-card p-5"
-              >
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <LibraryIcon type={lib.type} />
-                </div>
-                <p className="truncate text-lg font-semibold">{lib.name}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {lib.type === "movies" ? "Movies" : "TV"} · {lib.itemCount ?? 0} titles
-                </p>
-              </TvFocusLink>
+                title={lib.name}
+                detail={`${lib.itemCount ?? 0} titles`}
+                icon={
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <LibraryIcon type={lib.type} />
+                  </div>
+                }
+              />
             ))}
           </div>
         </section>
       )}
 
       {!hasContent && (
-        <div className="mx-auto max-w-xl px-8 py-24 text-center">
-          <h2 className="mb-3 text-3xl font-bold">No media yet</h2>
-          <p className="text-lg text-muted-foreground">
+        <div className="mx-auto max-w-xl px-8 py-20 text-center">
+          <h2 className="mb-2 text-2xl font-bold">No media yet</h2>
+          <p className="text-base text-muted-foreground">
             Add libraries on the desktop site, then come back here to browse.
           </p>
         </div>
