@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.61 — 2026-07-04
+
+### TV
+- **4K playback** — restore 4K transcode tier preference; direct-play 4K via ExoPlayer by setting both session cookies on login (legacy TV app compatibility); keep HEVC HLS remux on Android TV instead of unnecessary transcoding
+
 ## 0.1.60 — 2026-07-04
 
 ### TV

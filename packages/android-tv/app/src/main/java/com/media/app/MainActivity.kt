@@ -111,11 +111,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun applySessionCookie() {
+    private     fun applySessionCookie() {
         CookieManager.getInstance().setAcceptCookie(true)
         val token = AuthSession.resolveSessionToken(this, serverUrl) ?: return
         val cookieManager = CookieManager.getInstance()
         cookieManager.setCookie(serverUrl, "media_session=$token")
+        cookieManager.setCookie(serverUrl, "reel_session=$token")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             cookieManager.flush()
         }

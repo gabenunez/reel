@@ -28,7 +28,7 @@ export async function authRoutes(
       }
 
       const token = auth.createSessionToken();
-      reply.header("Set-Cookie", auth.sessionCookie(token));
+      reply.header("Set-Cookie", auth.allSessionCookies(token));
       return { success: true };
     },
   );
@@ -69,7 +69,7 @@ export async function authRoutes(
 
     auth.setPassword(password);
     const token = auth.createSessionToken();
-    reply.header("Set-Cookie", auth.sessionCookie(token));
+    reply.header("Set-Cookie", auth.allSessionCookies(token));
 
     return { success: true, passwordConfigured: true };
   });

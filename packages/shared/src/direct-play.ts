@@ -156,8 +156,7 @@ export function pickTranscodeQualityForPlayback(
     (quality): quality is TranscodeQuality => quality !== "original",
   );
 
-  // Prefer 1080p over 2160p for server-side transcode — realtime 4K encode is rarely viable.
-  for (const quality of ["1080p", "720p", "480p", "2160p"] as const) {
+  for (const quality of ["2160p", "1080p", "720p", "480p"] as const) {
     if (transcodeTiers.includes(quality)) return quality;
   }
 

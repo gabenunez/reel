@@ -140,8 +140,17 @@ export class AuthService {
   }
 
   sessionCookie(token: string): string {
+    return this.allSessionCookies(token)[0]!;
+  }
+
+  allSessionCookies(token: string): string[] {
     const maxAge = Math.floor(SESSION_TTL_MS / 1000);
-    return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+    const value = encodeURIComponent(token);
+    const attrs = `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+    return [
+      `${SESSION_COOKIE}=${value}; ${attrs}`,
+      `${LEGACY_SESSION_COOKIE}=${value}; ${attrs}`,
+    ];
   }
 
   clearSessionCookie(): string {

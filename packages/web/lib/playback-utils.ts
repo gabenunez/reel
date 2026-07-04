@@ -77,6 +77,10 @@ function effectiveOriginalPlaybackMode(
     (videoCodec === "hevc" || videoCodec === "h265") &&
     !browserSupportsHevcPlayback()
   ) {
+    // Android TV hardware decodes HEVC in HLS remux even when canPlayType is empty.
+    if (isTvClient()) {
+      return "remux";
+    }
     return streamInfo.transcodingEnabled ? "transcode" : "unsupported";
   }
 
@@ -490,10 +494,10 @@ export function createPlaybackHls(
   const tv = options?.tv ?? isTvClient();
 
   return new HlsConstructor({
-    backBufferLength: tv ? 30 : 90,
-    maxBufferLength: tv ? 60 : 30,
-    maxMaxBufferLength: tv ? 120 : 600,
-    maxBufferSize: tv ? 100 * 1000 * 1000 : 60 * 1000 * 1000,
+    backBufferLength: tv ? 60 : 90,
+    maxBufferLength: tv ? 120 : 30,
+    maxMaxBufferLength: tv ? 300 : 600,
+    maxBufferSize: tv ? 200 * 1000 * 1000 : 60 * 1000 * 1000,
     maxBufferHole: 0.5,
     nudgeOnVideoHole: true,
     startFragPrefetch: tv,
