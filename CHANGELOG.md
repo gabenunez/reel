@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.68 — 2026-07-05
+
+### Android TV (app 1.4.6)
+- **Native playback** — transparent WebView/TextureView compositing so video is visible (fixes audio-only black screen)
+- **Remote** — pass OK/Center and left/right to the WebView; stop native seek/play intercepts that bypassed focused controls
+- **Back** — layered dismiss (menus → controls → exit) via web handler before history back
+- **Pairing** — robust login token parsing and trimmed password on pair screen
+
+### TV watch player
+- **Controls** — scrubber above transport row; Up/Down navigation matches layout; Quality no longer opens on Up
+- **Seek** — left/right only skips when scrubber is focused; hidden controls reveal the bar instead of skipping
+- **Back** — first press closes open menus or hides controls; exit only when nothing is open
+- **Picture** — remove page gradient dimming during native playback
+
+### Server
+- **Auth** — login returns session token in JSON for native TV pairing
+
+### Playback
+- **Native TV** — prefer direct play again; HLS remux stays as error fallback only
+
 ## 0.1.67 — 2026-07-05
 
 ### Playback
