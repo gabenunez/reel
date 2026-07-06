@@ -2,107 +2,96 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
-import { Home, Heart, LogOut, Search } from "lucide-react";
-import { useAuth } from "@/components/auth-gate";
+import { Heart, Home, Settings } from "lucide-react";
 import { MediaIcon } from "@/components/media-icon";
+import { mainNavGroupClassName, NavTab } from "@/components/nav-tabs";
+import { SearchPopover } from "@/components/search-popover";
 import { TvSpatialNav } from "@/components/tv/tv-spatial-nav";
-import { tvNavItemClassName, TvFocusButton, TvFocusLink } from "@/components/tv/tv-focus-link";
+import { UpdateAvailableButton } from "@/components/update-available-button";
+import { isNavActive } from "@/lib/nav-utils";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
-function TvNavButton({
-  href,
-  label,
-  active,
-  children,
-}: {
-  href: string;
-  label: string;
-  active: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      data-tv-item=""
-      tabIndex={0}
-      aria-current={active ? "page" : undefined}
-      aria-label={label}
-      title={label}
-      {...(active ? { "data-tv-nav-active": "" as const } : {})}
-      className={cn(
-        "flex h-11 w-11 items-center justify-center",
-        tvNavItemClassName,
-        !active && "text-muted-foreground",
-      )}
-    >
-      {children}
-    </Link>
-  );
-}
+function TvHeader() {
+  const pathname = usePathname();
+  const homeActive = isNavActive(pathname, "/");
+  const favoritesActive = isNavActive(pathname, "/favorites");
+  const settingsActive = isNavActive(pathname, "/settings");
 
-function TvLogoutButton({ onLogout }: { onLogout: () => void }) {
   return (
-    <TvFocusButton
-      variant="nav"
-      title="Sign out"
-      aria-label="Sign out"
-      onClick={onLogout}
-      className="flex h-11 w-11 items-center justify-center text-muted-foreground"
-    >
-      <LogOut className="h-5 w-5" />
-    </TvFocusButton>
+    <header className="sticky top-0 z-50 shrink-0 overflow-visible border-b border-border/60 bg-background/90">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent"
+      />
+
+      <div className="flex h-16 items-center gap-3 px-4 sm:h-[4.5rem] sm:gap-4 sm:px-6">
+        <Link
+          href={routes.home()}
+          data-tv-item=""
+          tabIndex={0}
+          aria-label="MEDIA! home"
+          className="tv-focus-button group -my-1 flex shrink-0 items-center rounded-lg outline-none"
+        >
+          <MediaIcon className="h-16 w-16 transition-transform group-hover:-rotate-6 sm:h-20 sm:w-20" />
+        </Link>
+
+        <div className="hidden min-w-0 flex-1 md:block md:max-w-md lg:max-w-xl">
+          <SearchPopover variant="bar" />
+        </div>
+
+        <div className="ml-auto flex min-h-9 items-center gap-2 sm:gap-2.5">
+          <SearchPopover variant="icon" className="md:hidden" />
+
+          <nav
+            data-tv-row=""
+            data-tv-nav-row=""
+            aria-label="Main"
+            className={mainNavGroupClassName}
+          >
+            <NavTab
+              tvItem
+              href={routes.home()}
+              icon={Home}
+              label="Home"
+              active={homeActive}
+            />
+            <NavTab
+              tvItem
+              href={routes.favorites()}
+              icon={Heart}
+              label="Favorites"
+              active={favoritesActive}
+            />
+            <NavTab
+              tvItem
+              href={routes.settings()}
+              icon={Settings}
+              label="Settings"
+              active={settingsActive}
+            />
+          </nav>
+
+          <UpdateAvailableButton tvItem />
+        </div>
+      </div>
+
+      <div className="border-t border-border/40 px-4 pb-3 pt-2 md:hidden">
+        <SearchPopover variant="bar" />
+      </div>
+    </header>
   );
 }
 
 export function TvShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { required, authenticated, logout } = useAuth();
   const hideNav = pathname.startsWith("/watch");
-  const homeActive = pathname === "/";
-  const favoritesActive = pathname.startsWith("/favorites");
-  const searchActive = pathname.startsWith("/search");
-  const showLogout = required && authenticated;
-
-  const handleLogout = () => {
-    void logout();
-  };
 
   return (
     <TvSpatialNav>
-      <div className="tv-ui flex h-screen max-h-screen overflow-hidden">
-        {!hideNav && (
-          <aside className="flex w-[4.25rem] shrink-0 flex-col items-center border-r border-border/50 bg-background/95 py-5 min-h-screen">
-            <div className="mb-6 flex h-9 w-9 items-center justify-center" aria-hidden="true">
-              <MediaIcon className="h-9 w-9 opacity-90" />
-            </div>
-
-            <nav
-              data-tv-row=""
-              data-tv-nav-row=""
-              data-tv-vertical=""
-              className="flex flex-col items-center gap-2"
-            >
-              <TvNavButton href={routes.home()} label="Home" active={homeActive}>
-                <Home className="h-5 w-5" />
-              </TvNavButton>
-              <TvNavButton
-                href={routes.favorites()}
-                label="Favorites"
-                active={favoritesActive}
-              >
-                <Heart className="h-5 w-5" />
-              </TvNavButton>
-              <TvNavButton href={routes.search()} label="Search" active={searchActive}>
-                <Search className="h-5 w-5" />
-              </TvNavButton>
-              {showLogout && <TvLogoutButton onLogout={handleLogout} />}
-            </nav>
-          </aside>
-        )}
-
-        <main className="min-w-0 flex-1 pb-6">{children}</main>
+      <div className={cn("tv-ui flex h-screen max-h-screen flex-col overflow-hidden")}>
+        {!hideNav && <TvHeader />}
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto pb-6">{children}</main>
       </div>
     </TvSpatialNav>
   );

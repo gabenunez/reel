@@ -9,6 +9,7 @@ export const routes = {
   continueWatching: () => "/continue/",
   recentlyAdded: () => "/recent/",
   browse: () => "/browse/",
+  settings: () => "/settings/",
   watch: (
     type: "movie" | "episode",
     fileId: number,

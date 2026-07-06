@@ -1107,7 +1107,7 @@ function WatchDesktopClient() {
             <div className="group/watch-scrub mb-3 flex items-center gap-3 sm:mb-4">
               <div
                 ref={timelineRef}
-                className="relative flex h-5 flex-1 items-center"
+                className="relative h-5 flex-1"
                 onPointerMove={(e) => updateTimelineHover(e.clientX)}
                 onPointerLeave={() => setTimelineHoverPercent(null)}
               >
@@ -1119,7 +1119,7 @@ function WatchDesktopClient() {
                     spriteUrl={thumbnails?.spriteUrl ?? null}
                   />
                 )}
-                <div className="watch-scrub-track">
+                <div className="watch-scrub-track absolute inset-x-0 top-1/2 -translate-y-1/2">
                   {bufferedRanges.map((range, index) => {
                     const left = toTimelinePercent(range.start);
                     const width = Math.max(0, toTimelinePercent(range.end) - left);
@@ -1162,7 +1162,7 @@ function WatchDesktopClient() {
                     handleScrubCommit(parseFloat((e.currentTarget as HTMLInputElement).value))
                   }
                   aria-label="Progress"
-                  className="range-signal range-signal-overlay absolute inset-0 z-[3] w-full cursor-pointer appearance-none bg-transparent"
+                  className="range-signal range-signal-overlay absolute inset-x-0 top-1/2 z-[3] w-full -translate-y-1/2 cursor-pointer appearance-none bg-transparent"
                 />
               </div>
               <span className="hidden shrink-0 font-mono text-xs tabular-nums text-white/85 sm:inline">

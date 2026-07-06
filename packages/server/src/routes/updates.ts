@@ -3,6 +3,7 @@ import {
   checkForUpdates,
   getUpdateProgress,
   isUpdateInProgress,
+  prepareUpdateApply,
   triggerUpdate,
 } from "../services/updates.js";
 
@@ -20,43 +21,29 @@ export async function updateRoutes(app: FastifyInstance) {
   app.post<{ Body: { releaseTag?: string } }>(
     "/api/updates/apply",
     async (request, reply) => {
-      const status = await checkForUpdates(true);
-
-      if (!status.updateSupported) {
-        return reply
-          .status(400)
-          .send({ error: "In-app updates are not supported on this install" });
-      }
-
-      if (status.updateInProgress) {
-        return reply.status(409).send({ error: "An update is already in progress" });
-      }
-
-      const releaseTag =
-        request.body?.releaseTag?.trim() ||
-        (status.latestVersion ? `v${status.latestVersion}` : null);
-
-      if (!releaseTag) {
-        return reply.status(400).send({ error: "No release available to install" });
-      }
-
-      if (!status.updateAvailable) {
-        return reply.status(400).send({ error: "You are already on the latest release" });
-      }
-
       try {
-        triggerUpdate(releaseTag, status.installDir);
-      } catch (err) {
-        return reply.status(400).send({
-          error: err instanceof Error ? err.message : "Failed to start update",
-        });
-      }
+        const { releaseTag, installDir } = prepareUpdateApply(request.body?.releaseTag);
+        triggerUpdate(releaseTag, installDir);
 
-      return {
-        success: true,
-        message: "Update started. The server will restart when the update completes.",
-        releaseTag,
-      };
+        return {
+          success: true,
+          message: "Update started. The server will restart when the update completes.",
+          releaseTag,
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to start update";
+        const statusCode =
+          message === "An update is already in progress"
+            ? 409
+            : message === "You are already on the latest release" ||
+                message === "No release available to install" ||
+                message === "Invalid release tag" ||
+                message === "In-app updates are not supported on this install"
+              ? 400
+              : 400;
+
+        return reply.status(statusCode).send({ error: message });
+      }
     },
   );
 }

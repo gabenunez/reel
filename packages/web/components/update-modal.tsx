@@ -34,7 +34,13 @@ export function UpdateModal() {
       setMessage(result.message);
       await refresh(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed to start");
+      setError(
+        err instanceof Error && err.message === "Failed to fetch"
+          ? "Could not reach the server. If an update is already running, wait for the restart and refresh this page."
+          : err instanceof Error
+            ? err.message
+            : "Update failed to start",
+      );
     } finally {
       setApplying(false);
     }

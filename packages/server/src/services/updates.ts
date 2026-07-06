@@ -10,6 +10,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 const CHECK_CACHE_MS = 15 * 60 * 1000;
+const REMOTE_FETCH_TIMEOUT_MS = 8_000;
+const GIT_REMOTE_TIMEOUT_MS = 12_000;
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs = REMOTE_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export interface UpdateStatus {
   currentVersion: string;
@@ -477,7 +499,7 @@ async function fetchLatestReleaseFromGitHubApi(): Promise<GitHubRelease | null> 
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(GITHUB_API, { headers });
+  const res = await fetchWithTimeout(GITHUB_API, { headers });
 
   if (res.status === 404) {
     return null;
@@ -514,7 +536,7 @@ function fetchLatestTagFromGit(installDir: string): string | null {
         ["-C", installDir, "ls-remote", "--tags", "origin"],
         {
           encoding: "utf8",
-          timeout: 20000,
+          timeout: GIT_REMOTE_TIMEOUT_MS,
           env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
         },
       ),
@@ -532,7 +554,7 @@ function fetchLatestTagRemote(): string | null {
       ["ls-remote", "--tags", `https://github.com/${GITHUB_REPO}.git`],
       {
         encoding: "utf8",
-        timeout: 20000,
+        timeout: GIT_REMOTE_TIMEOUT_MS,
         env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
       },
     );
@@ -577,7 +599,7 @@ async function fetchReleaseNotesFromChangelog(version: string): Promise<string |
 
   for (const url of urls) {
     try {
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         headers: { "User-Agent": `MEDIA/${getCurrentVersion()}` },
       });
       if (!res.ok) continue;
@@ -615,7 +637,11 @@ function resolveLatestFromTags(
   };
 }
 
-export async function checkForUpdates(force = false): Promise<UpdateStatus> {
+export async function checkForUpdates(
+  force = false,
+  options: { includeReleaseNotes?: boolean } = {},
+): Promise<UpdateStatus> {
+  const includeReleaseNotes = options.includeReleaseNotes !== false;
   const installDir = detectInstallDir();
   const currentVersion = getCurrentVersion(installDir);
   const updateSupported = isUpdateSupported(installDir);
@@ -657,7 +683,9 @@ export async function checkForUpdates(force = false): Promise<UpdateStatus> {
     latestReleaseName = tagLatest.latestReleaseName;
     releaseUrl = tagLatest.releaseUrl;
     updateAvailable = tagLatest.updateAvailable;
-    releaseNotes = await fetchReleaseNotesFromChangelog(tagLatest.latestVersion);
+    if (includeReleaseNotes) {
+      releaseNotes = await fetchReleaseNotesFromChangelog(tagLatest.latestVersion);
+    }
   } else {
     try {
       const release = await fetchLatestReleaseFromGitHubApi();
@@ -691,6 +719,51 @@ export async function checkForUpdates(force = false): Promise<UpdateStatus> {
 
   cachedCheck = { at: Date.now(), status: { ...status, updateProgress: null } };
   return status;
+}
+
+export function normalizeReleaseTag(releaseTag: string): string {
+  const trimmed = releaseTag.trim();
+  const version = normalizeVersion(trimmed.replace(/^v/i, ""));
+  if (!/^\d+\.\d+\.\d+$/.test(version)) {
+    throw new Error("Invalid release tag");
+  }
+  return `v${version}`;
+}
+
+/** Fast validation for in-app apply — avoids changelog/GitHub fetches before responding. */
+export function prepareUpdateApply(requestedTag?: string | null): {
+  releaseTag: string;
+  installDir: string;
+  currentVersion: string;
+} {
+  if (isUpdateInProgress()) {
+    throw new Error("An update is already in progress");
+  }
+
+  const installDir = detectInstallDir();
+  if (!isUpdateSupported(installDir)) {
+    throw new Error("In-app updates are not supported on this install");
+  }
+
+  const currentVersion = getCurrentVersion(installDir);
+  let releaseTag = requestedTag?.trim() || null;
+
+  if (!releaseTag) {
+    const tagLatest = resolveLatestFromTags(installDir, currentVersion);
+    if (!tagLatest?.updateAvailable) {
+      throw new Error("No release available to install");
+    }
+    releaseTag = tagLatest.latestReleaseName;
+  }
+
+  releaseTag = normalizeReleaseTag(releaseTag);
+  const targetVersion = normalizeVersion(releaseTag.slice(1));
+
+  if (!isNewerVersion(targetVersion, currentVersion)) {
+    throw new Error("You are already on the latest release");
+  }
+
+  return { releaseTag, installDir, currentVersion };
 }
 
 export function triggerUpdate(releaseTag: string, installDir = detectInstallDir()): void {

@@ -4,43 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Film, Heart, Home, Settings, Tv } from "lucide-react";
 import { MediaIcon } from "@/components/media-icon";
-import type { LucideIcon } from "lucide-react";
-import { UpdateAvailableButton } from "@/components/update-available-button";
+import { mainNavGroupClassName, NavTab } from "@/components/nav-tabs";
 import { SearchPopover } from "@/components/search-popover";
+import { UpdateAvailableButton } from "@/components/update-available-button";
 import { isNavActive } from "@/lib/nav-utils";
-import { cn } from "@/lib/utils";
-
-function NavTab({
-  href,
-  icon: Icon,
-  label,
-  active,
-  compact = false,
-}: {
-  href: string;
-  icon: LucideIcon;
-  label: string;
-  active: boolean;
-  compact?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      title={label}
-      className={cn(
-        "relative flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-all",
-        compact ? "h-9 w-9" : "h-9 px-3.5 sm:px-4",
-        active
-          ? "bg-background text-primary shadow-sm ring-1 ring-primary/35"
-          : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
-      )}
-    >
-      <Icon className="h-4 w-4 shrink-0" />
-      {!compact && <span className="hidden sm:inline">{label}</span>}
-    </Link>
-  );
-}
 
 export function Navbar() {
   const pathname = usePathname();
@@ -73,13 +40,10 @@ export function Navbar() {
           <SearchPopover variant="bar" />
         </div>
 
-          <div className="ml-auto flex min-h-9 items-center gap-2 sm:gap-2.5">
+        <div className="ml-auto flex min-h-9 items-center gap-2 sm:gap-2.5">
           <SearchPopover variant="icon" className="hidden sm:block md:hidden" />
 
-          <nav
-            aria-label="Main"
-            className="flex items-center gap-0.5 rounded-lg border border-border/70 bg-muted/25 p-0.5"
-          >
+          <nav aria-label="Main" className={mainNavGroupClassName}>
             <NavTab href="/" icon={Home} label="Home" active={homeActive} compact />
             <NavTab
               href="/favorites/"
@@ -88,7 +52,13 @@ export function Navbar() {
               active={favoritesActive}
               compact
             />
-            <NavTab href="/settings/" icon={Settings} label="Settings" active={settingsActive} compact />
+            <NavTab
+              href="/settings/"
+              icon={Settings}
+              label="Settings"
+              active={settingsActive}
+              compact
+            />
           </nav>
 
           <div className="min-h-9">

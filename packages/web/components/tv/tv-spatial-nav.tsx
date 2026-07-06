@@ -214,14 +214,21 @@ function focusNavFromContent(active: HTMLElement) {
   const navItems = getRowItems(navRow);
   if (!navItems.length) return false;
 
-  const centerY = active.getBoundingClientRect().top + active.getBoundingClientRect().height / 2;
+  const rect = active.getBoundingClientRect();
+  const verticalNav = navRow.hasAttribute("data-tv-vertical");
+  const activeCenter = verticalNav
+    ? rect.top + rect.height / 2
+    : rect.left + rect.width / 2;
+
   let best = navItems[0];
   let bestDist = Infinity;
 
   for (const item of navItems) {
     const r = item.getBoundingClientRect();
-    const cy = r.top + r.height / 2;
-    const dist = Math.abs(cy - centerY);
+    const itemCenter = verticalNav
+      ? r.top + r.height / 2
+      : r.left + r.width / 2;
+    const dist = Math.abs(itemCenter - activeCenter);
     if (dist < bestDist) {
       bestDist = dist;
       best = item;
@@ -257,7 +264,7 @@ function moveHorizontal(active: HTMLElement, direction: "left" | "right") {
 
   const inNav = row.hasAttribute("data-tv-nav-row");
 
-  if (inNav && direction === "right") {
+  if (inNav && direction === "right" && row.hasAttribute("data-tv-vertical")) {
     return focusContentFromNav(active);
   }
 
@@ -298,6 +305,9 @@ function moveVertical(active: HTMLElement, direction: "up" | "down") {
       focusItem(next);
       return true;
     }
+    if (direction === "down" && !activeRow.hasAttribute("data-tv-vertical")) {
+      return focusContentFromNav(active);
+    }
     return false;
   }
 
@@ -319,6 +329,10 @@ function moveVertical(active: HTMLElement, direction: "up" | "down") {
       return true;
     }
     return false;
+  }
+
+  if (direction === "up" && contentIndex === 0) {
+    return focusNavFromContent(active);
   }
 
   if (direction === "up" && contentIndex > 0) {

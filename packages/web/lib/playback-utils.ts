@@ -75,12 +75,12 @@ function effectiveOriginalPlaybackMode(
       return "remux";
     }
 
-    // ExoPlayer direct-play of progressive MKV/WebM is unreliable — especially at 4K.
-    // HLS remux keeps source resolution (video copy) and is the stable native TV path.
+    // MKV/WebM remux is smoother for SD/HD on ExoPlayer — keep 4K on direct play.
     if (
       nativeMode === "direct" &&
       streamInfo.transcodingEnabled &&
       containerPrefersHlsRemux(streamInfo.fileName) &&
+      !is4KSource(streamInfo.height, streamInfo.width) &&
       isHlsVideoCopySupported(streamInfo.videoCodec)
     ) {
       return "remux";

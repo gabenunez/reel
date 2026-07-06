@@ -637,6 +637,7 @@ export function TvWatchView() {
             ? toAbsoluteMediaUrl(api.subtitleUrl(activeSubtitle))
             : undefined,
       });
+      setPlaybackHasBegun(true);
 
       progressInterval.current = setInterval(
         () => saveProgressRef.current(),
@@ -1083,7 +1084,7 @@ export function TvWatchView() {
     !error &&
     !(!usingHlsPlayback && optimisticAbsoluteSeconds !== null) &&
     (usesNativePlayer
-      ? !playbackHasBegun && (isPreparing || buffering)
+      ? isPreparing
       : isPreparing || (buffering && !playbackHasBegun));
   const showBufferingBar =
     !usesNativePlayer && bufferingMidPlayback && playbackHasBegun && !error;
@@ -1341,7 +1342,11 @@ export function TvWatchView() {
         data-tv-watch-video-stage=""
         className="relative min-h-0 flex-1 bg-transparent"
       >
-        <PlaybackPosterBackdrop posterUrl={posterUrl} visible={showPosterBackdrop} />
+        <PlaybackPosterBackdrop
+          posterUrl={posterUrl}
+          visible={showPosterBackdrop}
+          transparentBackground={usesNativePlayer}
+        />
         <div
           ref={focusSinkRef}
           tabIndex={-1}
@@ -1513,8 +1518,7 @@ export function TvWatchView() {
       <div className="relative z-20 shrink-0 overflow-hidden">
         <div
           className={cn(
-            "pointer-events-auto border-t border-white/10 px-6 pb-6 pt-4",
-            usesNativePlayer ? "bg-black/80" : "watch-chrome-bottom",
+            "pointer-events-auto border-t border-white/10 px-6 pb-6 pt-4 watch-chrome-bottom",
           )}
         >
           <div className="mb-3 flex items-end justify-between gap-3">
@@ -1523,9 +1527,9 @@ export function TvWatchView() {
               data-tv-content-row=""
               data-tv-watch-controls=""
               data-tv-watch-scrub-row=""
-              className="group/watch-scrub min-w-0 flex-1 py-1"
+              className="group/watch-scrub min-w-0 flex-1 py-2.5"
             >
-              <div className="relative overflow-hidden">
+              <div className="relative">
                 {showScrubPreview && (
                   <div className="mb-3 flex h-[92px] w-full max-w-full items-end justify-center overflow-hidden">
                     <SeekPreviewTooltip
@@ -1538,15 +1542,14 @@ export function TvWatchView() {
                   </div>
                 )}
                 <TvFocusButton
-                  variant="nav"
                   data-tv-watch-scrub=""
                   aria-label="Progress"
                   onClick={() => revealControls(false)}
                   onFocus={() => setScrubPreviewPercent(progress)}
                   onBlur={() => setScrubPreviewPercent(null)}
-                  className="relative h-9 w-full overflow-hidden rounded-lg border-2 border-transparent bg-transparent p-0"
+                  className="tv-watch-scrub relative flex h-8 w-full items-center overflow-visible border-2 border-transparent bg-transparent p-0 px-1.5"
                 >
-                  <div className="watch-scrub-track absolute inset-x-1.5 top-1/2 -translate-y-1/2">
+                  <div className="watch-scrub-track w-full">
                     {bufferedRanges.map((range, index) => {
                       const left = toTimelinePercent(range.start);
                       const width = Math.max(0, toTimelinePercent(range.end) - left);

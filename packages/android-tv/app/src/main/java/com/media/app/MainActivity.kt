@@ -176,12 +176,14 @@ class MainActivity : AppCompatActivity() {
     private fun setNativeVideoOverlayActive(active: Boolean) {
         if (active) {
             webView.setBackgroundColor(Color.TRANSPARENT)
-            webView.background?.mutate()?.alpha = 0
+            webView.background = null
+            webView.isOpaque = false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
                 // Hardware layers stay opaque on many Android TV WebViews and hide ExoPlayer below.
                 webView.setLayerType(View.LAYER_TYPE_NONE, null)
             }
         } else {
+            webView.isOpaque = true
             webView.setBackgroundColor(Color.BLACK)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
                 webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
