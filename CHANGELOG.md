@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.78 — 2026-07-06
+
+### UI
+
+- **Branding** — animated MEDIA! logo on desktop (exclamation bounce on hover)
+
+### Android TV
+
+- **Branding** — updated launcher icon, round icon, and TV banner to match web colors and wordmark
+- **Launcher** — setup screen label matches the app name
+
 ## 0.1.77 — 2026-07-06
 
 ### Playback
