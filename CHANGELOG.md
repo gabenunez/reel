@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.80 — 2026-07-06
+
+### TV
+
+- **Watch player** — overlay transport controls on full-screen video instead of a bottom dock that shrank the picture
+- **Watch player** — tighter button, title, and loading chrome sizing for a better 10-foot viewing experience
+- **Watch player** — smaller seek-preview thumbnails and safe-area padding on the control bar
+
 ## 0.1.79 — 2026-07-06
 
 ### Android TV
