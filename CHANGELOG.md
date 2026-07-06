@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.84 — 2026-07-06
+
+### UI
+
+- **Home** — redesigned hero with signal-style layout, animated headline, telemetry stats, and a monitor-style featured card
+- **Home** — full recently added card is clickable, not just the Open button
+
 ## 0.1.83 — 2026-07-06
 
 ### Fix
