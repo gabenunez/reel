@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.74 — 2026-07-06
+
+### Playback
+
+- **MKV/WebM** — remux browser-safe codecs in non-progressive containers (MKV, WebM, etc.) over HLS instead of broken direct play
+- **HLS recovery** — retry network and media errors before failing playback on desktop and TV web
+- **Visibility** — restart stopped HLS transcode sessions when returning to the watch tab or app
+
+### Fix
+
+- **Streaming** — parse HTTP range requests correctly (including suffix ranges) and return proper `416` responses
+- **Streaming** — send credential-aware CORS headers on media, HLS, and subtitle responses
+- **Transcoding** — accept completed short HLS playlists while waiting for the first segment
+
+### TV
+
+- **Playback** — resume HLS after the player was backgrounded, matching desktop behavior
+
 ## 0.1.73 — 2026-07-06
 
 ### Fix
