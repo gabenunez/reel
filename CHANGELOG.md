@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.79 — 2026-07-06
+
+### Android TV
+
+- **Setup** — stop auto-opening the keyboard on the QR pairing screen; focus Connect by default and show the IME only when selecting manual host/port fields
+
 ## 0.1.78 — 2026-07-06
 
 ### UI
