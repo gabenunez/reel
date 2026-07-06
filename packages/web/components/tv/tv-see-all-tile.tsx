@@ -15,7 +15,7 @@ interface TvSeeAllTileProps {
 /** Poster-sized tile at the end of a row — opens a full list page (not a header link). */
 export function TvSeeAllTile({ href, label, detail, className }: TvSeeAllTileProps) {
   return (
-    <div className={cn("tv-poster-tile shrink-0 snap-center", className)}>
+    <div className={cn("tv-poster-tile shrink-0", className)}>
       <TvFocusLink
         href={href}
         variant="poster"
@@ -57,7 +57,7 @@ export function TvBrowseCard({
       href={href}
       variant="card"
       className={cn(
-        "w-44 shrink-0 snap-center rounded-lg border border-border/80 bg-card p-3",
+        "w-44 shrink-0 rounded-lg border border-border/80 bg-card p-3",
         className,
       )}
     >

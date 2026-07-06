@@ -1,10 +1,12 @@
 "use client";
 
-import { focusTvItem } from "@/lib/tv-focus";
+import { focusTvItem, syncTvFocusedAttribute } from "@/lib/tv-focus";
 import { useEffect, type ReactNode } from "react";
 
-const NAV_COOLDOWN_MS = 80;
-const NAV_REPEAT_COOLDOWN_MS = 40;
+const NAV_COOLDOWN_MS = 50;
+const NAV_REPEAT_COOLDOWN_MS = 32;
+/** No throttle when holding left/right across a poster row. */
+const NAV_SCROLL_ROW_REPEAT_COOLDOWN_MS = 0;
 
 function isTvFocusable(el: HTMLElement) {
   return (
@@ -135,25 +137,53 @@ function findNextByGeometry(
   return best?.el ?? null;
 }
 
+function getAdjacentScrollRowItem(
+  active: HTMLElement,
+  direction: "left" | "right",
+): HTMLElement | null {
+  const tile = active.closest(".tv-poster-tile");
+  if (tile?.parentElement) {
+    let sibling: Element | null =
+      direction === "right" ? tile.nextElementSibling : tile.previousElementSibling;
+    while (sibling) {
+      const item =
+        sibling instanceof HTMLElement && sibling.hasAttribute("data-tv-item")
+          ? sibling
+          : sibling.querySelector<HTMLElement>("[data-tv-item]");
+      if (item && isTvFocusable(item)) return item;
+      sibling =
+        direction === "right" ? sibling.nextElementSibling : sibling.previousElementSibling;
+    }
+    return null;
+  }
+
+  let sibling: Element | null =
+    direction === "right" ? active.nextElementSibling : active.previousElementSibling;
+  while (sibling) {
+    if (sibling instanceof HTMLElement && sibling.hasAttribute("data-tv-item")) {
+      if (isTvFocusable(sibling)) return sibling;
+    } else {
+      const item = sibling.querySelector<HTMLElement>("[data-tv-item]");
+      if (item && isTvFocusable(item)) return item;
+    }
+    sibling =
+      direction === "right" ? sibling.nextElementSibling : sibling.previousElementSibling;
+  }
+
+  return null;
+}
+
 function moveInScrollRow(active: HTMLElement, direction: "left" | "right") {
   const row = active.closest("[data-tv-row]");
   if (!row || !isScrollRow(row)) return false;
 
-  const items = getRowItems(row);
-  const index = items.indexOf(active);
-  if (index === -1) return false;
-
-  if (direction === "right" && index < items.length - 1) {
-    focusItem(items[index + 1]);
-    return true;
+  const next = getAdjacentScrollRowItem(active, direction);
+  if (!next) {
+    return false;
   }
 
-  if (direction === "left" && index > 0) {
-    focusItem(items[index - 1]);
-    return true;
-  }
-
-  return false;
+  focusItem(next);
+  return true;
 }
 
 function moveInVerticalRow(active: HTMLElement, direction: "up" | "down") {
@@ -369,7 +399,13 @@ export function TvSpatialNav({ children }: { children: ReactNode }) {
       e.preventDefault();
 
       const now = performance.now();
-      const cooldown = e.repeat ? NAV_REPEAT_COOLDOWN_MS : NAV_COOLDOWN_MS;
+      const horizontalScrollRow =
+        isScrollRow(row) && (e.key === "ArrowLeft" || e.key === "ArrowRight");
+      const cooldown = e.repeat
+        ? horizontalScrollRow
+          ? NAV_SCROLL_ROW_REPEAT_COOLDOWN_MS
+          : NAV_REPEAT_COOLDOWN_MS
+        : NAV_COOLDOWN_MS;
       if (now - lastMoveAt < cooldown) return;
       lastMoveAt = now;
 
@@ -394,10 +430,7 @@ export function TvSpatialNav({ children }: { children: ReactNode }) {
     function onFocusIn(e: FocusEvent) {
       const target = e.target as HTMLElement | null;
       if (!target?.hasAttribute("data-tv-item")) return;
-      document.querySelectorAll<HTMLElement>("[data-tv-focused]").forEach((node) => {
-        if (node !== target) node.removeAttribute("data-tv-focused");
-      });
-      target.setAttribute("data-tv-focused", "");
+      syncTvFocusedAttribute(target);
     }
 
     window.addEventListener("keydown", onKeyDown);

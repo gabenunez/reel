@@ -17,8 +17,11 @@ function readStoredTvMode(): boolean {
   return isTvUserAgent(navigator.userAgent);
 }
 
+/** Inline in head before globals.css so TV clients never flash desktop while hydrating. */
+export const TV_CRITICAL_CSS = `html.${TV_MODE_HTML_CLASS}:not(.${TV_READY_HTML_CLASS}) body{visibility:hidden!important}html.${TV_MODE_HTML_CLASS} [data-web-only]{display:none!important}`;
+
 /** Runs in a blocking head script before first paint. */
-export const TV_MODE_BOOTSTRAP_SCRIPT = `(function(){try{var k=${JSON.stringify(TV_MODE_KEY)},v=${JSON.stringify(TV_MODE_VALUE)},t=${JSON.stringify(TV_UA_TOKEN)},lt=${JSON.stringify(LEGACY_TV_UA_TOKEN)},c=${JSON.stringify(TV_MODE_HTML_CLASS)},r=${JSON.stringify(TV_READY_HTML_CLASS)};var p=new URLSearchParams(location.search);if(p.get("tv")==="1")sessionStorage.setItem(k,v);var ua=navigator.userAgent;if(sessionStorage.getItem(k)===v||ua.indexOf(t)!==-1||ua.indexOf(lt)!==-1)document.documentElement.classList.add(c);setTimeout(function(){document.documentElement.classList.add(r)},2500)}catch(e){}})();`;
+export const TV_MODE_BOOTSTRAP_SCRIPT = `(function(){try{var k=${JSON.stringify(TV_MODE_KEY)},v=${JSON.stringify(TV_MODE_VALUE)},t=${JSON.stringify(TV_UA_TOKEN)},lt=${JSON.stringify(LEGACY_TV_UA_TOKEN)},c=${JSON.stringify(TV_MODE_HTML_CLASS)},r=${JSON.stringify(TV_READY_HTML_CLASS)};var p=new URLSearchParams(location.search);if(p.get("tv")==="1")sessionStorage.setItem(k,v);var ua=navigator.userAgent;if(sessionStorage.getItem(k)===v||ua.indexOf(t)!==-1||ua.indexOf(lt)!==-1)document.documentElement.classList.add(c);setTimeout(function(){if(!document.documentElement.classList.contains(r))document.documentElement.classList.add(r)},15000)}catch(e){}})();`;
 
 export function initTvMode(): boolean {
   if (typeof window === "undefined") return false;

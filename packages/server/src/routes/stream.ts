@@ -3,7 +3,7 @@ import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import mime from "mime-types";
 import type { AppConfig } from "@media-app/shared";
-import { getAvailableQualities, isBrowserDirectPlayAudioSupported, isBrowserDirectPlayVideoSupported, parseHlsQuality, parseTranscodeQuality, resolveNativeTvPlaybackMode, resolveOriginalPlaybackMode } from "@media-app/shared";
+import { getAvailableQualities, isBrowserDirectPlayAudioSupported, isBrowserDirectPlayVideoSupported, isHlsVideoCopySupported, parseHlsQuality, parseTranscodeQuality, resolveNativeTvPlaybackMode, resolveOriginalPlaybackMode } from "@media-app/shared";
 import type { DatabaseInstance } from "../db/index.js";
 import type { SubtitleService } from "../services/subtitles.js";
 import { subtitleHasContent } from "../utils/subtitle-content.js";
@@ -27,6 +27,7 @@ import {
   stopTranscodeSessionsForFile,
   waitForPlaylist,
   probeFile,
+  stopHlsSession,
 } from "../utils/ffmpeg.js";
 import {
   ensureThumbnailSprite,
@@ -474,6 +475,13 @@ export async function streamRoutes(
         probeFile(file.filePath),
       ]);
 
+      const videoCodec = metadata.videoCodec ?? probe?.videoCodec ?? null;
+      if (hlsQuality === "remux" && !isHlsVideoCopySupported(videoCodec)) {
+        return reply.status(400).send({
+          error: "Remux is not supported for this video codec",
+        });
+      }
+
       let session = resolveHlsSession(sessionId, outputDir, startSeconds);
 
       if (!session) {
@@ -501,6 +509,7 @@ export async function streamRoutes(
 
         const ready = await waitForFirstSegment(outputDir);
         if (!ready) {
+          stopHlsSession(sessionId);
           const logPath = path.join(outputDir, "ffmpeg.log");
           const logTail = fs.existsSync(logPath)
             ? fs.readFileSync(logPath, "utf-8").slice(-2000)
@@ -518,6 +527,7 @@ export async function streamRoutes(
       );
 
       if (!playlist) {
+        stopHlsSession(sessionId);
         return reply.status(500).send({ error: "Transcoding failed to start" });
       }
 
@@ -559,6 +569,11 @@ export async function streamRoutes(
       const sessionId = createStreamSessionId(type, fileId, quality, startSeconds);
       const outputDir = path.join(config.transcoding.cache_dir, sessionId);
 
+      const segmentName = request.params.segment;
+      if (!/^segment_\d+\.ts$/.test(segmentName)) {
+        return reply.status(400).send({ error: "Invalid segment name" });
+      }
+
       const session =
         getHlsSession(sessionId) ??
         resolveHlsSession(sessionId, outputDir, startSeconds);
@@ -566,7 +581,7 @@ export async function streamRoutes(
         return reply.status(404).send({ error: "HLS session not found" });
       }
 
-      const segmentPath = path.join(session.outputDir, request.params.segment);
+      const segmentPath = path.join(session.outputDir, segmentName);
       if (!fs.existsSync(segmentPath)) {
         return reply.status(404).send({ error: "Segment not found" });
       }

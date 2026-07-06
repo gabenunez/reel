@@ -29,6 +29,7 @@ export function useNextEpisodeCountdown(options: {
   const [countdown, setCountdown] = useState<NextEpisodeCountdownState | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onFinishedRef = useRef(onFinished);
+  const pendingStartRef = useRef(false);
   onFinishedRef.current = onFinished;
 
   const clearCountdown = useCallback(() => {
@@ -37,6 +38,7 @@ export function useNextEpisodeCountdown(options: {
       countdownTimerRef.current = null;
     }
     setCountdown(null);
+    pendingStartRef.current = false;
   }, []);
 
   const playNextEpisodeNow = useCallback(
@@ -52,16 +54,10 @@ export function useNextEpisodeCountdown(options: {
     [clearCountdown, mediaId, onNavigate],
   );
 
-  const startNextEpisodeCountdown = useCallback(() => {
-    if (type !== "episode" || !mediaId || !media) {
-      onFinishedRef.current?.();
-      return;
-    }
-
-    const next = findNextEpisode(media, fileId);
-    if (!next) {
-      onFinishedRef.current?.();
-      return;
+  const beginCountdown = useCallback((next: NextEpisodeInfo) => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
     }
 
     setCountdown({
@@ -74,22 +70,54 @@ export function useNextEpisodeCountdown(options: {
       .then((info) => {
         const initial = resolveInitialStreamQuality(info);
         const playback = resolvePlaybackStream(initial.quality, info);
-        if (!playback.usingHls) return;
+        const relativeUrl = api.streamUrl(
+          next.episode.id,
+          "episode",
+          initial.quality,
+          playback.usingHls ? 0 : undefined,
+          0,
+          playback.hlsQuality,
+        );
 
-        void fetch(
-          api.streamUrl(
-            next.episode.id,
-            "episode",
-            initial.quality,
-            0,
-            0,
-            playback.hlsQuality,
-          ),
-          { credentials: "include" },
-        ).catch(() => {});
+        if (playback.usingHls || !playback.audioCompatNotice) {
+          void fetch(relativeUrl, { credentials: "include" }).catch(() => {});
+        }
       })
       .catch(() => {});
-  }, [type, mediaId, media, fileId]);
+  }, []);
+
+  const startNextEpisodeCountdown = useCallback(() => {
+    if (type !== "episode" || !mediaId) {
+      onFinishedRef.current?.();
+      return;
+    }
+
+    if (!media) {
+      pendingStartRef.current = true;
+      return;
+    }
+
+    const next = findNextEpisode(media, fileId);
+    if (!next) {
+      onFinishedRef.current?.();
+      return;
+    }
+
+    beginCountdown(next);
+  }, [type, mediaId, media, fileId, beginCountdown]);
+
+  useEffect(() => {
+    if (!media || !pendingStartRef.current) return;
+    pendingStartRef.current = false;
+
+    const next = findNextEpisode(media, fileId);
+    if (!next) {
+      onFinishedRef.current?.();
+      return;
+    }
+
+    beginCountdown(next);
+  }, [media, fileId, beginCountdown]);
 
   useEffect(() => {
     if (!countdown) return;

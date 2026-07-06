@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.70 — 2026-07-05
+
+### Fix
+- **Quality labels** — classify widescreen 1080p sources by width (e.g. 1920×800) instead of mislabeling as 720p
+- **TV scrolling** — faster horizontal row navigation when holding left/right on the remote
+- **TV resume** — fix playback not continuing after pause and idle; sync native player state on activity resume
+- **TV startup** — hide desktop UI flash while the Android TV shell loads
+
+### Playback
+- **Default quality** — always start at Original; remove network-based auto-downgrade on open
+- **Display mode** — fit / fill / stretch toggle on desktop and TV (including native ExoPlayer stretch)
+- **Reliability** — stream info errors surface instead of spinning; HLS fatal-error guard and recovery after long pause; progress saved on unmount and page hide; remux failure steps to source-matched transcode tier
+- **Fallback** — skip blind 2160p transcode when remux fails on 1080p sources
+
+### TV
+- **Spatial nav** — O(1) focus tracking, edge-based row scroll, no repeat throttle on poster rows
+- **Watch player** — HLS restart at current position after long pause or error (up to 3 attempts)
+
+### Server
+- **Probe** — SAR-aware display dimensions for accurate quality tiers (e.g. 1440×1080 → 1920×1080)
+- **Streaming** — validate remux video copy support and HLS segment paths; clean up failed transcode sessions
+
+### Tooling
+- **Tests** — Vitest suite for shared, server, and web; GitHub Actions CI; release script runs tests before push
+
 ## 0.1.69 — 2026-07-05
 
 ### Fix

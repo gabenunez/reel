@@ -28,7 +28,7 @@ export function SeekPreviewTooltip({
         const displayHeight = Math.round(cue.height * scale);
 
         return (
-          <div className="max-w-full overflow-hidden rounded border border-white/20 bg-black shadow-lg">
+          <div className="max-w-full overflow-hidden rounded-lg border border-white/15 bg-black/90 shadow-2xl">
             <div
               className="overflow-hidden"
               style={{ width: displayWidth, height: displayHeight, maxWidth: "100%" }}
@@ -52,7 +52,7 @@ export function SeekPreviewTooltip({
         );
       })()
     ) : (
-      <div className="rounded border border-white/20 bg-background/95 px-2 py-1 font-mono text-xs tabular-nums text-white shadow-lg">
+      <div className="rounded-lg border border-white/15 bg-black/90 px-2.5 py-1.5 font-mono text-xs tabular-nums text-white shadow-xl">
         {formatDuration(timeMs)}
       </div>
     );

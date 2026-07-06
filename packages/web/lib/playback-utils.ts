@@ -2,7 +2,9 @@ import type { StreamQuality } from "@/lib/api";
 import type { StreamInfo } from "@/lib/api";
 import { nativeTvPlayerAvailable } from "@/lib/android-bridge";
 import {
+  containerPrefersHlsRemux,
   isBrowserDirectPlayVideoSupported,
+  is4KSource,
   isHlsVideoCopySupported,
   normalizeCodecName,
   pickTranscodeQualityForPlayback,
@@ -73,7 +75,17 @@ function effectiveOriginalPlaybackMode(
       return "remux";
     }
 
-    // MKV/WebM remux is available as a native error fallback — direct play is preferred.
+    // ExoPlayer direct-play of progressive MKV/WebM is unreliable — especially at 4K.
+    // HLS remux keeps source resolution (video copy) and is the stable native TV path.
+    if (
+      nativeMode === "direct" &&
+      streamInfo.transcodingEnabled &&
+      containerPrefersHlsRemux(streamInfo.fileName) &&
+      isHlsVideoCopySupported(streamInfo.videoCodec)
+    ) {
+      return "remux";
+    }
+
     return nativeMode;
   }
 
@@ -110,6 +122,27 @@ export function resolvePlaybackStream(
   audioCompatNotice: string | null;
 } {
   if (quality !== "original") {
+    // "4K" transcode tier on a 4K source re-encodes for no benefit and often fails on TV.
+    // Use source direct/remux instead when native ExoPlayer is available.
+    if (
+      quality === "2160p" &&
+      nativeTvPlayerAvailable() &&
+      streamInfo &&
+      is4KSource(streamInfo.height, streamInfo.width)
+    ) {
+      const mode = effectiveOriginalPlaybackMode(streamInfo, options);
+      if (mode === "direct") {
+        return { usingHls: false, audioCompatNotice: null };
+      }
+      if (mode === "remux") {
+        return {
+          usingHls: true,
+          hlsQuality: "remux",
+          audioCompatNotice: null,
+        };
+      }
+    }
+
     return { usingHls: true, hlsQuality: quality, audioCompatNotice: null };
   }
 
@@ -134,17 +167,13 @@ export function resolvePlaybackStream(
   }
 
   if (mode === "transcode") {
-    const networkQuality = pickNetworkAwareTranscodeQuality(streamInfo.availableQualities);
-    const fallback =
-      networkQuality && networkQuality !== "original"
-        ? networkQuality
-        : pickTranscodeQualityForPlayback(
-            streamInfo.availableQualities,
-            streamInfo.height,
-          );
     return {
       usingHls: true,
-      hlsQuality: fallback,
+      hlsQuality: pickTranscodeQualityForPlayback(
+        streamInfo.availableQualities,
+        streamInfo.height,
+        streamInfo.width,
+      ),
       audioCompatNotice: null,
     };
   }
@@ -164,27 +193,7 @@ export function resolveInitialStreamQuality(streamInfo: StreamInfo): {
 } {
   const playback = resolvePlaybackStream("original", streamInfo);
 
-  if (playback.usingHls) {
-    if (playback.hlsQuality && playback.hlsQuality !== "remux") {
-      return { quality: playback.hlsQuality, error: null };
-    }
-    return { quality: "original", error: null };
-  }
-
-  if (playback.audioCompatNotice) {
-    if (streamInfo.transcodingEnabled) {
-      const networkQuality = pickNetworkAwareTranscodeQuality(streamInfo.availableQualities);
-      return {
-        quality:
-          networkQuality && networkQuality !== "original"
-            ? networkQuality
-            : pickTranscodeQualityForPlayback(
-                streamInfo.availableQualities,
-                streamInfo.height,
-              ),
-        error: null,
-      };
-    }
+  if (playback.audioCompatNotice && !streamInfo.transcodingEnabled) {
     return { quality: "original", error: playback.audioCompatNotice };
   }
 
@@ -241,9 +250,9 @@ export function startDirectPlaybackWithResume(
     }
 
     const target = Math.min(startSeconds, video.duration);
-    options?.onSeekComplete?.(target);
 
     onSeeked = () => {
+      options?.onSeekComplete?.(target);
       cleanup();
       play();
     };
@@ -252,6 +261,7 @@ export function startDirectPlaybackWithResume(
     video.currentTime = target;
 
     if (Math.abs(video.currentTime - target) < 0.25) {
+      options?.onSeekComplete?.(target);
       cleanup();
       play();
     }
@@ -533,36 +543,4 @@ export function createPlaybackHls(
       xhr.withCredentials = true;
     },
   });
-}
-
-type NetworkInformation = {
-  effectiveType?: string;
-  saveData?: boolean;
-};
-
-/** Suggest a transcode tier from Network Information API hints. */
-export function pickNetworkAwareTranscodeQuality(
-  availableQualities: StreamQuality[],
-): StreamQuality | null {
-  if (typeof navigator === "undefined") return null;
-
-  const conn = (navigator as Navigator & { connection?: NetworkInformation })
-    .connection;
-  if (!conn) return null;
-
-  if (conn.saveData) {
-    if (availableQualities.includes("480p")) return "480p";
-    return null;
-  }
-
-  switch (conn.effectiveType) {
-    case "slow-2g":
-    case "2g":
-      return availableQualities.includes("480p") ? "480p" : null;
-    case "3g":
-      if (availableQualities.includes("720p")) return "720p";
-      return availableQualities.includes("480p") ? "480p" : null;
-    default:
-      return null;
-  }
 }

@@ -547,20 +547,39 @@ export const api = {
         body: JSON.stringify(releaseTag ? { releaseTag } : {}),
       },
     ),
-  saveProgress: (data: {
-    itemType: "movie" | "episode";
-    itemId: number;
-    positionMs: number;
-    durationMs?: number;
-  }) =>
-    fetchApi<{ success: boolean }>("/api/watch-progress", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }).then((result) => {
+  saveProgress: (
+    data: {
+      itemType: "movie" | "episode";
+      itemId: number;
+      positionMs: number;
+      durationMs?: number;
+    },
+    options?: { keepalive?: boolean },
+  ) => {
+    const request = options?.keepalive
+      ? fetch(`${API_BASE}/api/watch-progress`, {
+          method: "POST",
+          credentials: "include",
+          keepalive: true,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        }).then((response) => {
+          if (!response.ok) {
+            throw new Error(`Save progress failed (${response.status})`);
+          }
+          return response.json() as Promise<{ success: boolean }>;
+        })
+      : fetchApi<{ success: boolean }>("/api/watch-progress", {
+          method: "POST",
+          body: JSON.stringify(data),
+        });
+
+    return request.then((result) => {
       invalidateApiCache("home");
       invalidateApiCache("continue");
       return result;
-    }),
+    });
+  },
   getCastConfig: () => fetchApi<CastConfigResponse>("/api/cast/config"),
   prepareCast: (data: {
     fileId: number;

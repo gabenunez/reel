@@ -1,6 +1,6 @@
 {
   "name": "@media-app/shared",
-  "version": "0.1.69",
+  "version": "0.1.70",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -14,9 +14,11 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts"
   },
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.4"
   }
 }

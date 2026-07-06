@@ -18,6 +18,8 @@ export interface NativePlaybackState {
   ready: boolean;
 }
 
+export type NativeVideoDisplayMode = "fit" | "fill" | "stretch";
+
 type AndroidBridge = NonNullable<Window["MediaAndroid"]>;
 
 interface NativePlayerBridge {
@@ -71,6 +73,15 @@ export function stopNativePlayback(): void {
   getAndroidBridge()?.stop?.();
 }
 
+export function setNativeVideoDisplayMode(mode: NativeVideoDisplayMode): void {
+  getAndroidBridge()?.setVideoDisplayMode?.(mode);
+}
+
+/** Re-sync play/pause UI after the WebView resumes from background. */
+export function syncNativePlaybackState(): void {
+  getAndroidBridge()?.syncPlaybackState?.();
+}
+
 export function registerNativePlayerHandlers(handlers: {
   onState?: (state: NativePlaybackState) => void;
   onError?: () => void;
@@ -115,6 +126,8 @@ declare global {
       resume: () => void;
       seekTo: (positionMs: number) => void;
       stop: () => void;
+      setVideoDisplayMode?: (mode: NativeVideoDisplayMode) => void;
+      syncPlaybackState?: () => void;
     };
     /** Legacy Android TV shell before MEDIA! rebrand. */
     ReelAndroid?: Window["MediaAndroid"];

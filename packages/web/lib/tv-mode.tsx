@@ -17,23 +17,28 @@ export { initTvMode } from "@/lib/tv-mode-detect";
 
 const TvModeContext = createContext(false);
 
+function getInitialTvMode(): boolean {
+  if (typeof window === "undefined") return false;
+  if (document.documentElement.classList.contains(TV_MODE_HTML_CLASS)) {
+    return true;
+  }
+  return initTvMode();
+}
+
 export function TvModeProvider({ children }: { children: ReactNode }) {
-  const [isTvMode, setIsTvMode] = useState(false);
+  const [isTvMode, setIsTvMode] = useState(getInitialTvMode);
 
   useLayoutEffect(() => {
     const tv = initTvMode();
     if (tv) {
       document.documentElement.classList.add(TV_MODE_HTML_CLASS);
+      document.documentElement.classList.add(TV_READY_HTML_CLASS);
+    } else {
+      document.documentElement.classList.remove(TV_MODE_HTML_CLASS);
+      document.documentElement.classList.remove(TV_READY_HTML_CLASS);
     }
     setIsTvMode(tv);
   }, []);
-
-  useLayoutEffect(() => {
-    const pendingTvShell =
-      document.documentElement.classList.contains(TV_MODE_HTML_CLASS) && !isTvMode;
-    if (pendingTvShell) return;
-    document.documentElement.classList.add(TV_READY_HTML_CLASS);
-  }, [isTvMode]);
 
   return (
     <TvModeContext.Provider value={isTvMode}>{children}</TvModeContext.Provider>

@@ -40,9 +40,43 @@ type FfprobeStream = {
   codec_name?: string;
   width?: number;
   height?: number;
+  sample_aspect_ratio?: string;
   disposition?: { default?: number; original?: number };
   tags?: { language?: string; title?: string };
 };
+
+function parseSampleAspectRatio(value?: string): number | null {
+  if (!value || value === "0:1" || value === "N/A") return null;
+  const [numRaw, denRaw] = value.split(":");
+  const num = Number(numRaw);
+  const den = Number(denRaw);
+  if (!Number.isFinite(num) || !Number.isFinite(den) || den <= 0 || num <= 0) {
+    return null;
+  }
+  return num / den;
+}
+
+/** Coded size × SAR — e.g. 1440×1080 with 4:3 SAR → 1920×1080 display width. */
+function displayDimensionsFromStream(stream: FfprobeStream | undefined): {
+  width?: number;
+  height?: number;
+} {
+  const codedWidth = stream?.width;
+  const codedHeight = stream?.height;
+  if (!codedWidth || !codedHeight) {
+    return { width: codedWidth, height: codedHeight };
+  }
+
+  const sar = parseSampleAspectRatio(stream.sample_aspect_ratio);
+  if (sar && Math.abs(sar - 1) > 0.001) {
+    return {
+      width: Math.round(codedWidth * sar),
+      height: codedHeight,
+    };
+  }
+
+  return { width: codedWidth, height: codedHeight };
+}
 
 function scoreAudioStream(stream: FfprobeStream): number {
   let score = 0;
@@ -113,6 +147,7 @@ export async function probeFile(filePath: string): Promise<ProbeResult | null> {
     };
 
     const videoStream = data.streams?.find((s) => s.codec_type === "video");
+    const display = displayDimensionsFromStream(videoStream);
     const audioStream = pickAudioStream(data.streams);
     const subtitleStreams =
       data.streams
@@ -132,8 +167,8 @@ export async function probeFile(filePath: string): Promise<ProbeResult | null> {
       videoCodec: videoStream?.codec_name,
       audioCodec: audioStream?.codec_name,
       audioStreamIndex: audioStream?.index,
-      width: videoStream?.width,
-      height: videoStream?.height,
+      width: display.width,
+      height: display.height,
       bitrate: data.format?.bit_rate
         ? parseInt(data.format.bit_rate, 10)
         : undefined,

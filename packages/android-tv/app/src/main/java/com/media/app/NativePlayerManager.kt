@@ -12,6 +12,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import org.json.JSONObject
 
@@ -27,6 +28,7 @@ class NativePlayerManager(
     private var sessionToken: String? = null
     private var currentPayload: PlaybackPayload? = null
     private var mediaSessionManager: PlaybackMediaSessionManager? = null
+    private var displayMode: String = "fit"
 
     private val progressRunnable = object : Runnable {
         override fun run() {
@@ -81,6 +83,7 @@ class NativePlayerManager(
                                 exoPlayer.seekTo((payload.startSeconds * 1000).toLong())
                                 seekApplied = true
                             }
+                            applyDisplayMode()
                             emitState()
                         }
 
@@ -135,6 +138,10 @@ class NativePlayerManager(
         emitState()
     }
 
+    fun syncPlaybackState() {
+        emitState()
+    }
+
     fun seekTo(positionMs: Long) {
         player?.seekTo(positionMs.coerceAtLeast(0L))
         emitState()
@@ -145,8 +152,62 @@ class NativePlayerManager(
         saveProgress(player?.currentPosition ?: 0L, ended = false)
         releasePlayer()
         playerView.visibility = View.GONE
+        playerView.scaleX = 1f
+        playerView.scaleY = 1f
         currentPayload = null
         onPlaybackStopped()
+    }
+
+    fun setDisplayMode(mode: String) {
+        displayMode =
+            when (mode) {
+                "fill", "stretch" -> mode
+                else -> "fit"
+            }
+        applyDisplayMode()
+    }
+
+    private fun applyDisplayMode() {
+        playerView.scaleX = 1f
+        playerView.scaleY = 1f
+        playerView.pivotX = playerView.width / 2f
+        playerView.pivotY = playerView.height / 2f
+
+        when (displayMode) {
+            "fill" -> playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            "stretch" -> {
+                playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                playerView.post { applyStretchScale() }
+            }
+            else -> playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+        }
+    }
+
+    private fun applyStretchScale() {
+        val exoPlayer = player ?: return
+        val videoSize = exoPlayer.videoSize
+        if (videoSize.width <= 0 || videoSize.height <= 0) return
+
+        val containerW = playerView.width.toFloat()
+        val containerH = playerView.height.toFloat()
+        if (containerW <= 0f || containerH <= 0f) return
+
+        val videoAspect =
+            videoSize.width.toFloat() * videoSize.pixelWidthHeightRatio / videoSize.height.toFloat()
+        val containerAspect = containerW / containerH
+
+        val fittedW: Float
+        val fittedH: Float
+        if (videoAspect > containerAspect) {
+            fittedW = containerW
+            fittedH = containerW / videoAspect
+        } else {
+            fittedH = containerH
+            fittedW = containerH * videoAspect
+        }
+
+        playerView.scaleX = containerW / fittedW
+        playerView.scaleY = containerH / fittedH
     }
 
     fun release() {

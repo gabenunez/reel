@@ -5,7 +5,7 @@
 #   ./scripts/release.sh           # release package.json version (v0.1.45)
 #   ./scripts/release.sh v0.1.45   # release an explicit tag
 #
-# Requires: git, node, gh (https://cli.github.com/) authenticated for the repo.
+# Requires: git, node, pnpm, gh (https://cli.github.com/) authenticated for the repo.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,6 +36,10 @@ media_step "Validating CHANGELOG for $TAG"
 NOTES_FILE="$(mktemp)"
 trap 'rm -f "$NOTES_FILE"' EXIT
 node scripts/extract-changelog.mjs "$TAG" > "$NOTES_FILE"
+
+media_step "Running test suite"
+pnpm test
+media_ok "Tests passed"
 
 if git rev-parse "$TAG" >/dev/null 2>&1; then
   media_ok "Tag $TAG already exists locally"

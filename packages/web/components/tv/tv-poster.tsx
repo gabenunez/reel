@@ -34,7 +34,7 @@ export const TvPoster = memo(function TvPoster({
   const loadImmediately = isTvClient() || priority;
 
   return (
-    <div className={cn("tv-poster-tile shrink-0 snap-center", className)}>
+    <div className={cn("tv-poster-tile shrink-0", className)}>
       <TvFocusLink
         href={linkHref}
         variant="poster"

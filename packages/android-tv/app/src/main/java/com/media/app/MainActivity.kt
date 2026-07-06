@@ -312,6 +312,9 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         webView.onResume()
+        if (nativePlayer.isActive()) {
+            nativePlayer.syncPlaybackState()
+        }
     }
 
     override fun onPause() {
@@ -342,11 +345,6 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_MEDIA_PLAY,
                 KeyEvent.KEYCODE_MEDIA_PAUSE,
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                    if (nativePlayer.isActive()) {
-                        nativePlayer.togglePlayPause()
-                        updateKeepScreenOn()
-                        return true
-                    }
                     dispatchMediaKeyToWeb(event.keyCode)
                     return true
                 }
@@ -483,12 +481,18 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun pause() {
-            runOnUiThread { nativePlayer.pause() }
+            runOnUiThread {
+                nativePlayer.pause()
+                updateKeepScreenOn()
+            }
         }
 
         @JavascriptInterface
         fun resume() {
-            runOnUiThread { nativePlayer.resume() }
+            runOnUiThread {
+                nativePlayer.resume()
+                updateKeepScreenOn()
+            }
         }
 
         @JavascriptInterface
@@ -499,6 +503,16 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun stop() {
             runOnUiThread { stopNativeVideoPlayback() }
+        }
+
+        @JavascriptInterface
+        fun setVideoDisplayMode(mode: String) {
+            runOnUiThread { nativePlayer.setDisplayMode(mode) }
+        }
+
+        @JavascriptInterface
+        fun syncPlaybackState() {
+            runOnUiThread { nativePlayer.syncPlaybackState() }
         }
     }
 

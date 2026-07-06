@@ -24,6 +24,7 @@ import {
   qualityLabel,
   resolveFallbackQuality,
 } from "@/lib/watch-helpers";
+import { is4KSource, isHlsVideoCopySupported } from "@media-app/shared";
 import { SubtitleSearchDialog } from "@/components/subtitle-search-dialog";
 import { NextEpisodeCountdownOverlay } from "@/components/next-episode-countdown";
 import { PlaybackPosterBackdrop } from "@/components/playback-poster-backdrop";
@@ -42,10 +43,20 @@ import {
   seekNativePlayback,
   startNativePlayback,
   stopNativePlayback,
+  setNativeVideoDisplayMode,
+  syncNativePlaybackState,
   toAbsoluteMediaUrl,
 } from "@/lib/android-bridge";
 import { useNextEpisodeCountdown } from "@/lib/use-next-episode-countdown";
 import { useSeekThumbnails } from "@/lib/use-seek-thumbnails";
+import { VideoDisplayModeButton } from "@/components/video-display-mode-button";
+import {
+  cycleVideoDisplayMode,
+  loadVideoDisplayMode,
+  saveVideoDisplayMode,
+  videoDisplayModeClass,
+  type VideoDisplayMode,
+} from "@/lib/video-display-mode";
 
 export function TvWatchView() {
   const router = useRouter();
@@ -75,8 +86,14 @@ export function TvWatchView() {
   const streamInfoRef = useRef<StreamInfo | null>(null);
   const titleRef = useRef("");
   const playbackStreamRef = useRef<ReturnType<typeof resolvePlaybackStream> | null>(null);
+  const playbackFatalHandledRef = useRef(-1);
   const nativePlaySessionRef = useRef(0);
   const nativeErrorHandledSessionRef = useRef(0);
+  const nativeWasPlayingRef = useRef(false);
+  const nativeIsPlayingRef = useRef(false);
+  const nativePausedAtRef = useRef<number | null>(null);
+  const nativeHlsRecoveryAttemptsRef = useRef(0);
+  const startNextEpisodeCountdownRef = useRef<() => void>(() => {});
 
   const TV_CONTROLS_AUTO_HIDE_MS = 3_000;
 
@@ -98,6 +115,7 @@ export function TvWatchView() {
   const [streamGeneration, setStreamGeneration] = useState(0);
   const [forceRemux, setForceRemux] = useState(false);
   const nativeRemuxFallbackRef = useRef(false);
+  const nativeTranscodeFallbackRef = useRef(false);
   const [availableQualities, setAvailableQualities] = useState<StreamQuality[]>([
     "original",
     "480p",
@@ -105,6 +123,7 @@ export function TvWatchView() {
     "1080p",
   ]);
   const [sourceHeight, setSourceHeight] = useState<number | null>(null);
+  const [sourceWidth, setSourceWidth] = useState<number | null>(null);
   const [transcodingEnabled, setTranscodingEnabled] = useState(true);
   const [buffering, setBuffering] = useState(false);
   const [bufferingMidPlayback, setBufferingMidPlayback] = useState(false);
@@ -130,6 +149,24 @@ export function TvWatchView() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [playbackHasBegun, setPlaybackHasBegun] = useState(false);
   const [scrubPreviewPercent, setScrubPreviewPercent] = useState<number | null>(null);
+  const [videoDisplayMode, setVideoDisplayMode] = useState<VideoDisplayMode>("fit");
+
+  useEffect(() => {
+    setVideoDisplayMode(loadVideoDisplayMode());
+  }, []);
+
+  const cycleVideoDisplayModeSetting = useCallback(() => {
+    setVideoDisplayMode((current) => {
+      const next = cycleVideoDisplayMode(current);
+      saveVideoDisplayMode(next);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!usesNativePlayer) return;
+    setNativeVideoDisplayMode(videoDisplayMode);
+  }, [usesNativePlayer, videoDisplayMode]);
 
   const {
     subtitles,
@@ -179,6 +216,34 @@ export function TvWatchView() {
     onNavigate: (href) => router.push(href),
     onFinished: handlePlaybackFinished,
   });
+  startNextEpisodeCountdownRef.current = startNextEpisodeCountdown;
+
+  const captureStreamRestartPosition = useCallback(() => {
+    const absoluteTime = usingHlsRef.current
+      ? hlsStartOffsetRef.current + currentTimeRef.current
+      : currentTimeRef.current;
+    if (absoluteTime > 0) {
+      setStreamStartSeconds(absoluteTime);
+    }
+  }, []);
+
+  /** HLS transcode/remux sessions expire server-side after idle — restart at current position. */
+  const restartNativeHlsAtCurrentPosition = useCallback(() => {
+    captureStreamRestartPosition();
+    setStreamGeneration((g) => g + 1);
+  }, [captureStreamRestartPosition]);
+
+  const resumeNativeWithRecovery = useCallback(() => {
+    const pausedMs = nativePausedAtRef.current
+      ? Date.now() - nativePausedAtRef.current
+      : 0;
+    // Server drops idle transcode sessions after ~2 min — refresh HLS before resume when paused a while.
+    if (usingHlsRef.current && pausedMs >= 45_000) {
+      restartNativeHlsAtCurrentPosition();
+      return;
+    }
+    resumeNativePlayback();
+  }, [restartNativeHlsAtCurrentPosition]);
 
   useEffect(() => {
     cancelCountdown();
@@ -254,7 +319,7 @@ export function TvWatchView() {
     if (!durationMs) return;
 
     const positionSeconds = usingHlsPlayback
-      ? hlsStartOffset + currentTime
+      ? hlsStartOffsetRef.current + currentTime
       : currentTime;
 
     api
@@ -265,7 +330,7 @@ export function TvWatchView() {
         durationMs,
       })
       .catch(() => {});
-  }, [fileId, type, usingHlsPlayback, hlsStartOffset, currentTime, sourceDurationMs, duration]);
+  }, [fileId, type, usingHlsPlayback, currentTime, sourceDurationMs, duration]);
 
   saveProgressRef.current = saveProgress;
 
@@ -290,6 +355,9 @@ export function TvWatchView() {
         }
       }
       setQuality(nextQuality);
+      nativeRemuxFallbackRef.current = false;
+      nativeTranscodeFallbackRef.current = false;
+      setForceRemux(false);
       closeMenus();
       setError(null);
       revealControls(true);
@@ -302,11 +370,13 @@ export function TvWatchView() {
       quality,
       availableQualities,
       playbackStreamRef.current?.hlsQuality,
+      sourceHeight,
+      sourceWidth,
     );
     if (!next || next === quality) return false;
     changeQuality(next);
     return true;
-  }, [quality, availableQualities, changeQuality]);
+  }, [quality, availableQualities, changeQuality, sourceHeight, sourceWidth]);
 
   tryFallbackQualityRef.current = tryFallbackQuality;
 
@@ -319,10 +389,20 @@ export function TvWatchView() {
       onState: (state) => {
         setCurrentTime(state.currentTime);
         if (state.duration > 0) setDuration(state.duration);
+        if (nativeWasPlayingRef.current && !state.isPlaying) {
+          saveProgressRef.current();
+        }
+        nativeWasPlayingRef.current = state.isPlaying;
+        nativeIsPlayingRef.current = state.isPlaying;
+        if (state.isPlaying) {
+          nativePausedAtRef.current = null;
+        } else if (nativePausedAtRef.current === null) {
+          nativePausedAtRef.current = Date.now();
+        }
         setIsPlaying(state.isPlaying);
         setBuffering(state.isBuffering && !state.ready);
         setBufferingMidPlayback(state.isBuffering && state.ready);
-        if (state.ready) {
+        if (state.ready || state.isPlaying) {
           setPlaybackHasBegun(true);
         }
         const offset = hlsStartOffsetRef.current;
@@ -338,26 +418,52 @@ export function TvWatchView() {
         nativeErrorHandledSessionRef.current = session;
 
         setBuffering(false);
+        captureStreamRestartPosition();
+        const info = streamInfoRef.current;
         if (
           !nativeRemuxFallbackRef.current &&
           !usingHlsRef.current &&
-          streamInfoRef.current?.transcodingEnabled
+          info?.transcodingEnabled &&
+          isHlsVideoCopySupported(info.videoCodec)
         ) {
           nativeRemuxFallbackRef.current = true;
           setForceRemux(true);
           setStreamGeneration((g) => g + 1);
           return;
         }
-        // Keep the user's quality choice on TV — don't silently downgrade to 1080p.
+        if (
+          nativeRemuxFallbackRef.current &&
+          usingHlsRef.current &&
+          !nativeTranscodeFallbackRef.current &&
+          info &&
+          is4KSource(info.height, info.width) &&
+          info.availableQualities.includes("1080p")
+        ) {
+          nativeTranscodeFallbackRef.current = true;
+          setForceRemux(false);
+          setQuality("1080p");
+          setStreamGeneration((g) => g + 1);
+          return;
+        }
+        if (
+          usingHlsRef.current &&
+          info?.transcodingEnabled &&
+          nativeHlsRecoveryAttemptsRef.current < 3
+        ) {
+          nativeHlsRecoveryAttemptsRef.current += 1;
+          restartNativeHlsAtCurrentPosition();
+          return;
+        }
+        // Keep the user's quality choice on TV — don't silently downgrade further.
         setError("Playback failed. Try Original again or pick a lower quality from the settings menu.");
       },
       onEnded: () => {
         setIsPlaying(false);
         saveProgressRef.current();
-        startNextEpisodeCountdown();
+        startNextEpisodeCountdownRef.current();
       },
     });
-  }, [usesNativePlayer, startNextEpisodeCountdown]);
+  }, [usesNativePlayer, captureStreamRestartPosition, restartNativeHlsAtCurrentPosition]);
 
   useEffect(() => {
     if (!usesNativePlayer) return;
@@ -372,6 +478,10 @@ export function TvWatchView() {
     setStreamGeneration(0);
     setForceRemux(false);
     nativeRemuxFallbackRef.current = false;
+    nativeTranscodeFallbackRef.current = false;
+    nativeHlsRecoveryAttemptsRef.current = 0;
+    nativePausedAtRef.current = null;
+    nativeIsPlayingRef.current = false;
     nativePlaySessionRef.current = 0;
     nativeErrorHandledSessionRef.current = 0;
     nativeSubtitleInitializedRef.current = false;
@@ -421,6 +531,7 @@ export function TvWatchView() {
         }
         setAvailableQualities(info.availableQualities);
         setSourceHeight(info.height ?? null);
+        setSourceWidth(info.width ?? null);
         setSourceDurationMs(info.durationMs ?? 0);
         setTranscodingEnabled(info.transcodingEnabled);
 
@@ -443,7 +554,11 @@ export function TvWatchView() {
         }
         setInitialResumeSeconds(0);
       })
-      .catch(() => setInitialResumeSeconds(0));
+      .catch((err) => {
+        console.error(err);
+        setError("Could not load this video. Check your connection and try again.");
+        setInitialResumeSeconds(0);
+      });
   }, [fileId, type]);
 
   useEffect(() => {
@@ -529,8 +644,12 @@ export function TvWatchView() {
       );
 
       return () => {
+        stopNativePlayback();
         if (progressInterval.current) clearInterval(progressInterval.current);
         saveProgressRef.current();
+        if (usingHls) {
+          void api.stopStream(fileId, type).catch(() => {});
+        }
       };
     }
 
@@ -572,7 +691,11 @@ export function TvWatchView() {
       stream.hlsQuality,
     );
 
+    const sessionGen = streamGeneration;
     const onFatalError = () => {
+      if (playbackFatalHandledRef.current === sessionGen) return;
+      playbackFatalHandledRef.current = sessionGen;
+      setOptimisticAbsoluteSeconds(null);
       setBuffering(false);
       if (tryFallbackQualityRef.current()) return;
       setError("Playback failed. Try a lower quality from the settings menu.");
@@ -582,27 +705,32 @@ export function TvWatchView() {
     let webPlayback: ReturnType<typeof startWebPlayback> | null = null;
 
     void (async () => {
-      const HlsConstructor = usingHls ? await loadHls() : undefined;
-      if (cancelled) return;
+      try {
+        const HlsConstructor = usingHls ? await loadHls() : undefined;
+        if (cancelled) return;
 
-      webPlayback = startWebPlayback({
-        HlsConstructor,
-        video,
-        url,
-        usingHls,
-        startAt,
-        tv: true,
-        onFatalError,
-        onBufferUpdate: updateBufferedPosition,
-        onSeekComplete: (seconds) => setCurrentTime(seconds),
-      });
+        webPlayback = startWebPlayback({
+          HlsConstructor,
+          video,
+          url,
+          usingHls,
+          startAt,
+          tv: true,
+          onFatalError,
+          onBufferUpdate: updateBufferedPosition,
+          onSeekComplete: (seconds) => setCurrentTime(seconds),
+        });
 
-      if (cancelled) {
-        webPlayback.cleanup();
-        return;
+        if (cancelled) {
+          webPlayback.cleanup();
+          return;
+        }
+
+        hlsRef.current = webPlayback.hls;
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) onFatalError();
       }
-
-      hlsRef.current = webPlayback.hls;
     })();
 
     progressInterval.current = setInterval(() => saveProgressRef.current(), PROGRESS_SAVE_MS);
@@ -613,6 +741,9 @@ export function TvWatchView() {
       hlsRef.current = null;
       if (progressInterval.current) clearInterval(progressInterval.current);
       saveProgressRef.current();
+      if (usingHls) {
+        void api.stopStream(fileId, type).catch(() => {});
+      }
     };
   }, [
     fileId,
@@ -649,11 +780,13 @@ export function TvWatchView() {
       ? hlsStartOffsetRef.current + relativeTime
       : relativeTime;
 
+    stopNativePlayback();
+
     const relativeUrl = api.streamUrl(
       fileId,
       type === "movie" ? "movie" : "episode",
       quality,
-      undefined,
+      usingHls ? absoluteTime : undefined,
       streamGeneration,
       stream.hlsQuality,
     );
@@ -692,10 +825,33 @@ export function TvWatchView() {
   ]);
 
   useEffect(() => {
-    const onPageHide = () => saveProgress();
+    const onPageHide = () => {
+      if (!fileId) return;
+
+      const durationMs = Math.floor(
+        sourceDurationMs || (duration ? duration * 1000 : 0),
+      );
+      if (!durationMs) return;
+
+      const positionSeconds = usingHlsPlayback
+        ? hlsStartOffsetRef.current + currentTimeRef.current
+        : currentTimeRef.current;
+
+      void api
+        .saveProgress(
+          {
+            itemType: type === "movie" ? "movie" : "episode",
+            itemId: fileId,
+            positionMs: Math.floor(positionSeconds * 1000),
+            durationMs,
+          },
+          { keepalive: true },
+        )
+        .catch(() => {});
+    };
     window.addEventListener("pagehide", onPageHide);
     return () => window.removeEventListener("pagehide", onPageHide);
-  }, [saveProgress]);
+  }, [fileId, type, usingHlsPlayback, sourceDurationMs, duration]);
 
   const absoluteCurrentTime =
     usingHlsPlayback ? hlsStartOffsetRef.current + currentTime : currentTime;
@@ -795,11 +951,11 @@ export function TvWatchView() {
 
   const togglePlay = useCallback(() => {
     if (usesNativePlayer) {
-      if (isPlaying) {
+      if (nativeIsPlayingRef.current) {
         pauseNativePlayback();
         revealControls(false);
       } else {
-        resumeNativePlayback();
+        resumeNativeWithRecovery();
         revealControls(true);
       }
       return;
@@ -813,11 +969,16 @@ export function TvWatchView() {
       video.pause();
     }
     revealControls(!video.paused);
-  }, [revealControls, usesNativePlayer, isPlaying]);
+  }, [revealControls, usesNativePlayer, resumeNativeWithRecovery]);
 
   useEffect(() => {
     setPanelOpen(subtitleMenuOpen || qualityMenuOpen);
   }, [subtitleMenuOpen, qualityMenuOpen]);
+
+  useEffect(() => {
+    if (!error) return;
+    setOptimisticAbsoluteSeconds(null);
+  }, [error]);
 
   useEffect(() => {
     if (optimisticAbsoluteSeconds === null) return;
@@ -923,7 +1084,9 @@ export function TvWatchView() {
     !(!usingHlsPlayback && optimisticAbsoluteSeconds !== null) &&
     (usesNativePlayer
       ? !playbackHasBegun && (isPreparing || buffering)
-      : isPreparing || buffering);
+      : isPreparing || (buffering && !playbackHasBegun));
+  const showBufferingBar =
+    !usesNativePlayer && bufferingMidPlayback && playbackHasBegun && !error;
   const loadingMessage = isPreparing
     ? "Preparing playback..."
     : bufferingMidPlayback
@@ -1174,7 +1337,10 @@ export function TvWatchView() {
       onClick={() => revealControls(true, true)}
     >
       {/* Video stage — poster and video stay above the control dock */}
-      <div className="relative min-h-0 flex-1 bg-transparent">
+      <div
+        data-tv-watch-video-stage=""
+        className="relative min-h-0 flex-1 bg-transparent"
+      >
         <PlaybackPosterBackdrop posterUrl={posterUrl} visible={showPosterBackdrop} />
         <div
           ref={focusSinkRef}
@@ -1186,7 +1352,10 @@ export function TvWatchView() {
           <video
             ref={videoRef}
             tabIndex={-1}
-            className="media-subtitles absolute inset-0 z-[2] h-full w-full object-contain outline-none focus:outline-none"
+            className={cn(
+              "media-subtitles absolute inset-0 z-[2] h-full w-full outline-none focus:outline-none",
+              videoDisplayModeClass(videoDisplayMode),
+            )}
             controls={false}
             playsInline
             preload={streamInfo ? "auto" : "metadata"}
@@ -1202,13 +1371,25 @@ export function TvWatchView() {
         )}
 
         {showLoadingOverlay && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
-            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-background/80 px-5 py-4 text-lg text-white">
+          <div
+            className={cn(
+              "absolute inset-0 z-10 flex items-center justify-center",
+              usesNativePlayer ? "bg-transparent" : "bg-black/40",
+            )}
+          >
+            <div
+              className={cn(
+                "flex items-center gap-3 rounded-xl border border-white/10 px-5 py-4 text-lg text-white",
+                usesNativePlayer ? "bg-black/75" : "bg-background/80",
+              )}
+            >
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
               {loadingMessage}
             </div>
           </div>
         )}
+
+        {showBufferingBar && <div className="watch-buffering-bar" aria-hidden="true" />}
 
         {countdown && countdownLabel && (
           <NextEpisodeCountdownOverlay
@@ -1236,6 +1417,8 @@ export function TvWatchView() {
                     quality,
                     availableQualities,
                     playbackStream.hlsQuality,
+                    sourceHeight,
+                    sourceWidth,
                   ) && (
                     <TvFocusButton
                       onClick={() => {
@@ -1243,6 +1426,8 @@ export function TvWatchView() {
                           quality,
                           availableQualities,
                           playbackStream.hlsQuality,
+                          sourceHeight,
+                          sourceWidth,
                         );
                         if (next) changeQuality(next);
                       }}
@@ -1254,8 +1439,11 @@ export function TvWatchView() {
                           quality,
                           availableQualities,
                           playbackStream.hlsQuality,
+                          sourceHeight,
+                          sourceWidth,
                         )!,
                         sourceHeight,
+                        sourceWidth,
                       )}
                     </TvFocusButton>
                   )}
@@ -1270,57 +1458,63 @@ export function TvWatchView() {
           </div>
         )}
 
-        {/* Top chrome overlays the video stage only */}
-        <div
-          className={cn(
-            "absolute inset-x-0 top-0 z-20 transition-opacity duration-300 pointer-events-none",
-            controlsVisible ? "opacity-100" : "opacity-0",
-          )}
-        >
-          <div className="pointer-events-auto bg-gradient-to-b from-black/85 to-transparent px-6 pb-6 pt-6">
+        {/* Top chrome overlays the video stage only while controls are visible */}
+        {controlsVisible && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20">
             <div
-              data-tv-row=""
-              data-tv-content-row=""
-              data-tv-watch-controls=""
-              className="flex items-center gap-3 py-1"
+              className={cn(
+                "pointer-events-auto px-6 pb-6 pt-6",
+                usesNativePlayer
+                  ? "bg-transparent"
+                  : "watch-chrome-top",
+              )}
             >
-              <TvFocusLink
-                href={backHref}
-                variant="nav"
-                className={cn("h-11 w-11 backdrop-blur", controlButtonClassName)}
-                aria-label="Back"
+              <div
+                data-tv-row=""
+                data-tv-content-row=""
+                data-tv-watch-controls=""
+                className="flex items-center gap-3 py-1"
               >
-                <ChevronLeft className="h-5 w-5" />
-              </TvFocusLink>
-              <div className="min-w-0">
-                <p className="truncate text-lg font-bold text-white">{title || "Playing"}</p>
-                <p className="text-xs text-white/70">
-                  {qualityLabel(quality, sourceHeight)}
-                  {activeSubtitle !== null && " · Subtitles on"}
-                </p>
+                <TvFocusLink
+                  href={backHref}
+                  variant="nav"
+                  className={cn("h-11 w-11", controlButtonClassName)}
+                  aria-label="Back"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </TvFocusLink>
+                <div className="min-w-0">
+                  <p
+                    className={cn(
+                      "truncate text-lg font-bold text-white",
+                      usesNativePlayer && "drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]",
+                    )}
+                  >
+                    {title || "Playing"}
+                  </p>
+                  <p
+                    className={cn(
+                      "text-xs text-white/70",
+                      usesNativePlayer && "drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]",
+                    )}
+                  >
+                    {qualityLabel(quality, sourceHeight, sourceWidth)}
+                    {activeSubtitle !== null && " · Subtitles on"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Bottom dock — scrub, preview, and transport never overlap the poster */}
-      <div
-        className={cn(
-          "relative z-20 shrink-0 overflow-hidden transition-all duration-300",
-          !showTransportControls && "pointer-events-none max-h-0 opacity-0",
-          showTransportControls && controlsVisible
-            ? "max-h-[280px] opacity-100"
-            : "pointer-events-none max-h-0 opacity-0",
-        )}
-        {...(!controlsVisible && !panelOpen ? { inert: true } : {})}
-      >
+      {/* Bottom dock — scrub, preview, and transport sit below the video stage */}
+      {showTransportControls && controlsVisible && (
+      <div className="relative z-20 shrink-0 overflow-hidden">
         <div
           className={cn(
             "pointer-events-auto border-t border-white/10 px-6 pb-6 pt-4",
-            usesNativePlayer
-              ? "bg-gradient-to-t from-black/70 to-transparent"
-              : "bg-gradient-to-t from-black via-black/95 to-black/80",
+            usesNativePlayer ? "bg-black/80" : "watch-chrome-bottom",
           )}
         >
           <div className="mb-3 flex items-end justify-between gap-3">
@@ -1329,7 +1523,7 @@ export function TvWatchView() {
               data-tv-content-row=""
               data-tv-watch-controls=""
               data-tv-watch-scrub-row=""
-              className="min-w-0 flex-1 py-1"
+              className="group/watch-scrub min-w-0 flex-1 py-1"
             >
               <div className="relative overflow-hidden">
                 {showScrubPreview && (
@@ -1350,9 +1544,9 @@ export function TvWatchView() {
                   onClick={() => revealControls(false)}
                   onFocus={() => setScrubPreviewPercent(progress)}
                   onBlur={() => setScrubPreviewPercent(null)}
-                  className="relative h-8 w-full overflow-hidden rounded-lg border-2 border-transparent bg-transparent p-0"
+                  className="relative h-9 w-full overflow-hidden rounded-lg border-2 border-transparent bg-transparent p-0"
                 >
-                  <div className="absolute inset-x-1.5 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-white/20">
+                  <div className="watch-scrub-track absolute inset-x-1.5 top-1/2 -translate-y-1/2">
                     {bufferedRanges.map((range, index) => {
                       const left = toTimelinePercent(range.start);
                       const width = Math.max(0, toTimelinePercent(range.end) - left);
@@ -1360,21 +1554,21 @@ export function TvWatchView() {
                       return (
                         <div
                           key={index}
-                          className="pointer-events-none absolute inset-y-0 rounded-full bg-white/45"
+                          className="watch-scrub-buffer"
                           style={{ left: `${left}%`, width: `${width}%` }}
                         />
                       );
                     })}
                     <div
                       className={cn(
-                        "pointer-events-none absolute inset-y-0 left-0 bg-primary",
+                        "watch-scrub-progress",
                         progress >= 99.5 ? "rounded-full" : "rounded-l-full",
                         optimisticAbsoluteSeconds === null && "transition-[width] duration-150",
                       )}
                       style={{ width: `${Math.min(100, progress)}%` }}
                     />
                     <div
-                      className="pointer-events-none absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-primary"
+                      className="watch-scrub-playhead"
                       style={{ left: `${Math.min(100, Math.max(0, progress))}%` }}
                     />
                   </div>
@@ -1382,7 +1576,7 @@ export function TvWatchView() {
               </div>
             </div>
 
-            <span className="shrink-0 font-mono text-sm tabular-nums text-white">
+            <span className="shrink-0 font-mono text-sm tabular-nums text-white/90">
               {formatDuration(displayedAbsoluteTime * 1000)}
               {totalDurationSeconds > 0 && (
                 <> / {formatDuration(totalDurationSeconds * 1000)}</>
@@ -1429,6 +1623,13 @@ export function TvWatchView() {
               <SkipForward className="h-5 w-5" />
             </TvFocusButton>
 
+            <VideoDisplayModeButton
+              variant="tv"
+              mode={videoDisplayMode}
+              onCycle={cycleVideoDisplayModeSetting}
+              className={controlButtonClassName}
+            />
+
             <TvFocusButton
               variant="nav"
               onClick={() => {
@@ -1463,11 +1664,14 @@ export function TvWatchView() {
               className={cn("h-11 gap-2 px-3", controlButtonClassName)}
             >
               <Settings2 className="h-4 w-4" />
-              <span className="text-xs font-medium">Quality</span>
+              <span className="text-xs font-medium">
+                {qualityLabel(quality, sourceHeight, sourceWidth)}
+              </span>
             </TvFocusButton>
           </div>
         </div>
       </div>
+      )}
 
       {subtitleMenuOpen && (
         <div
@@ -1551,7 +1755,7 @@ export function TvWatchView() {
                 onClick={() => changeQuality(option)}
                 className="rounded-xl px-4 py-3 text-left text-base disabled:opacity-40"
               >
-                {qualityLabel(option, sourceHeight)}
+                {qualityLabel(option, sourceHeight, sourceWidth)}
               </TvFocusButton>
             ))}
           </div>

@@ -1,4 +1,5 @@
 import type { StreamQuality, TranscodeQuality } from "./stream-quality.js";
+import { getSourceResolutionTier, tierToTranscodeQuality } from "./stream-quality.js";
 
 /** Codecs browsers can reliably decode in a direct progressive file stream. */
 const BROWSER_DIRECT_PLAY_AUDIO_CODECS = new Set(["aac", "mp3", "mp4a"]);
@@ -164,22 +165,15 @@ export function containerPrefersHlsRemux(fileName?: string | null): boolean {
 export function pickTranscodeQualityForPlayback(
   available: StreamQuality[],
   sourceHeight?: number | null,
+  sourceWidth?: number | null,
 ): TranscodeQuality {
   const transcodeTiers = available.filter(
     (quality): quality is TranscodeQuality => quality !== "original",
   );
 
   // Prefer a tier close to source resolution — avoids upscaling SD/DVD content.
-  const sourceTier: TranscodeQuality | null =
-    sourceHeight == null
-      ? null
-      : sourceHeight >= 2160
-        ? "2160p"
-        : sourceHeight >= 1080
-          ? "1080p"
-          : sourceHeight >= 720
-            ? "720p"
-            : "480p";
+  const tier = getSourceResolutionTier(sourceHeight, sourceWidth);
+  const sourceTier: TranscodeQuality | null = tier ? tierToTranscodeQuality(tier) : null;
 
   const searchOrder: TranscodeQuality[] = sourceTier
     ? ([sourceTier, "1080p", "720p", "480p", "2160p"] as const).filter(

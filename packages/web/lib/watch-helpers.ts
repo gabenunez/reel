@@ -1,5 +1,8 @@
 import type { StreamQuality } from "@/lib/api";
-import { qualityLabel as sharedQualityLabel } from "@media-app/shared";
+import {
+  pickTranscodeQualityForPlayback,
+  qualityLabel as sharedQualityLabel,
+} from "@media-app/shared";
 
 export interface SubtitleTrack {
   id: number;
@@ -30,8 +33,9 @@ export function formatSubtitleLabel(sub: SubtitleTrack): string {
 export function qualityLabel(
   quality: StreamQuality,
   sourceHeight?: number | null,
+  sourceWidth?: number | null,
 ): string {
-  return sharedQualityLabel(quality, sourceHeight);
+  return sharedQualityLabel(quality, sourceHeight, sourceWidth);
 }
 
 export function nextFallbackQuality(
@@ -49,12 +53,24 @@ export function nextFallbackQuality(
   return null;
 }
 
-/** Skip redundant original→2160p when Original already transcodes at 2160p. */
+/** Pick the next quality tier after a playback failure. */
 export function resolveFallbackQuality(
   current: StreamQuality,
   available: StreamQuality[],
   activeHlsQuality?: StreamQuality | "remux" | null,
+  sourceHeight?: number | null,
+  sourceWidth?: number | null,
 ): StreamQuality | null {
+  // Remux failed on Original — step to a source-matched transcode tier, not menu order.
+  if (current === "original" && activeHlsQuality === "remux") {
+    const transcode = pickTranscodeQualityForPlayback(
+      available,
+      sourceHeight,
+      sourceWidth,
+    );
+    if (available.includes(transcode)) return transcode;
+  }
+
   let next = nextFallbackQuality(current, available);
   if (
     current === "original" &&

@@ -47,10 +47,18 @@ import { TvCastButton, type TvCastPayload } from "@/components/tv-cast-button";
 import { SubtitleSearchDialog } from "@/components/subtitle-search-dialog";
 import { SubtitleAppearanceSettingsLink } from "@/components/subtitle-style-settings";
 import { FileDetailsDialog } from "@/components/file-details-dialog";
+import { VideoDisplayModeButton } from "@/components/video-display-mode-button";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { useTvMode } from "@/lib/tv-mode";
 import { TvWatchView } from "@/components/tv/views/watch-view";
 import { resolveFallbackQuality, qualityLabel } from "@/lib/watch-helpers";
+import {
+  cycleVideoDisplayMode,
+  loadVideoDisplayMode,
+  saveVideoDisplayMode,
+  videoDisplayModeClass,
+  type VideoDisplayMode,
+} from "@/lib/video-display-mode";
 
 interface SubtitleTrack {
   id: number;
@@ -110,6 +118,7 @@ function WatchDesktopClient() {
   const seekToAbsoluteRef = useRef<(seconds: number) => void>(() => {});
   const tryFallbackQualityRef = useRef<() => boolean>(() => false);
   const playbackStreamRef = useRef<ReturnType<typeof resolvePlaybackStream> | null>(null);
+  const playbackFatalHandledRef = useRef(-1);
   const volumeBeforeMuteRef = useRef(1);
 
   const [quality, setQuality] = useState<StreamQuality>("original");
@@ -124,6 +133,7 @@ function WatchDesktopClient() {
     "1080p",
   ]);
   const [sourceHeight, setSourceHeight] = useState<number | null>(null);
+  const [sourceWidth, setSourceWidth] = useState<number | null>(null);
   const [transcodingEnabled, setTranscodingEnabled] = useState(true);
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
   const [buffering, setBuffering] = useState(false);
@@ -157,6 +167,19 @@ function WatchDesktopClient() {
   const [playbackHasBegun, setPlaybackHasBegun] = useState(false);
   const [streamInfo, setStreamInfo] = useState<StreamInfo | null>(null);
   const [initialResumeSeconds, setInitialResumeSeconds] = useState<number | null>(null);
+  const [videoDisplayMode, setVideoDisplayMode] = useState<VideoDisplayMode>("fit");
+
+  useEffect(() => {
+    setVideoDisplayMode(loadVideoDisplayMode());
+  }, []);
+
+  const cycleVideoDisplayModeSetting = useCallback(() => {
+    setVideoDisplayMode((current) => {
+      const next = cycleVideoDisplayMode(current);
+      saveVideoDisplayMode(next);
+      return next;
+    });
+  }, []);
 
   const playbackStream = useMemo(
     () => resolvePlaybackStream(quality, streamInfo),
@@ -264,7 +287,7 @@ function WatchDesktopClient() {
     if (!durationMs) return;
 
     const positionSeconds = usingHlsPlayback
-      ? hlsStartOffset + video.currentTime
+      ? hlsStartOffsetRef.current + video.currentTime
       : video.currentTime;
     api.saveProgress({
       itemType: type === "movie" ? "movie" : "episode",
@@ -272,7 +295,7 @@ function WatchDesktopClient() {
       positionMs: Math.floor(positionSeconds * 1000),
       durationMs,
     }).catch(() => {});
-  }, [fileId, type, usingHlsPlayback, hlsStartOffset, sourceDurationMs]);
+  }, [fileId, type, usingHlsPlayback, sourceDurationMs]);
 
   saveProgressRef.current = saveProgress;
 
@@ -300,11 +323,13 @@ function WatchDesktopClient() {
       quality,
       availableQualities,
       playbackStreamRef.current?.hlsQuality,
+      sourceHeight,
+      sourceWidth,
     );
     if (!next || next === quality) return false;
     changeQuality(next);
     return true;
-  }, [quality, availableQualities, changeQuality]);
+  }, [quality, availableQualities, changeQuality, sourceHeight, sourceWidth]);
 
   tryFallbackQualityRef.current = tryFallbackQuality;
 
@@ -339,6 +364,7 @@ function WatchDesktopClient() {
         }
         setAvailableQualities(info.availableQualities);
         setSourceHeight(info.height ?? null);
+        setSourceWidth(info.width ?? null);
         setSourceDurationMs(info.durationMs ?? 0);
         setTranscodingEnabled(info.transcodingEnabled);
 
@@ -368,6 +394,7 @@ function WatchDesktopClient() {
       })
       .catch((err) => {
         console.error(err);
+        setError("Could not load this video. Check your connection and try again.");
         setInitialResumeSeconds(0);
       });
   }, [fileId, type, castStartSeconds]);
@@ -484,7 +511,11 @@ function WatchDesktopClient() {
       stream.hlsQuality,
     );
 
+    const sessionGen = streamGeneration;
     const onFatalError = () => {
+      if (playbackFatalHandledRef.current === sessionGen) return;
+      playbackFatalHandledRef.current = sessionGen;
+      setOptimisticAbsoluteSeconds(null);
       setBuffering(false);
       if (tryFallbackQualityRef.current()) return;
       setError("Playback failed. Try a lower quality or Original.");
@@ -494,26 +525,31 @@ function WatchDesktopClient() {
     let webPlayback: ReturnType<typeof startWebPlayback> | null = null;
 
     void (async () => {
-      const HlsConstructor = usingHls ? await loadHls() : undefined;
-      if (cancelled) return;
+      try {
+        const HlsConstructor = usingHls ? await loadHls() : undefined;
+        if (cancelled) return;
 
-      webPlayback = startWebPlayback({
-        HlsConstructor,
-        video,
-        url,
-        usingHls,
-        startAt,
-        onFatalError,
-        onBufferUpdate: updateBufferedPosition,
-        onSeekComplete: (seconds) => setCurrentTime(seconds),
-      });
+        webPlayback = startWebPlayback({
+          HlsConstructor,
+          video,
+          url,
+          usingHls,
+          startAt,
+          onFatalError,
+          onBufferUpdate: updateBufferedPosition,
+          onSeekComplete: (seconds) => setCurrentTime(seconds),
+        });
 
-      if (cancelled) {
-        webPlayback.cleanup();
-        return;
+        if (cancelled) {
+          webPlayback.cleanup();
+          return;
+        }
+
+        hlsRef.current = webPlayback.hls;
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) onFatalError();
       }
-
-      hlsRef.current = webPlayback.hls;
     })();
 
     progressInterval.current = setInterval(() => saveProgressRef.current(), PROGRESS_SAVE_MS);
@@ -524,14 +560,41 @@ function WatchDesktopClient() {
       hlsRef.current = null;
       if (progressInterval.current) clearInterval(progressInterval.current);
       saveProgressRef.current();
+      if (usingHls) {
+        void api.stopStream(fileId, type).catch(() => {});
+      }
     };
   }, [fileId, type, quality, streamGeneration, streamStartSeconds, initialResumeSeconds, streamInfo, updateBufferedPosition]);
 
   useEffect(() => {
-    const onPageHide = () => saveProgress();
+    const onPageHide = () => {
+      const video = videoRef.current;
+      if (!video || !fileId) return;
+
+      const durationMs = Math.floor(
+        sourceDurationMs || (video.duration ? video.duration * 1000 : 0),
+      );
+      if (!durationMs) return;
+
+      const positionSeconds = usingHlsPlayback
+        ? hlsStartOffsetRef.current + video.currentTime
+        : video.currentTime;
+
+      void api
+        .saveProgress(
+          {
+            itemType: type === "movie" ? "movie" : "episode",
+            itemId: fileId,
+            positionMs: Math.floor(positionSeconds * 1000),
+            durationMs,
+          },
+          { keepalive: true },
+        )
+        .catch(() => {});
+    };
     window.addEventListener("pagehide", onPageHide);
     return () => window.removeEventListener("pagehide", onPageHide);
-  }, [saveProgress]);
+  }, [fileId, type, usingHlsPlayback, sourceDurationMs]);
 
   useVideoPlaybackEvents({
     videoRef,
@@ -787,12 +850,14 @@ function WatchDesktopClient() {
     },
     [absoluteCurrentTime, seekToAbsolute],
   );
-  const isPreparing = initialResumeSeconds === null || !streamInfo;
+  const isPreparing = initialResumeSeconds === null;
   const showPosterBackdrop = Boolean(posterUrl) && !playbackHasBegun && !error;
-  const showLoadingOverlay =
-    (isPreparing || buffering) &&
+  const showInitialLoading =
+    (isPreparing || (buffering && !playbackHasBegun)) &&
     !error &&
     !(!usingHlsPlayback && optimisticAbsoluteSeconds !== null);
+  const showBufferingBar =
+    bufferingMidPlayback && playbackHasBegun && !error && !showInitialLoading;
   const loadingMessage = isPreparing
     ? "Preparing playback..."
     : bufferingMidPlayback
@@ -827,6 +892,11 @@ function WatchDesktopClient() {
       seekToAbsoluteRef.current(Math.max(0, absoluteCurrentTime - 10)),
     onSeekForward: () => seekToAbsoluteRef.current(absoluteCurrentTime + 10),
   });
+
+  useEffect(() => {
+    if (!error) return;
+    setOptimisticAbsoluteSeconds(null);
+  }, [error]);
 
   useEffect(() => {
     if (optimisticAbsoluteSeconds === null) return;
@@ -924,6 +994,7 @@ function WatchDesktopClient() {
   return (
     <div
       ref={containerRef}
+      data-watch-player=""
       className="fixed inset-0 z-40 bg-black"
       onMouseMove={() => revealControls(true)}
       onTouchStart={() => revealControls(true)}
@@ -931,21 +1002,26 @@ function WatchDesktopClient() {
       <PlaybackPosterBackdrop posterUrl={posterUrl} visible={showPosterBackdrop} />
       <video
         ref={videoRef}
-        className="media-subtitles absolute inset-0 z-[2] h-full w-full object-contain"
+        className={cn(
+          "media-subtitles absolute inset-0 z-[2] h-full w-full",
+          videoDisplayModeClass(videoDisplayMode),
+        )}
         controls={false}
         playsInline
         preload={streamInfo ? "auto" : "metadata"}
         onClick={togglePlay}
       />
 
-      {showLoadingOverlay && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
-          <div className="flex items-center gap-3 rounded-md border border-white/10 bg-background/80 px-4 py-3 text-sm text-white">
+      {showInitialLoading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
+          <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/70 px-5 py-3.5 text-sm text-white shadow-xl">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
             {loadingMessage}
           </div>
         </div>
       )}
+
+      {showBufferingBar && <div className="watch-buffering-bar" aria-hidden="true" />}
 
       {countdown && countdownLabel && (
         <NextEpisodeCountdownOverlay
@@ -970,16 +1046,16 @@ function WatchDesktopClient() {
 
       <div
         className={cn(
-          "absolute inset-0 z-20 flex flex-col justify-between transition-opacity duration-300 pointer-events-none",
-          showControls ? "opacity-100" : "opacity-0",
+          "watch-controls-overlay absolute inset-0 z-20 flex flex-col justify-between",
+          showControls && "watch-controls-visible",
         )}
       >
-        <div className="pointer-events-auto bg-gradient-to-b from-background/95 via-background/45 to-transparent px-3 pb-8 pt-3 sm:px-4">
-          <div className="mx-auto flex max-w-7xl items-center gap-3 rounded-md border border-white/10 bg-background/65 px-2 py-2 backdrop-blur">
+        <div className="watch-chrome-top pointer-events-auto px-4 pb-12 pt-4 sm:px-6 sm:pt-5">
+          <div className="mx-auto flex max-w-7xl items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
-              className="shrink-0 text-white hover:bg-white/10"
+              className="watch-control-btn shrink-0"
               asChild
             >
               <Link href={mediaId ? routes.media(parseInt(mediaId, 10)) : "/"}>
@@ -987,17 +1063,18 @@ function WatchDesktopClient() {
               </Link>
             </Button>
             <div className="min-w-0 flex-1">
-              <p className="font-mono text-[0.62rem] uppercase text-primary">
-                Now playing
-              </p>
-              <h1 className="truncate text-base font-medium text-white sm:text-lg">
+              <p className="truncate text-base font-semibold text-white drop-shadow-sm sm:text-lg">
                 {title}
-              </h1>
+              </p>
+              <p className="truncate text-xs text-white/60">
+                {qualityLabel(quality, streamInfo?.height ?? null, streamInfo?.width ?? null)}
+                {activeSubtitle !== null && " · Subtitles on"}
+              </p>
             </div>
             <Button
               variant="ghost"
               size="sm"
-              className="shrink-0 text-white hover:bg-white/10"
+              className="watch-control-btn shrink-0"
               onClick={() => {
                 setDetailsOpen(true);
                 setSubtitleMenuOpen(false);
@@ -1011,12 +1088,26 @@ function WatchDesktopClient() {
           </div>
         </div>
 
-        <div className="pointer-events-auto bg-gradient-to-t from-background/95 via-background/45 to-transparent px-3 pb-3 pt-10 sm:px-4 sm:pb-4">
-          <div className="mx-auto max-w-7xl overflow-visible rounded-md border border-white/10 bg-background/75 p-3 backdrop-blur">
-            <div className="relative isolate z-0 mb-3 flex items-center gap-3">
+        {showControls && !isPlaying && playbackHasBegun && !error && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="watch-control-btn pointer-events-auto h-16 w-16 rounded-full bg-black/55 hover:bg-black/70"
+              onClick={togglePlay}
+              aria-label="Play"
+            >
+              <Play className="ml-0.5 h-9 w-9 fill-current" />
+            </Button>
+          </div>
+        )}
+
+        <div className="watch-chrome-bottom pointer-events-auto px-4 pb-4 pt-16 sm:px-6 sm:pb-5">
+          <div className="mx-auto max-w-7xl">
+            <div className="group/watch-scrub mb-3 flex items-center gap-3 sm:mb-4">
               <div
                 ref={timelineRef}
-                className="relative flex h-4 flex-1 items-center"
+                className="relative flex h-5 flex-1 items-center"
                 onPointerMove={(e) => updateTimelineHover(e.clientX)}
                 onPointerLeave={() => setTimelineHoverPercent(null)}
               >
@@ -1028,7 +1119,7 @@ function WatchDesktopClient() {
                     spriteUrl={thumbnails?.spriteUrl ?? null}
                   />
                 )}
-                <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-white/15">
+                <div className="watch-scrub-track">
                   {bufferedRanges.map((range, index) => {
                     const left = toTimelinePercent(range.start);
                     const width = Math.max(0, toTimelinePercent(range.end) - left);
@@ -1036,18 +1127,22 @@ function WatchDesktopClient() {
                     return (
                       <div
                         key={index}
-                        className="absolute inset-y-0 bg-white/55"
+                        className="watch-scrub-buffer"
                         style={{ left: `${left}%`, width: `${width}%` }}
                       />
                     );
                   })}
                   <div
                     className={cn(
-                      "absolute inset-y-0 left-0 z-[1] bg-primary",
+                      "watch-scrub-progress",
                       displayedProgress >= 99.5 ? "rounded-full" : "rounded-l-full",
                       !isOptimisticScrub && "transition-[width] duration-150",
                     )}
                     style={{ width: `${displayedProgress}%` }}
+                  />
+                  <div
+                    className="watch-scrub-playhead"
+                    style={{ left: `${Math.min(100, Math.max(0, displayedProgress))}%` }}
                   />
                 </div>
                 <input
@@ -1066,17 +1161,24 @@ function WatchDesktopClient() {
                   onTouchEnd={(e) =>
                     handleScrubCommit(parseFloat((e.currentTarget as HTMLInputElement).value))
                   }
-                  className="range-signal range-signal-overlay relative z-[2] w-full cursor-pointer appearance-none bg-transparent"
+                  aria-label="Progress"
+                  className="range-signal range-signal-overlay absolute inset-0 z-[3] w-full cursor-pointer appearance-none bg-transparent"
                 />
               </div>
+              <span className="hidden shrink-0 font-mono text-xs tabular-nums text-white/85 sm:inline">
+                {formatDuration(displayedAbsoluteTime * 1000)}
+                {totalDurationSeconds > 0 && (
+                  <> / {formatDuration(totalDurationSeconds * 1000)}</>
+                )}
+              </span>
             </div>
 
-            <div className="relative z-10 flex items-center justify-between gap-2 sm:gap-4">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-white hover:bg-white/10"
+                  className="watch-control-btn"
                   onClick={() => skipRelative(-10)}
                   title="Back 10 seconds"
                 >
@@ -1085,28 +1187,28 @@ function WatchDesktopClient() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-white hover:bg-white/10"
+                  className="watch-control-btn"
                   onClick={togglePlay}
+                  aria-label={isPlaying ? "Pause" : "Play"}
                 >
                   {isPlaying ? (
                     <Pause className="h-5 w-5" />
                   ) : (
-                    <Play className="h-5 w-5" />
+                    <Play className="h-5 w-5 fill-current" />
                   )}
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-white hover:bg-white/10"
+                  className="watch-control-btn"
                   onClick={() => skipRelative(30)}
                   title="Forward 30 seconds"
                 >
                   <SkipForward className="h-5 w-5" />
                 </Button>
 
-                <span className="hidden min-w-[5.5rem] text-sm tabular-nums text-white/80 sm:inline">
-                  {formatDuration(displayedAbsoluteTime * 1000)} /{" "}
-                  {formatDuration(absoluteDurationMs)}
+                <span className="ml-1 min-w-[4.5rem] font-mono text-xs tabular-nums text-white/75 sm:hidden">
+                  {formatDuration(displayedAbsoluteTime * 1000)}
                 </span>
 
                 <div
@@ -1117,7 +1219,7 @@ function WatchDesktopClient() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="text-white hover:bg-white/10"
+                    className="watch-control-btn"
                     onClick={toggleMute}
                     aria-label={muted || volume === 0 ? "Unmute" : "Mute"}
                   >
@@ -1154,7 +1256,7 @@ function WatchDesktopClient() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="text-white hover:bg-white/10"
+                    className="watch-control-btn"
                     onClick={() => setVolumeMenuOpen((open) => !open)}
                     aria-label={muted || volume === 0 ? "Unmute" : "Volume"}
                   >
@@ -1196,12 +1298,17 @@ function WatchDesktopClient() {
               </div>
 
               <div className="flex shrink-0 items-center gap-1">
+                <VideoDisplayModeButton
+                  mode={videoDisplayMode}
+                  onCycle={cycleVideoDisplayModeSetting}
+                />
+
                 <div className="relative">
                   <Button
                     variant="ghost"
                     size="sm"
                     className={cn(
-                      "text-white hover:bg-white/10",
+                      "watch-control-btn",
                       activeSubtitle !== null && "text-primary",
                     )}
                     onClick={() => {
@@ -1290,7 +1397,7 @@ function WatchDesktopClient() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-white hover:bg-white/10"
+                    className="watch-control-btn"
                     onClick={() => {
                       setQualityMenuOpen((open) => !open);
                       setSubtitleMenuOpen(false);
@@ -1300,7 +1407,7 @@ function WatchDesktopClient() {
                   >
                     <Settings2 className="h-4 w-4" />
                     <span className="hidden sm:inline">
-                      {qualityLabel(quality, sourceHeight)}
+                      {qualityLabel(quality, sourceHeight, sourceWidth)}
                     </span>
                   </Button>
                   {qualityMenuOpen && (
@@ -1318,27 +1425,21 @@ function WatchDesktopClient() {
                           disabled={option !== "original" && !transcodingEnabled}
                           onClick={() => changeQuality(option)}
                         >
-                          {qualityLabel(option, sourceHeight)}
+                          {qualityLabel(option, sourceHeight, sourceWidth)}
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <CastButton
-                  onCast={handleCast}
-                  className="text-white hover:bg-white/10"
-                />
+                <CastButton onCast={handleCast} className="watch-control-btn" />
 
-                <TvCastButton
-                  onCast={handleTvCast}
-                  className="text-white hover:bg-white/10"
-                />
+                <TvCastButton onCast={handleTvCast} className="watch-control-btn" />
 
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-white hover:bg-white/10"
+                  className="watch-control-btn"
                   onClick={toggleFullscreen}
                 >
                   {isFullscreen ? (

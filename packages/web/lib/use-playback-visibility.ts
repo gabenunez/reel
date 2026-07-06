@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import type Hls from "hls.js";
 import { api, type StreamQuality } from "@/lib/api";
 import { destroyHlsInstance } from "@/lib/playback-engine";
-import { pauseNativePlayback } from "@/lib/android-bridge";
+import { syncNativePlaybackState } from "@/lib/android-bridge";
 
 interface PlaybackVisibilityOptions {
   enabled: boolean;
@@ -48,21 +48,22 @@ export function usePlaybackVisibility(options: PlaybackVisibilityOptions): void 
         onSaveProgressRef.current();
 
         if (usesNativePlayer) {
-          pauseNativePlayback();
+          // Activity onPause already pauses native playback — avoid double-pause races.
         } else if (video && !video.paused) {
           video.pause();
         }
 
-        if (usingHlsPlayback) {
-          if (!usesNativePlayer) {
-            hlsRef.current?.stopLoad();
-          }
+        if (usingHlsPlayback && !usesNativePlayer) {
+          hlsRef.current?.stopLoad();
           void api.stopStream(fileId, type).catch(() => {});
         }
         return;
       }
 
-      if (usesNativePlayer) return;
+      if (usesNativePlayer) {
+        syncNativePlaybackState();
+        return;
+      }
 
       if (wasPlayingRef.current && video) {
         void video.play().catch(() => {});

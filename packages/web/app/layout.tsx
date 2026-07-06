@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 import { APP_NAME } from "@/lib/document-title";
-import { TV_MODE_BOOTSTRAP_SCRIPT } from "@/lib/tv-mode-detect";
+import { TV_CRITICAL_CSS, TV_MODE_BOOTSTRAP_SCRIPT } from "@/lib/tv-mode-detect";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,6 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
+        <style dangerouslySetInnerHTML={{ __html: TV_CRITICAL_CSS }} />
         <script dangerouslySetInnerHTML={{ __html: TV_MODE_BOOTSTRAP_SCRIPT }} />
       </head>
       <body className={inter.className}>

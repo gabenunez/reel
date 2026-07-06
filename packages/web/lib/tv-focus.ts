@@ -1,6 +1,18 @@
 /** Shared TV focus helpers for spatial nav and page views. */
 
 const TV_SCROLL_BEHAVIOR: ScrollBehavior = "auto";
+const HORIZONTAL_SCROLL_PADDING = 32;
+
+let tvFocusedElement: HTMLElement | null = null;
+
+/** Sync focus ring attribute without scanning the whole document. */
+export function syncTvFocusedAttribute(el: HTMLElement) {
+  if (tvFocusedElement && tvFocusedElement !== el) {
+    tvFocusedElement.removeAttribute("data-tv-focused");
+  }
+  tvFocusedElement = el;
+  el.setAttribute("data-tv-focused", "");
+}
 
 function isRowVisibleInMain(row: HTMLElement): boolean {
   const main = document.querySelector("main");
@@ -16,6 +28,27 @@ function isRowVisibleInMain(row: HTMLElement): boolean {
   );
 }
 
+/** Keep the focused tile in view — scroll only when near the row edge (not center). */
+function scrollHorizontalRowItemIntoView(el: HTMLElement, row: HTMLElement) {
+  const rowRect = row.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  const pad = HORIZONTAL_SCROLL_PADDING;
+
+  let delta = 0;
+  if (elRect.left < rowRect.left + pad) {
+    delta = elRect.left - rowRect.left - pad;
+  } else if (elRect.right > rowRect.right - pad) {
+    delta = elRect.right - rowRect.right + pad;
+  }
+
+  if (delta !== 0) {
+    row.scrollTo({
+      left: Math.max(0, row.scrollLeft + delta),
+      behavior: TV_SCROLL_BEHAVIOR,
+    });
+  }
+}
+
 export function scrollItemIntoView(
   el: HTMLElement,
   behavior: ScrollBehavior = TV_SCROLL_BEHAVIOR,
@@ -25,13 +58,7 @@ export function scrollItemIntoView(
   );
 
   if (horizontalRow) {
-    const rowRect = horizontalRow.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    const targetLeft =
-      horizontalRow.scrollLeft +
-      (elRect.left - rowRect.left) -
-      (rowRect.width - elRect.width) / 2;
-    horizontalRow.scrollTo({ left: Math.max(0, targetLeft), behavior });
+    scrollHorizontalRowItemIntoView(el, horizontalRow);
 
     if (!isRowVisibleInMain(horizontalRow)) {
       horizontalRow.scrollIntoView({ behavior, block: "nearest", inline: "nearest" });
@@ -50,12 +77,9 @@ export function focusTvItem(
   el: HTMLElement,
   scrollBehavior: ScrollBehavior = TV_SCROLL_BEHAVIOR,
 ) {
-  document.querySelectorAll<HTMLElement>("[data-tv-focused]").forEach((node) => {
-    node.removeAttribute("data-tv-focused");
-  });
-  el.setAttribute("data-tv-focused", "");
+  syncTvFocusedAttribute(el);
   el.focus({ preventScroll: true });
-  requestAnimationFrame(() => scrollItemIntoView(el, scrollBehavior));
+  scrollItemIntoView(el, scrollBehavior);
 }
 
 /** Focus a TV episode row by file id. Returns false if the row is not in the DOM. */
