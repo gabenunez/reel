@@ -6,13 +6,14 @@
     android:viewportHeight="108">
     <!-- M -->
     <path
-        android:fillColor="#2FFFE5"
-        android:pathData="M28,34 L28,74 L36,74 L36,50 L44,62 L52,50 L52,74 L60,74 L60,34 L50,34 L44,46 L38,34 Z" />
-    <!-- ! -->
+        android:fillColor="@color/media_accent"
+        android:pathData="M26,32 L26,78 L35,78 L35,52 L43.5,67 L52,52 L52,78 L61,78 L61,32 L50,32 L43.5,45 L37,32 Z" />
+    <!-- ! stem -->
     <path
-        android:fillColor="#2FFFE5"
-        android:pathData="M66,34 L66,58 L74,58 L74,34 Z" />
+        android:fillColor="@color/media_primary"
+        android:pathData="M67,32 L67,59 L75,59 L75,32 Z" />
+    <!-- ! dot -->
     <path
-        android:fillColor="#2FFFE5"
-        android:pathData="M66,64 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+        android:fillColor="@color/media_primary"
+        android:pathData="M71,67 m-4.5,0 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0" />
 </vector>

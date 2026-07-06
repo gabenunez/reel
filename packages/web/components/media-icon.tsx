@@ -11,7 +11,7 @@ export function MediaIcon({ className }: { className?: string }) {
     >
       <rect x="6" y="6" width="20" height="20" rx="5" fill="#0c1415" />
       <text
-        x="16"
+        x="12.5"
         y="19.5"
         textAnchor="middle"
         fill="#2fffe5"
@@ -19,8 +19,21 @@ export function MediaIcon({ className }: { className?: string }) {
         fontWeight="900"
         fontFamily="system-ui, sans-serif"
       >
-        M!
+        M
       </text>
+      <g className="origin-[20.5px_19.5px] transition-transform duration-200 ease-out motion-reduce:transition-none md:group-hover:-translate-y-1">
+        <text
+          x="20.5"
+          y="19.5"
+          textAnchor="middle"
+          fill="#2fffe5"
+          fontSize="11.5"
+          fontWeight="900"
+          fontFamily="system-ui, sans-serif"
+        >
+          !
+        </text>
+      </g>
     </svg>
   );
 }

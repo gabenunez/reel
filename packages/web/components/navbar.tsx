@@ -33,7 +33,7 @@ export function Navbar() {
           aria-label="MEDIA! home"
           className="group -my-1 flex shrink-0 items-center rounded-lg outline-none ring-primary/40 focus-visible:ring-2 sm:-my-1.5"
         >
-          <MediaIcon className="h-20 w-20 transition-transform group-hover:-rotate-6 sm:h-24 sm:w-24" />
+          <MediaIcon className="h-20 w-20 sm:h-24 sm:w-24" />
         </Link>
 
         <div className="hidden min-w-0 flex-1 md:block md:max-w-md lg:max-w-xl">

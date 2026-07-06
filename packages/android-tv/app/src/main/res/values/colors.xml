@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="media_background">#0A0A0B</color>
+    <color name="media_accent">#2FFFE5</color>
+    <color name="media_icon_background">#0C1415</color>
     <color name="media_surface">#141416</color>
     <color name="media_primary">#E5A00D</color>
     <color name="media_on_primary">#1A1200</color>
