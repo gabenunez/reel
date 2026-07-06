@@ -84,6 +84,9 @@ class MainActivity : AppCompatActivity() {
             mediaPlaybackRequiresUserGesture = false
             cacheMode = WebSettings.LOAD_DEFAULT
             userAgentString = buildUserAgent(userAgentString)
+            useWideViewPort = true
+            loadWithOverviewMode = true
+            textZoom = 100
         }
 
         val bridge = MediaAndroidBridge()

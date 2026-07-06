@@ -201,6 +201,9 @@ export const SUBTITLE_EXTENSIONS = new Set([
 export const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 export const TMDB_POSTER_SIZE = "w500";
 export const TMDB_BACKDROP_SIZE = "w1280";
+/** Higher-res TMDB tiers for 4K TV clients (posters ~780px, backdrops ~1920px). */
+export const TMDB_POSTER_SIZE_HD = "w780";
+export const TMDB_BACKDROP_SIZE_HD = "w1920";
 export const TMDB_PROFILE_SIZE = "w185";
 
 export const DEFAULT_PORT = 8096;

@@ -32,8 +32,10 @@ import { PlaybackPosterBackdrop } from "@/components/playback-poster-backdrop";
 import { SeekPreviewTooltip } from "@/components/seek-preview-tooltip";
 import { TvFocusButton, TvFocusLink } from "@/components/tv/tv-focus-link";
 import { focusTvItem } from "@/lib/tv-focus";
+import { tvImageUrl } from "@/lib/tv-image";
+import { isTv4KClient } from "@/lib/tv-mode-detect";
 import { cn, formatDuration } from "@/lib/utils";
-import { formatDynamicRangeShort } from "@media-app/shared";
+import { formatDynamicRangeChromeSuffix } from "@media-app/shared";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import {
   nativeTvPlayerAvailable,
@@ -196,7 +198,7 @@ export function TvWatchView() {
   playbackStreamRef.current = playbackStream;
   titleRef.current = title;
   streamInfoRef.current = streamInfo;
-  const posterUrl = api.imageUrl(posterPath);
+  const posterUrl = tvImageUrl(posterPath);
 
   const backHref =
     mediaId && !Number.isNaN(parseInt(mediaId, 10))
@@ -1185,7 +1187,10 @@ export function TvWatchView() {
     scrubPreviewPercent !== null &&
     totalDurationSeconds > 0;
 
+  const seekPreviewMaxWidth = isTv4KClient() ? 220 : 160;
+
   const controlButtonClassName =
+    "tv-watch-control flex min-h-11 items-center justify-center rounded-lg text-white";
     "tv-watch-control flex min-h-11 items-center justify-center rounded-lg text-white";
 
   const handleWatchBack = useCallback((): boolean => {
@@ -1619,9 +1624,7 @@ export function TvWatchView() {
                     )}
                   >
                     {qualityLabel(quality, sourceHeight, sourceWidth)}
-                    {streamInfo?.dynamicRange
-                      ? ` · ${formatDynamicRangeShort(streamInfo.dynamicRange)}`
-                      : null}
+                    {formatDynamicRangeChromeSuffix(streamInfo?.dynamicRange)}
                     {activeSubtitle !== null && " · Subtitles on"}
                   </p>
                 </div>
@@ -1655,7 +1658,7 @@ export function TvWatchView() {
                       <div className="mb-2 flex w-full max-w-full items-end justify-center">
                         <SeekPreviewTooltip
                           variant="inline"
-                          maxThumbWidth={160}
+                          maxThumbWidth={seekPreviewMaxWidth}
                           percent={timelinePreviewPercent}
                           timeMs={timelinePreviewMs}
                           cue={lookupCue(timelinePreviewMs)}

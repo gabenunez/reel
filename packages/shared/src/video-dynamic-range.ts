@@ -91,6 +91,14 @@ export function formatDynamicRangeShort(
   return null;
 }
 
+/** Watch-player chrome suffix — omits SDR / unknown ranges (never renders "null"). */
+export function formatDynamicRangeChromeSuffix(
+  dynamicRange: VideoDynamicRange | null | undefined,
+): string {
+  const label = formatDynamicRangeShort(dynamicRange);
+  return label ? ` · ${label}` : "";
+}
+
 export function buildTranscodeVideoFilter(
   height: number,
   dynamicRange: VideoDynamicRange | null | undefined,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildTranscodeVideoFilter,
   formatDynamicRangeShort,
+  formatDynamicRangeChromeSuffix,
   needsHdrToneMap,
   parseVideoDynamicRangeFromStream,
 } from "./video-dynamic-range.js";
@@ -59,6 +60,41 @@ describe("formatDynamicRangeShort", () => {
         hlg: false,
       }),
     ).toBe("Dolby Vision P5");
+  });
+
+  it("returns null for SDR probes", () => {
+    expect(
+      formatDynamicRangeShort({
+        dolbyVision: false,
+        dolbyVisionProfile: null,
+        hdr10: false,
+        hlg: false,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("formatDynamicRangeChromeSuffix", () => {
+  it("returns empty string for SDR", () => {
+    expect(
+      formatDynamicRangeChromeSuffix({
+        dolbyVision: false,
+        dolbyVisionProfile: null,
+        hdr10: false,
+        hlg: false,
+      }),
+    ).toBe("");
+  });
+
+  it("prefixes HDR labels for watch chrome", () => {
+    expect(
+      formatDynamicRangeChromeSuffix({
+        dolbyVision: false,
+        dolbyVisionProfile: null,
+        hdr10: true,
+        hlg: false,
+      }),
+    ).toBe(" · HDR10");
   });
 });
 

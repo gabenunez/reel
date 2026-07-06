@@ -96,6 +96,7 @@
     height: 100vh;
     max-height: 100vh;
     overflow: hidden;
+    --tv-poster-width: 7.5rem;
     --tv-focus-glow:
       0 0 0 2px hsl(var(--background)),
       0 0 0 4px hsl(var(--primary));
@@ -732,5 +733,25 @@
       rgb(0 0 0 / 0.28) 50%,
       transparent 100%
     );
+  }
+
+  /* 4K TV — sharper imagery, slightly larger 10-foot UI */
+  html.tv-mode.tv-4k {
+    font-size: 106.25%;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  html.tv-mode.tv-4k .tv-ui {
+    --tv-poster-width: 8.25rem;
+  }
+
+  html.tv-mode.tv-4k .tv-media-hero {
+    min-height: 260px;
+    max-height: 400px;
+  }
+
+  html.tv-mode.tv-4k .tv-ui video.media-subtitles::cue {
+    font-size: calc(var(--subtitle-cue-size, 1.05em) * 1.35);
   }
 }

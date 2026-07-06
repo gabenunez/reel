@@ -11,6 +11,7 @@ import {
   TV_MODE_HTML_CLASS,
   TV_READY_HTML_CLASS,
   initTvMode,
+  initTv4KMode,
 } from "@/lib/tv-mode-detect";
 
 export { initTvMode } from "@/lib/tv-mode-detect";
@@ -33,6 +34,7 @@ export function TvModeProvider({ children }: { children: ReactNode }) {
     if (tv) {
       document.documentElement.classList.add(TV_MODE_HTML_CLASS);
       document.documentElement.classList.add(TV_READY_HTML_CLASS);
+      initTv4KMode();
     } else {
       document.documentElement.classList.remove(TV_MODE_HTML_CLASS);
       document.documentElement.classList.remove(TV_READY_HTML_CLASS);

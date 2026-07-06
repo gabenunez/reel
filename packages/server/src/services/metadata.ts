@@ -4,6 +4,8 @@ import {
   TMDB_IMAGE_BASE,
   TMDB_POSTER_SIZE,
   TMDB_BACKDROP_SIZE,
+  hdImageSizeForCached,
+  parseCachedImageFilename,
 } from "@media-app/shared";
 import type { AppConfig } from "@media-app/shared";
 import PQueue from "p-queue";
@@ -221,6 +223,20 @@ export class MetadataService {
 
   async cacheBackdrop(imagePath?: string | null): Promise<string | null> {
     return this.cacheImage(imagePath, TMDB_BACKDROP_SIZE);
+  }
+
+  /** Upgrade a cached image to an HD TMDB tier when a TV client requests ?hd=1. */
+  async resolveHdImageFilename(filename: string): Promise<string> {
+    const parsed = parseCachedImageFilename(filename);
+    if (!parsed) return filename;
+
+    const targetSize = hdImageSizeForCached(parsed.size);
+    if (!targetSize || targetSize === parsed.size) return filename;
+
+    const hdPath = await this.cacheImage(parsed.imagePath, targetSize);
+    if (!hdPath) return filename;
+
+    return hdPath.replace(/^\/api\/images\//, "");
   }
 
   isConfigured(): boolean {

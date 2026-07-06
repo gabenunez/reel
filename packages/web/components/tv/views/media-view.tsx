@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2, Play } from "lucide-react";
 import { api, type MediaItem } from "@/lib/api";
+import { tvImageUrl } from "@/lib/tv-image";
 import { routes } from "@/lib/routes";
 import { TvFocusButton, TvFocusLink } from "@/components/tv/tv-focus-link";
 import { TvFavoriteButton } from "@/components/tv/tv-favorite-button";
@@ -138,8 +139,8 @@ export function TvMediaView() {
     );
   }
 
-  const backdropUrl = api.imageUrl(media.backdropPath ?? media.posterPath);
-  const posterUrl = api.imageUrl(media.posterPath);
+  const backdropUrl = tvImageUrl(media.backdropPath ?? media.posterPath);
+  const posterUrl = tvImageUrl(media.posterPath);
   const seasons = media.seasons ?? [];
   const episodes = seasons[selectedSeason]?.episodes ?? [];
   const movieFile = media.files?.[0];
@@ -156,10 +157,16 @@ export function TvMediaView() {
     <div className="pb-6">
       {/* Hero — compact cinematic strip, not a full desktop detail page */}
       <section className="relative mb-5 overflow-hidden">
-        <div className="relative h-[30vh] min-h-[220px] max-h-[320px]">
+        <div className="relative h-[30vh] min-h-[220px] max-h-[320px] tv-media-hero">
           {backdropUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={backdropUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <img
+              src={backdropUrl}
+              alt=""
+              loading="eager"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
           ) : (
             <div className="signal-grid absolute inset-0" />
           )}
@@ -178,6 +185,8 @@ export function TvMediaView() {
                 <img
                   src={posterUrl}
                   alt=""
+                  loading="eager"
+                  decoding="async"
                   className="aspect-[2/3] w-full rounded-md poster-shadow"
                 />
               ) : (
@@ -295,8 +304,10 @@ export function TvMediaView() {
                     {ep.stillPath ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={api.imageUrl(ep.stillPath) ?? ""}
+                        src={tvImageUrl(ep.stillPath) ?? ""}
                         alt=""
+                        loading="eager"
+                        decoding="async"
                         className="h-full w-full object-cover"
                       />
                     ) : (

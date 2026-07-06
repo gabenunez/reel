@@ -644,9 +644,13 @@ export const api = {
   },
   subtitleUrl: (id: number) => `${API_BASE}/api/subtitles/${id}`,
   themeMusicUrl: (mediaId: number) => `${API_BASE}/api/media/${mediaId}/theme`,
-  imageUrl: (path?: string | null) => {
+  imageUrl: (path?: string | null, options?: { hd?: boolean }) => {
     if (!path) return null;
     if (path.startsWith("http")) return path;
-    return `${API_BASE}${path}`;
+    const url = `${API_BASE}${path}`;
+    if (options?.hd) {
+      return `${url}${url.includes("?") ? "&" : "?"}hd=1`;
+    }
+    return url;
   },
 };

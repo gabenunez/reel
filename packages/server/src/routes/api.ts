@@ -443,19 +443,25 @@ export async function apiRoutes(
     return { success: true, id: row.id };
   });
 
-  app.get("/api/images/:filename", async (request, reply) => {
-    const { filename } = request.params as { filename: string };
-    const imagePath = path.join(config.data_dir, "cache", "images", filename);
+  app.get<{ Params: { filename: string }; Querystring: { hd?: string } }>(
+    "/api/images/:filename",
+    async (request, reply) => {
+      let { filename } = request.params;
+      if (request.query.hd === "1") {
+        filename = await metadata.resolveHdImageFilename(filename);
+      }
+      const imagePath = path.join(config.data_dir, "cache", "images", filename);
 
-    if (!fs.existsSync(imagePath)) {
-      return reply.status(404).send({ error: "Image not found" });
-    }
+      if (!fs.existsSync(imagePath)) {
+        return reply.status(404).send({ error: "Image not found" });
+      }
 
-    const ext = path.extname(filename);
-    reply.header("Content-Type", mimeLookup(ext) || "image/jpeg");
-    reply.header("Cache-Control", "public, max-age=86400");
-    return reply.send(fs.createReadStream(imagePath));
-  });
+      const ext = path.extname(filename);
+      reply.header("Content-Type", mimeLookup(ext) || "image/jpeg");
+      reply.header("Cache-Control", "public, max-age=86400");
+      return reply.send(fs.createReadStream(imagePath));
+    },
+  );
 }
 
 function mimeLookup(ext: string): string | false {

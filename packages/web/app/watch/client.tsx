@@ -41,7 +41,7 @@ import { WatchControlHint } from "@/components/watch-control-hint";
 import { useNextEpisodeCountdown } from "@/lib/use-next-episode-countdown";
 import { NextEpisodeCountdownOverlay } from "@/components/next-episode-countdown";
 import { cn, formatDuration } from "@/lib/utils";
-import { formatDynamicRangeShort } from "@media-app/shared";
+import { formatDynamicRangeChromeSuffix } from "@media-app/shared";
 import { Button } from "@/components/ui/button";
 import { CastButton } from "@/components/cast-button";
 import { PlaybackPosterBackdrop } from "@/components/playback-poster-backdrop";
@@ -1103,9 +1103,7 @@ function WatchDesktopClient() {
               </p>
               <p className="truncate text-xs text-white/60">
                 {qualityLabel(quality, streamInfo?.height ?? null, streamInfo?.width ?? null)}
-                {streamInfo?.dynamicRange
-                  ? ` · ${formatDynamicRangeShort(streamInfo.dynamicRange)}`
-                  : null}
+                {formatDynamicRangeChromeSuffix(streamInfo?.dynamicRange)}
                 {activeSubtitle !== null && " · Subtitles on"}
               </p>
             </div>
