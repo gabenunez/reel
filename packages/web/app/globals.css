@@ -112,20 +112,25 @@
     --tv-focus-border-selected: 2px solid hsl(var(--primary) / 0.55);
   }
 
-  /* —— Main nav tabs (match desktop NavTab; focus ring only on TV) —— */
+  /* —— Side nav —— */
   .tv-ui [data-tv-item].tv-focus-nav {
+    color: hsl(var(--muted-foreground));
+    background-color: transparent;
     border: 2px solid transparent;
     box-shadow: none;
   }
 
-  .tv-ui [data-tv-item].tv-focus-nav[data-tv-focused]:not([data-tv-nav-active]) {
-    background-color: hsl(var(--background) / 0.6);
-    color: hsl(var(--foreground));
-    border-color: hsl(var(--primary));
+  .tv-ui [data-tv-item].tv-focus-nav[data-tv-nav-active]:not([data-tv-focused]) {
+    background-color: hsl(var(--primary) / 0.55);
+    color: hsl(var(--primary-foreground));
   }
 
-  .tv-ui [data-tv-item].tv-focus-nav[data-tv-nav-active][data-tv-focused] {
-    border-color: hsl(var(--primary));
+  .tv-ui [data-tv-item].tv-focus-nav[data-tv-focused] {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border-color: hsl(var(--accent));
+    box-shadow: none;
+    transform: none;
   }
 
   /* —— Standard buttons —— */
@@ -629,6 +634,11 @@
   }
 
   html[data-native-video="true"] .tv-ui > main {
+    background: transparent !important;
+    background-image: none !important;
+  }
+
+  html[data-native-video="true"] [data-tv-watch-player] .watch-chrome-bottom {
     background: transparent !important;
     background-image: none !important;
   }

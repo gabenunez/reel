@@ -45,6 +45,7 @@ import {
   stopNativePlayback,
   setNativeVideoDisplayMode,
   syncNativePlaybackState,
+  setNativeWebOverlayAlpha,
   toAbsoluteMediaUrl,
 } from "@/lib/android-bridge";
 import { useNextEpisodeCountdown } from "@/lib/use-next-episode-countdown";
@@ -469,6 +470,7 @@ export function TvWatchView() {
     if (!usesNativePlayer) return;
     return () => {
       document.documentElement.removeAttribute("data-native-video");
+      setNativeWebOverlayAlpha(1);
       stopNativePlayback();
     };
   }, [usesNativePlayer]);
@@ -1099,6 +1101,12 @@ export function TvWatchView() {
           : "Loading video...";
   const controlsVisible = showControls || panelOpen;
   const showTransportControls = playbackHasBegun && !showPosterBackdrop;
+
+  useEffect(() => {
+    if (!usesNativePlayer) return;
+    setNativeWebOverlayAlpha(controlsVisible ? 1 : 0);
+  }, [usesNativePlayer, controlsVisible]);
+
   const timelinePreviewPercent = scrubPreviewPercent ?? progress;
   const timelinePreviewMs =
     totalDurationSeconds > 0
@@ -1518,7 +1526,8 @@ export function TvWatchView() {
       <div className="relative z-20 shrink-0 overflow-hidden">
         <div
           className={cn(
-            "pointer-events-auto border-t border-white/10 px-6 pb-6 pt-4 watch-chrome-bottom",
+            "pointer-events-auto border-t border-white/10 px-6 pb-6 pt-4",
+            usesNativePlayer ? "bg-transparent" : "watch-chrome-bottom",
           )}
         >
           <div className="mb-3 flex items-end justify-between gap-3">

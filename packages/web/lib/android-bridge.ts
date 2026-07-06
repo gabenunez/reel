@@ -82,6 +82,11 @@ export function syncNativePlaybackState(): void {
   getAndroidBridge()?.syncPlaybackState?.();
 }
 
+/** Hide the WebView layer during native playback so it does not dim ExoPlayer below. */
+export function setNativeWebOverlayAlpha(alpha: number): void {
+  getAndroidBridge()?.setWebOverlayAlpha?.(alpha);
+}
+
 export function registerNativePlayerHandlers(handlers: {
   onState?: (state: NativePlaybackState) => void;
   onError?: () => void;
@@ -128,6 +133,7 @@ declare global {
       stop: () => void;
       setVideoDisplayMode?: (mode: NativeVideoDisplayMode) => void;
       syncPlaybackState?: () => void;
+      setWebOverlayAlpha?: (alpha: number) => void;
     };
     /** Legacy Android TV shell before MEDIA! rebrand. */
     ReelAndroid?: Window["MediaAndroid"];

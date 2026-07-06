@@ -12,7 +12,7 @@
         android:visibility="gone"
         app:resize_mode="fit"
         app:show_buffering="never"
-        app:surface_type="texture_view"
+        app:surface_type="surface_view"
         app:use_controller="false" />
 
     <WebView

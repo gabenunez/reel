@@ -177,14 +177,13 @@ class MainActivity : AppCompatActivity() {
         if (active) {
             webView.setBackgroundColor(Color.TRANSPARENT)
             webView.background = null
-            webView.isOpaque = false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
                 // Hardware layers stay opaque on many Android TV WebViews and hide ExoPlayer below.
                 webView.setLayerType(View.LAYER_TYPE_NONE, null)
             }
         } else {
-            webView.isOpaque = true
             webView.setBackgroundColor(Color.BLACK)
+            webView.alpha = 1f
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
                 webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
             }
@@ -515,6 +514,13 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun syncPlaybackState() {
             runOnUiThread { nativePlayer.syncPlaybackState() }
+        }
+
+        @JavascriptInterface
+        fun setWebOverlayAlpha(alpha: Double) {
+            runOnUiThread {
+                webView.alpha = alpha.toFloat().coerceIn(0f, 1f)
+            }
         }
     }
 
