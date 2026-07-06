@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.83 — 2026-07-06
+
+### Fix
+
+- **Android TV 4K playback** — remove tunneled decoding that hung on some panels; 4K titles no longer stuck on "Loading video..."
+- **Android TV HDR** — apply HDR window mode only after the player is ready
+
+### TV
+
+- **Back navigation** — one Back exits watch (unless controls were just opened); replace history so Back from the title page does not reopen playback
+- **Side nav** — larger transparent logo without the dark tile background
+
 ## 0.1.82 — 2026-07-06
 
 ### Fix
