@@ -27,6 +27,16 @@ function getContentRows() {
   return Array.from(main.querySelectorAll<HTMLElement>("[data-tv-content-row]"));
 }
 
+function getScopedContentRows(active: HTMLElement) {
+  const watchMenu = active.closest<HTMLElement>("[data-tv-watch-menu]");
+  if (watchMenu) {
+    return Array.from(
+      watchMenu.querySelectorAll<HTMLElement>("[data-tv-content-row]"),
+    );
+  }
+  return getContentRows();
+}
+
 function getNavRow() {
   return document.querySelector<HTMLElement>("[data-tv-nav-row]");
 }
@@ -292,7 +302,8 @@ function moveHorizontal(active: HTMLElement, direction: "left" | "right") {
 }
 
 function moveVertical(active: HTMLElement, direction: "up" | "down") {
-  const contentRows = getContentRows();
+  const watchMenu = active.closest("[data-tv-watch-menu]");
+  const contentRows = getScopedContentRows(active);
   const activeRow = active.closest("[data-tv-row]");
   if (!activeRow) return false;
 
@@ -313,6 +324,7 @@ function moveVertical(active: HTMLElement, direction: "up" | "down") {
 
   if (activeRow.hasAttribute("data-tv-vertical")) {
     if (moveInVerticalRow(active, direction)) return true;
+    if (watchMenu) return false;
   }
 
   if (activeRow.hasAttribute("data-tv-grid")) {
@@ -332,6 +344,7 @@ function moveVertical(active: HTMLElement, direction: "up" | "down") {
   }
 
   if (direction === "up" && contentIndex === 0) {
+    if (watchMenu) return false;
     return focusNavFromContent(active);
   }
 
@@ -395,14 +408,15 @@ export function TvSpatialNav({ children }: { children: ReactNode }) {
 
       if (document.querySelector("[data-tv-watch-player]")) {
         if (active.hasAttribute("data-tv-watch-scrub")) return;
+        const inWatchMenu = active.closest("[data-tv-watch-menu]");
         if (
-          !active.closest("[data-tv-watch-menu]") &&
+          !inWatchMenu &&
           !active.closest("[data-tv-watch-controls]")
         ) {
           return;
         }
-        // Watch view handles Up/Down on the control bar (menus, play focus).
-        if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        // Watch view handles Up/Down on the control bar; menus use normal spatial nav.
+        if (!inWatchMenu && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
           return;
         }
       }

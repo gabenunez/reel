@@ -10,6 +10,8 @@ import {
 } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { TvFocusButton } from "@/components/tv/tv-focus-link";
+import { tvScrollRowClassName } from "@/components/tv/tv-row";
 import { cn } from "@/lib/utils";
 import {
   DEFAULT_SUBTITLE_STYLES,
@@ -237,5 +239,144 @@ export function SubtitleAppearanceSettingsLink({ onNavigate }: { onNavigate?: ()
     >
       Subtitle appearance...
     </Link>
+  );
+}
+
+function TvSubtitleOptionRow<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  options: Array<{ value: T; label: string }>;
+  value: T;
+  onChange: (value: T) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="px-1 text-sm font-medium text-muted-foreground">{label}</p>
+      <div
+        data-tv-row=""
+        data-tv-content-row=""
+        data-tv-scroll-row=""
+        className={cn(tvScrollRowClassName, "gap-2 px-0 py-1")}
+      >
+        {options.map((option) => (
+          <TvFocusButton
+            key={option.value}
+            variant="chip"
+            selected={value === option.value}
+            disabled={disabled}
+            onClick={() => onChange(option.value)}
+            className="px-4 py-2 text-sm font-semibold"
+          >
+            {option.label}
+          </TvFocusButton>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function TvSubtitleAppearancePanel() {
+  const { styles, setStyles, updateStyle, resetStyles } = useSubtitleStyles();
+  const preview = previewSubtitleStyles(styles);
+
+  return (
+    <div className="space-y-5">
+      <div className="overflow-hidden rounded-lg border border-white/10 bg-black">
+        <div className="relative aspect-[16/5] bg-gradient-to-b from-zinc-900 to-black">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(255,255,255,0.08),transparent_55%)]" />
+          <div className="absolute inset-x-0 bottom-[18%] flex justify-center px-6">
+            <p
+              className="max-w-xl text-center leading-snug"
+              style={{
+                color: preview.color,
+                backgroundColor: preview.backgroundColor,
+                fontSize: preview.fontSize,
+                fontFamily: preview.fontFamily,
+                textShadow: preview.textShadow,
+                padding:
+                  styles.background === "none" || styles.backgroundOpacity === "0"
+                    ? "0"
+                    : "0.2em 0.55em",
+                borderRadius: "0.2em",
+              }}
+            >
+              These are sample subtitles for preview.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <TvSubtitleOptionRow
+        label="Text size"
+        options={SUBTITLE_SIZE_OPTIONS}
+        value={styles.size}
+        onChange={(value) => updateStyle("size", value)}
+      />
+
+      <TvSubtitleOptionRow
+        label="Font"
+        options={SUBTITLE_FONT_OPTIONS}
+        value={styles.font}
+        onChange={(value) => updateStyle("font", value)}
+      />
+
+      <TvSubtitleOptionRow
+        label="Text color"
+        options={SUBTITLE_COLOR_OPTIONS}
+        value={styles.color}
+        onChange={(value) => updateStyle("color", value)}
+      />
+
+      <TvSubtitleOptionRow
+        label="Text opacity"
+        options={SUBTITLE_OPACITY_OPTIONS}
+        value={styles.opacity}
+        onChange={(value) => updateStyle("opacity", value)}
+      />
+
+      <TvSubtitleOptionRow
+        label="Background"
+        options={SUBTITLE_BACKGROUND_OPTIONS}
+        value={styles.background}
+        onChange={(value) => {
+          const next = { ...styles, background: value };
+          if (value === "none") {
+            next.backgroundOpacity = "0";
+          } else if (styles.backgroundOpacity === "0") {
+            next.backgroundOpacity = "75";
+          }
+          setStyles(next);
+        }}
+      />
+
+      <TvSubtitleOptionRow
+        label="Background opacity"
+        options={SUBTITLE_BACKGROUND_OPACITY_OPTIONS}
+        value={styles.backgroundOpacity}
+        onChange={(value) => updateStyle("backgroundOpacity", value)}
+        disabled={styles.background === "none"}
+      />
+
+      <TvSubtitleOptionRow
+        label="Text edge style"
+        options={SUBTITLE_EDGE_OPTIONS}
+        value={styles.edge}
+        onChange={(value) => updateStyle("edge", value)}
+      />
+
+      <TvFocusButton
+        variant="card"
+        onClick={resetStyles}
+        className="w-full rounded-xl px-4 py-3 text-left text-base"
+      >
+        Reset to defaults
+      </TvFocusButton>
+    </div>
   );
 }

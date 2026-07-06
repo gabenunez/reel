@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, Loader2, Search, X } from "lucide-react";
 import { api, type SubtitleSearchResult, type SubtitleTrack } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { TvFocusButton } from "@/components/tv/tv-focus-link";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { focusTvItem } from "@/lib/tv-focus";
 
 interface SubtitleSearchDialogProps {
   open: boolean;
@@ -33,6 +34,9 @@ export function SubtitleSearchDialog({
   const [loading, setLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
+  const firstResultRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) {
@@ -70,6 +74,20 @@ export function SubtitleSearchDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, opensubtitlesConfigured]);
 
+  useEffect(() => {
+    if (!open || !tv) return;
+
+    requestAnimationFrame(() => {
+      const target =
+        results.length > 0
+          ? firstResultRef.current
+          : opensubtitlesConfigured && !loading
+            ? searchButtonRef.current
+            : closeButtonRef.current;
+      if (target) focusTvItem(target);
+    });
+  }, [open, tv, opensubtitlesConfigured, results.length, loading]);
+
   const handleDownload = async (result: SubtitleSearchResult) => {
     setDownloadingId(result.fileId);
     setError(null);
@@ -106,6 +124,7 @@ export function SubtitleSearchDialog({
             </p>
           </div>
           <TvFocusButton
+            ref={closeButtonRef}
             onClick={onClose}
             aria-label="Close"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted/50 text-white"
@@ -134,6 +153,7 @@ export function SubtitleSearchDialog({
                 className="max-w-xs bg-muted/40 text-base text-white"
               />
               <TvFocusButton
+                ref={searchButtonRef}
                 onClick={runSearch}
                 disabled={loading}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
@@ -161,6 +181,7 @@ export function SubtitleSearchDialog({
                 results.map((result) => (
                   <TvFocusButton
                     key={`${result.id}-${result.fileId}`}
+                    ref={result === results[0] ? firstResultRef : undefined}
                     variant="card"
                     disabled={downloadingId === result.fileId}
                     onClick={() => handleDownload(result)}

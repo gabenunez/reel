@@ -527,7 +527,7 @@
   }
 
   .tv-ui video.media-subtitles::cue {
-    font-size: 1.45em;
+    font-size: calc(var(--subtitle-cue-size, 1.05em) * 1.25);
     line-height: 1.4;
   }
 

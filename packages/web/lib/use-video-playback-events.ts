@@ -70,7 +70,10 @@ export function useVideoPlaybackEvents(options: UseVideoPlaybackEventsOptions): 
       handlersRef.current.onBuffering(false, false);
       handlersRef.current.onBufferUpdate();
     };
-    const onCanPlay = () => handlersRef.current.onBufferUpdate();
+    const onCanPlay = () => {
+      handlersRef.current.onBuffering(false, false);
+      handlersRef.current.onBufferUpdate();
+    };
     const onSeeked = () => {
       if (optimisticRef.current === null) return;
       const actual = usingHlsPlayback
