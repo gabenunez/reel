@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { api, type UpdateStatus } from "@/lib/api";
+import { reloadForFreshAssets } from "@/lib/stale-chunk-recovery";
 
 const UPDATE_POLL_MS = 15 * 60 * 1000;
 const UPDATE_IN_PROGRESS_POLL_MS = 2000;
@@ -97,6 +98,8 @@ export function UpdateStatusProvider({ children }: { children: ReactNode }) {
         if (wasUpdatingRef.current && !stillUpdating) {
           wasUpdatingRef.current = false;
           await refresh(true, { reschedule: false });
+          reloadForFreshAssets("server-update-complete");
+          return;
         } else {
           wasUpdatingRef.current = stillUpdating;
         }

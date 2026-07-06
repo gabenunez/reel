@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { AuthProvider } from "@/components/auth-gate";
 import { AudioUnlock } from "@/components/audio-unlock";
 import { ThemeMusicSettingsProvider } from "@/components/theme-music-settings";
@@ -11,9 +12,19 @@ import { Navbar } from "@/components/navbar";
 import { ScanStatusBar } from "@/components/scan-status-bar";
 import { TvShell } from "@/components/tv/tv-shell";
 import { TvModeProvider, useTvMode } from "@/lib/tv-mode";
+import {
+  clearStaleChunkReloadGuard,
+  installStaleChunkRecovery,
+} from "@/lib/stale-chunk-recovery";
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const isTvMode = useTvMode();
+
+  useEffect(() => {
+    installStaleChunkRecovery();
+    const timer = window.setTimeout(clearStaleChunkReloadGuard, 5_000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   return (
     <AuthProvider>
