@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.87 — 2026-07-07
+
+### UI
+
+- **Watch player** — subtitle appearance opens in a modal over the video from the subtitles menu instead of Settings
+
 ## 0.1.86 — 2026-07-07
 
 ### Fix
