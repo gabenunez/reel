@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.93 — 2026-07-07
+
+### Fix
+
+- **Subtitles** — sync HLS captions to absolute playback time on resume and seek-restart; hide them while watch menus are open and keep them below the controls chrome
+
 ## 0.1.92 — 2026-07-07
 
 ### Fix

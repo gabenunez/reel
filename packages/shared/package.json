@@ -1,6 +1,6 @@
 {
   "name": "@media-app/shared",
-  "version": "0.1.92",
+  "version": "0.1.93",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
