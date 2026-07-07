@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.92 — 2026-07-07
+
+### Fix
+
+- **Subtitles** — render web captions from parsed VTT timed to playback (reliable on HLS) and show clear errors when subtitle loads fail
+
 ## 0.1.91 — 2026-07-07
 
 ### Fix
