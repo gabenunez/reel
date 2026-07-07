@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.91 — 2026-07-07
+
+### Fix
+
+- **Navigation** — parse entity IDs from the browser URL so `/media/7/` and other path routes work with static export (no more “Invalid media” flash)
+- **Subtitles** — render desktop captions above watch controls via a DOM overlay and fix track sync races during HLS playback
+
 ## 0.1.90 — 2026-07-07
 
 ### Fix
