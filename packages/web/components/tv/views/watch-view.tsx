@@ -22,7 +22,7 @@ import { notifyWebPlaybackSourceReady } from "@/lib/web-subtitle-attach";
 import { usePlaybackVisibility } from "@/lib/use-playback-visibility";
 import { useVideoPlaybackEvents } from "@/lib/use-video-playback-events";
 import { useSubtitleTracks } from "@/lib/use-subtitle-tracks";
-import { resolveHlsSubtitleTimelineOffset } from "@/lib/subtitle-timeline";
+import { resolveWebSubtitlePlaybackSeconds } from "@/lib/subtitle-timeline";
 import { WebSubtitleCueOverlay } from "@/components/web-subtitle-cue-overlay";
 import { SubtitleLoadNotice } from "@/components/subtitle-load-notice";
 import {
@@ -204,17 +204,24 @@ export function TvWatchView() {
   titleRef.current = title;
   streamInfoRef.current = streamInfo;
 
-  const hlsSubtitleTimelineOffset = useMemo(
-    () =>
-      usingHlsPlayback
-        ? resolveHlsSubtitleTimelineOffset({
-            streamStartSeconds,
-            hlsStartOffset,
-            initialResumeSeconds,
-          })
-        : 0,
-    [usingHlsPlayback, streamStartSeconds, hlsStartOffset, initialResumeSeconds],
-  );
+  const getSubtitlePlaybackSeconds = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return 0;
+    return resolveWebSubtitlePlaybackSeconds({
+      usingHlsPlayback,
+      videoCurrentTime: video.currentTime,
+      streamStartSeconds,
+      hlsStartOffsetLive: hlsStartOffsetRef.current,
+      hlsStartOffset,
+      initialResumeSeconds,
+      playbackActive: true,
+    });
+  }, [
+    usingHlsPlayback,
+    streamStartSeconds,
+    hlsStartOffset,
+    initialResumeSeconds,
+  ]);
 
   const {
     subtitles,
@@ -612,6 +619,8 @@ export function TvWatchView() {
     menuReturnFocusRef.current = null;
     setShowControls(true);
     setPlaybackHasBegun(false);
+    hlsStartOffsetRef.current = 0;
+    setHlsStartOffset(0);
   }, [fileId, type]);
 
   useEffect(() => {
@@ -1614,7 +1623,8 @@ export function TvWatchView() {
           <WebSubtitleCueOverlay
             videoRef={videoRef}
             vtt={activeVtt}
-            timelineOffsetSeconds={hlsSubtitleTimelineOffset}
+            getPlaybackSeconds={getSubtitlePlaybackSeconds}
+            streamEpoch={streamGeneration}
             hidden={playbackMenusOpen}
           />
         )}

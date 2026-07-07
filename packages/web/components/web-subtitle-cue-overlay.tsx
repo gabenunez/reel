@@ -9,23 +9,50 @@ import { cn } from "@/lib/utils";
 export function WebSubtitleCueOverlay({
   videoRef,
   vtt,
-  timelineOffsetSeconds = 0,
+  getPlaybackSeconds,
+  streamEpoch = 0,
   hidden = false,
   className,
 }: {
   videoRef: RefObject<HTMLVideoElement | null>;
   vtt: string | null;
-  /** Absolute media time (seconds) mapped to `video.currentTime` 0 for HLS resume. */
-  timelineOffsetSeconds?: number;
+  getPlaybackSeconds: () => number;
+  /** Increment when the playback source restarts (seek/HLS generation). */
+  streamEpoch?: number;
   /** Hide while watch menus or dialogs cover the lower chrome. */
   hidden?: boolean;
   className?: string;
 }) {
   const { styles } = useSubtitleStyles();
   const [lines, setLines] = useState<string[]>([]);
+  const [playbackReady, setPlaybackReady] = useState(false);
   const cues = useMemo(() => (vtt ? parseWebVttCues(vtt) : []), [vtt]);
-  const timelineOffsetRef = useRef(timelineOffsetSeconds);
-  timelineOffsetRef.current = timelineOffsetSeconds;
+  const getPlaybackSecondsRef = useRef(getPlaybackSeconds);
+  getPlaybackSecondsRef.current = getPlaybackSeconds;
+
+  useEffect(() => {
+    setPlaybackReady(false);
+  }, [streamEpoch]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const onPlaying = () => setPlaybackReady(true);
+    const onEmptied = () => setPlaybackReady(false);
+
+    video.addEventListener("playing", onPlaying);
+    video.addEventListener("emptied", onEmptied);
+
+    if (!video.paused && !video.ended && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      setPlaybackReady(true);
+    }
+
+    return () => {
+      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("emptied", onEmptied);
+    };
+  }, [videoRef, streamEpoch]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -35,7 +62,11 @@ export function WebSubtitleCueOverlay({
     }
 
     const update = () => {
-      setLines(findActiveCueTexts(cues, timelineOffsetRef.current + video.currentTime));
+      if (!playbackReady) {
+        setLines([]);
+        return;
+      }
+      setLines(findActiveCueTexts(cues, getPlaybackSecondsRef.current()));
     };
 
     video.addEventListener("timeupdate", update);
@@ -52,9 +83,9 @@ export function WebSubtitleCueOverlay({
       video.removeEventListener("loadedmetadata", update);
       video.removeEventListener("play", update);
     };
-  }, [videoRef, cues]);
+  }, [videoRef, cues, playbackReady, getPlaybackSeconds]);
 
-  if (hidden || lines.length === 0) return null;
+  if (hidden || !playbackReady || lines.length === 0) return null;
 
   const appearance = playbackSubtitleAppearance(styles);
 
