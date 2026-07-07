@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.88 — 2026-07-07
+
+### Fix
+
+- **Subtitles** — restore web subtitle display after playback reloads and fix HLS resume timing by shifting VTT cues to the stream offset
+- **Subtitles** — prefetch and cache tracks for instant selection; native hot-swap only applies when ExoPlayer is active
+
+### TV
+
+- **Subtitles** — pass timeline offset to native subtitle URLs so cues stay in sync during transcoded playback
+
 ## 0.1.87 — 2026-07-07
 
 ### UI
