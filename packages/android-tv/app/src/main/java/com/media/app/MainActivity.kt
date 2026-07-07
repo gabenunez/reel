@@ -546,10 +546,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun setSubtitles(subtitleUrl: String) {
+        fun setSubtitles(subtitleUrl: String): Boolean {
+            if (!nativePlayer.isActive()) return false
             runOnUiThread {
                 nativePlayer.updateSubtitles(subtitleUrl.takeIf { it.isNotBlank() })
             }
+            return true
         }
 
         @JavascriptInterface

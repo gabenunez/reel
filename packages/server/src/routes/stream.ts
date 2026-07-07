@@ -7,6 +7,7 @@ import { getAvailableQualities, isBrowserDirectPlayAudioSupported, isBrowserDire
 import type { DatabaseInstance } from "../db/index.js";
 import type { SubtitleService } from "../services/subtitles.js";
 import { subtitleHasContent } from "../utils/subtitle-content.js";
+import { shiftVttByOffset } from "@media-app/shared";
 import {
   mediaItems,
   movieFiles,
@@ -663,10 +664,11 @@ export async function subtitleRoutes(
   db: DatabaseInstance,
   subtitleService: SubtitleService,
 ) {
-  app.get<{ Params: { id: string } }>(
+  app.get<{ Params: { id: string }; Querystring: { offset?: string } }>(
     "/api/subtitles/:id",
     async (request, reply) => {
       const id = parseInt(request.params.id, 10);
+      const offsetSeconds = Math.max(0, parseInt(request.query.offset ?? "0", 10) || 0);
       const subtitle = await db.query.subtitles.findFirst({
         where: eq(subtitles.id, id),
       });
@@ -681,9 +683,13 @@ export async function subtitleRoutes(
           await subtitleService.deleteSubtitle(id);
           return reply.status(404).send({ error: "Subtitle has no content" });
         }
+        const body = offsetSeconds > 0 ? shiftVttByOffset(content, offsetSeconds) : content;
+        if (!subtitleHasContent(body)) {
+          return reply.status(404).send({ error: "Subtitle has no content" });
+        }
         setMediaCorsHeaders(request, reply);
         reply.header("Content-Type", "text/vtt");
-        return content;
+        return body;
       } catch {
         return reply.status(500).send({ error: "Failed to read subtitle" });
       }

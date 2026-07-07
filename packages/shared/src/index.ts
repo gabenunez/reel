@@ -5,5 +5,6 @@ export * from "./stream-quality.js";
 export * from "./direct-play.js";
 export * from "./video-dynamic-range.js";
 export * from "./image-cache.js";
+export * from "./vtt-timing.js";
 export * from "./parsers/movie.js";
 export * from "./parsers/tv.js";

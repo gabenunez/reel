@@ -642,7 +642,13 @@ export const api = {
     }
     return `${API_BASE}/api/stream/${fileId}/hls/master.m3u8?${params.toString()}`;
   },
-  subtitleUrl: (id: number) => `${API_BASE}/api/subtitles/${id}`,
+  subtitleUrl: (id: number, offsetSeconds = 0) => {
+    const base = `${API_BASE}/api/subtitles/${id}`;
+    if (offsetSeconds > 0) {
+      return `${base}?offset=${Math.floor(offsetSeconds)}`;
+    }
+    return base;
+  },
   themeMusicUrl: (mediaId: number) => `${API_BASE}/api/media/${mediaId}/theme`,
   imageUrl: (path?: string | null, options?: { hd?: boolean }) => {
     if (!path) return null;

@@ -16,6 +16,7 @@ import {
   type PlaybackMediaDetail,
 } from "@/lib/playback-utils";
 import { destroyHlsInstance, loadHls, startWebPlayback } from "@/lib/playback-engine";
+import { notifyWebPlaybackSourceReady } from "@/lib/web-subtitle-attach";
 import { usePlaybackVisibility } from "@/lib/use-playback-visibility";
 import { useVideoPlaybackEvents } from "@/lib/use-video-playback-events";
 import { useSubtitleTracks } from "@/lib/use-subtitle-tracks";
@@ -185,14 +186,6 @@ export function TvWatchView() {
     setNativeVideoDisplayMode(videoDisplayMode);
   }, [usesNativePlayer, videoDisplayMode]);
 
-  const {
-    subtitles,
-    activeSubtitle,
-    setActiveSubtitle,
-    refreshSubtitles,
-    opensubtitlesConfigured,
-  } = useSubtitleTracks(fileId, type, videoRef, streamGeneration);
-
   const { thumbnails, lookupCue } = useSeekThumbnails(
     fileId,
     type === "movie" ? "movie" : "episode",
@@ -208,6 +201,42 @@ export function TvWatchView() {
   playbackStreamRef.current = playbackStream;
   titleRef.current = title;
   streamInfoRef.current = streamInfo;
+
+  const {
+    subtitles,
+    activeSubtitle,
+    setActiveSubtitle: selectWebSubtitle,
+    prefetchMenuTracks,
+    refreshSubtitles,
+    opensubtitlesConfigured,
+  } = useSubtitleTracks(
+    fileId,
+    type,
+    videoRef,
+    streamGeneration,
+    usingHlsPlayback ? hlsStartOffset : 0,
+  );
+
+  const selectSubtitle = useCallback(
+    (subtitleId: number | null) => {
+      if (usesNativePlayer) {
+        const offset = usingHlsRef.current ? hlsStartOffsetRef.current : 0;
+        const subtitleUrl =
+          subtitleId != null
+            ? toAbsoluteMediaUrl(api.subtitleUrl(subtitleId, offset))
+            : undefined;
+        updateNativeSubtitles(subtitleUrl);
+      }
+      selectWebSubtitle(subtitleId);
+    },
+    [selectWebSubtitle, usesNativePlayer],
+  );
+
+  useEffect(() => {
+    if (!subtitleMenuOpen) return;
+    prefetchMenuTracks();
+  }, [subtitleMenuOpen, prefetchMenuTracks]);
+
   const posterUrl = tvImageUrl(posterPath);
 
   const backHref =
@@ -711,7 +740,7 @@ export function TvWatchView() {
         isHdr: needsHdrToneMap(streamInfo.dynamicRange),
         subtitleUrl:
           activeSubtitle != null
-            ? toAbsoluteMediaUrl(api.subtitleUrl(activeSubtitle))
+            ? toAbsoluteMediaUrl(api.subtitleUrl(activeSubtitle, usingHls ? startAt : 0))
             : undefined,
       });
 
@@ -796,6 +825,7 @@ export function TvWatchView() {
           onFatalError,
           onBufferUpdate: updateBufferedPosition,
           onSeekComplete: (seconds) => setCurrentTime(seconds),
+          onSourceReady: notifyWebPlaybackSourceReady,
         });
 
         if (cancelled) {
@@ -851,21 +881,22 @@ export function TvWatchView() {
     if (activeSubtitleRef.current === activeSubtitle) return;
     activeSubtitleRef.current = activeSubtitle;
 
-    const subtitleUrl =
-      activeSubtitle != null
-        ? toAbsoluteMediaUrl(api.subtitleUrl(activeSubtitle))
-        : undefined;
-
-    if (updateNativeSubtitles(subtitleUrl)) {
-      return;
-    }
-
     const stream = resolvePlaybackStream(quality, streamInfo, { forceRemux });
     const usingHls = stream.usingHls;
     const relativeTime = currentTimeRef.current;
     const absoluteTime = usingHls
       ? hlsStartOffsetRef.current + relativeTime
       : relativeTime;
+    const subtitleOffset = usingHls ? hlsStartOffsetRef.current : 0;
+
+    const subtitleUrl =
+      activeSubtitle != null
+        ? toAbsoluteMediaUrl(api.subtitleUrl(activeSubtitle, subtitleOffset))
+        : undefined;
+
+    if (updateNativeSubtitles(subtitleUrl)) {
+      return;
+    }
 
     const relativeUrl = api.streamUrl(
       fileId,
@@ -1886,7 +1917,7 @@ export function TvWatchView() {
             <TvFocusButton
               variant="card"
               selected={activeSubtitle === null}
-              onClick={() => setActiveSubtitle(null)}
+              onClick={() => selectSubtitle(null)}
               className={tvWatchMenuOptionClassName()}
             >
               Off
@@ -1896,7 +1927,7 @@ export function TvWatchView() {
                 key={sub.id}
                 variant="card"
                 selected={activeSubtitle === sub.id}
-                onClick={() => setActiveSubtitle(sub.id)}
+                onClick={() => selectSubtitle(sub.id)}
                 className={tvWatchMenuOptionClassName("flex items-center justify-between gap-3")}
               >
                 <span className="min-w-0 truncate">{formatSubtitleLabel(sub)}</span>
@@ -1997,7 +2028,7 @@ export function TvWatchView() {
         type={type}
         opensubtitlesConfigured={opensubtitlesConfigured}
         onDownloaded={(track) => {
-          setActiveSubtitle(track.id);
+          selectSubtitle(track.id);
           void refreshSubtitles(track);
           setSubtitleSearchOpen(false);
           requestAnimationFrame(() => {

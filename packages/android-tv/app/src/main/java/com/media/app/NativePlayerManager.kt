@@ -160,12 +160,12 @@ class NativePlayerManager(
         emitState()
     }
 
-    fun updateSubtitles(subtitleUrl: String?) {
-        val exoPlayer = player ?: return
-        val payload = currentPayload ?: return
+    fun updateSubtitles(subtitleUrl: String?): Boolean {
+        val exoPlayer = player ?: return false
+        val payload = currentPayload ?: return false
 
         val normalizedUrl = subtitleUrl?.takeIf { it.isNotBlank() }
-        if (payload.subtitleUrl == normalizedUrl) return
+        if (payload.subtitleUrl == normalizedUrl) return true
 
         val position = exoPlayer.currentPosition
         val wasPlaying = exoPlayer.isPlaying
@@ -182,6 +182,7 @@ class NativePlayerManager(
         exoPlayer.prepare()
         exoPlayer.playWhenReady = wasPlaying
         emitState()
+        return true
     }
 
     fun stop() {

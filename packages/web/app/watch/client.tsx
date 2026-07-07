@@ -32,6 +32,7 @@ import {
   type PlaybackMediaDetail,
 } from "@/lib/playback-utils";
 import { destroyHlsInstance, loadHls, startWebPlayback } from "@/lib/playback-engine";
+import { notifyWebPlaybackSourceReady } from "@/lib/web-subtitle-attach";
 import { usePlaybackVisibility } from "@/lib/use-playback-visibility";
 import { useMediaSession } from "@/lib/use-media-session";
 import { useVideoPlaybackEvents } from "@/lib/use-video-playback-events";
@@ -48,6 +49,8 @@ import { PlaybackPosterBackdrop } from "@/components/playback-poster-backdrop";
 import { TvCastButton, type TvCastPayload } from "@/components/tv-cast-button";
 import { SubtitleSearchDialog } from "@/components/subtitle-search-dialog";
 import { SubtitleAppearanceDialog } from "@/components/subtitle-style-settings";
+import { useSubtitleTracks } from "@/lib/use-subtitle-tracks";
+import { formatSubtitleLabel } from "@/lib/watch-helpers";
 import { FileDetailsDialog } from "@/components/file-details-dialog";
 import { VideoDisplayModeButton } from "@/components/video-display-mode-button";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -61,24 +64,6 @@ import {
   videoDisplayModeClass,
   type VideoDisplayMode,
 } from "@/lib/video-display-mode";
-
-interface SubtitleTrack {
-  id: number;
-  language: string;
-  label?: string | null;
-  source?: "external" | "embedded" | "opensubtitles";
-}
-
-function formatSubtitleLabel(sub: SubtitleTrack): string {
-  const sourceLabel =
-    sub.source === "opensubtitles"
-      ? "Online"
-      : sub.source === "embedded"
-        ? "Embedded"
-        : "File";
-  const detail = sub.label ? sub.label.slice(0, 48) : sourceLabel;
-  return `${sub.language} · ${detail}`;
-}
 
 const VOLUME_STORAGE_KEY = "media:volume";
 const PROGRESS_SAVE_MS = 10_000;
@@ -143,12 +128,9 @@ function WatchDesktopClient() {
   const [bufferedRanges, setBufferedRanges] = useState<Array<{ start: number; end: number }>>(
     [],
   );
-  const [subtitles, setSubtitles] = useState<SubtitleTrack[]>([]);
-  const [activeSubtitle, setActiveSubtitle] = useState<number | null>(null);
   const [subtitleMenuOpen, setSubtitleMenuOpen] = useState(false);
   const [subtitleAppearanceOpen, setSubtitleAppearanceOpen] = useState(false);
   const [subtitleSearchOpen, setSubtitleSearchOpen] = useState(false);
-  const [opensubtitlesConfigured, setOpensubtitlesConfigured] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -190,6 +172,28 @@ function WatchDesktopClient() {
   );
   const usingHlsPlayback = playbackStream.usingHls;
   playbackStreamRef.current = playbackStream;
+
+  const {
+    subtitles,
+    activeSubtitle,
+    setActiveSubtitle,
+    prefetchMenuTracks,
+    removeSubtitleTrack,
+    refreshSubtitles,
+    opensubtitlesConfigured,
+  } = useSubtitleTracks(
+    fileId,
+    type,
+    videoRef,
+    streamGeneration,
+    usingHlsPlayback ? hlsStartOffset : 0,
+  );
+
+  useEffect(() => {
+    if (!subtitleMenuOpen) return;
+    prefetchMenuTracks();
+  }, [subtitleMenuOpen, prefetchMenuTracks]);
+
   const posterUrl = api.imageUrl(posterPath);
   const { thumbnails, lookupCue } = useSeekThumbnails(
     fileId,
@@ -413,38 +417,6 @@ function WatchDesktopClient() {
     video.muted = muted;
   }, [volume, muted]);
 
-  const refreshSubtitles = useCallback(
-    async (ensureTrack?: SubtitleTrack) => {
-      if (!fileId || Number.isNaN(fileId)) return;
-      try {
-        const data = await api.listSubtitles(
-          fileId,
-          type === "movie" ? "movie" : "episode",
-        );
-        const tracks =
-          ensureTrack && !data.tracks.some((track) => track.id === ensureTrack.id)
-            ? [...data.tracks, ensureTrack]
-            : data.tracks;
-        setSubtitles(tracks);
-        setActiveSubtitle((current) => {
-          const keepId = current ?? ensureTrack?.id ?? null;
-          if (keepId && tracks.some((track) => track.id === keepId)) {
-            return keepId;
-          }
-          return null;
-        });
-        setOpensubtitlesConfigured(data.opensubtitlesConfigured);
-      } catch (err) {
-        console.warn("Failed to load subtitles", err);
-      }
-    },
-    [fileId, type],
-  );
-
-  useEffect(() => {
-    refreshSubtitles();
-  }, [refreshSubtitles]);
-
   useEffect(() => {
     if (!fileId || Number.isNaN(fileId) || !mediaId) return;
 
@@ -541,6 +513,7 @@ function WatchDesktopClient() {
           onFatalError,
           onBufferUpdate: updateBufferedPosition,
           onSeekComplete: (seconds) => setCurrentTime(seconds),
+          onSourceReady: notifyWebPlaybackSourceReady,
         });
 
         if (cancelled) {
@@ -648,59 +621,6 @@ function WatchDesktopClient() {
       if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
     };
   }, []);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || activeSubtitle === null) {
-      video?.querySelectorAll("track").forEach((track) => track.remove());
-      return;
-    }
-
-    let cancelled = false;
-    let objectUrl: string | null = null;
-    const activeTrack = subtitles.find((sub) => sub.id === activeSubtitle);
-
-    const clearTracks = () => {
-      video.querySelectorAll("track").forEach((track) => track.remove());
-    };
-
-    clearTracks();
-
-    void (async () => {
-      try {
-        const res = await fetch(api.subtitleUrl(activeSubtitle), {
-          credentials: "include",
-        });
-        if (!res.ok || cancelled) return;
-
-        const vtt = await res.text();
-        if (cancelled || !vtt.trim()) return;
-
-        objectUrl = URL.createObjectURL(new Blob([vtt], { type: "text/vtt" }));
-        if (cancelled) return;
-
-        const track = document.createElement("track");
-        track.kind = "subtitles";
-        track.src = objectUrl;
-        track.default = true;
-        track.label = activeTrack?.language ?? "Subtitles";
-        track.srclang = activeTrack?.language?.slice(0, 2) ?? "en";
-        track.addEventListener("load", () => {
-          if (track.track) track.track.mode = "showing";
-        });
-        video.appendChild(track);
-        if (track.track) track.track.mode = "showing";
-      } catch (err) {
-        console.warn("Failed to load subtitle track", err);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      clearTracks();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [activeSubtitle, subtitles, streamGeneration]);
 
   const handleTvCast = useCallback(async (): Promise<TvCastPayload> => {
     const video = videoRef.current;
@@ -1438,12 +1358,8 @@ function WatchDesktopClient() {
                           {sub.source === "opensubtitles" && (
                             <button
                               className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-background hover:text-red-400"
-                              onClick={async () => {
-                                await api.deleteSubtitle(sub.id);
-                                if (activeSubtitle === sub.id) {
-                                  setActiveSubtitle(null);
-                                }
-                                await refreshSubtitles();
+                              onClick={() => {
+                                void removeSubtitleTrack(sub.id);
                               }}
                             >
                               Remove
@@ -1565,10 +1481,6 @@ function WatchDesktopClient() {
         type={type === "movie" ? "movie" : "episode"}
         opensubtitlesConfigured={opensubtitlesConfigured}
         onDownloaded={(track) => {
-          setSubtitles((current) => {
-            const exists = current.some((entry) => entry.id === track.id);
-            return exists ? current : [...current, track];
-          });
           setActiveSubtitle(track.id);
           setSubtitleMenuOpen(false);
           void refreshSubtitles(track);

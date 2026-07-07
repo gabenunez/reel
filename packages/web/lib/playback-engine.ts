@@ -20,6 +20,7 @@ export interface WebPlaybackOptions {
   onFatalError: () => void;
   onBufferUpdate: () => void;
   onSeekComplete?: (seconds: number) => void;
+  onSourceReady?: () => void;
 }
 
 export interface WebPlaybackHandle {
@@ -45,6 +46,7 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
     onFatalError,
     onBufferUpdate,
     onSeekComplete,
+    onSourceReady,
   } = options;
 
   let hls: Hls | null = null;
@@ -68,6 +70,7 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
       video.addEventListener("error", onVideoError);
       hls.on(HlsConstructor.Events.MANIFEST_PARSED, () => {
         hls?.startLoad(0);
+        onSourceReady?.();
         video.play().catch(() => {});
       });
       hls.on(HlsConstructor.Events.ERROR, (_, data) => {
@@ -92,6 +95,7 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = url;
       video.addEventListener("error", onVideoError);
+      onSourceReady?.();
       video.play().catch(() => {});
     } else {
       onFatalError();
@@ -99,6 +103,7 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
   } else {
     video.src = url;
     video.addEventListener("error", onVideoError);
+    onSourceReady?.();
     stopDirectPlayback = startDirectPlaybackWithResume(video, startAt, {
       onSeekComplete,
     });

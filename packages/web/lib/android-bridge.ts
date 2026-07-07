@@ -79,8 +79,7 @@ export function stopNativePlayback(): void {
 export function updateNativeSubtitles(subtitleUrl?: string): boolean {
   const bridge = getAndroidBridge();
   if (typeof bridge?.setSubtitles !== "function") return false;
-  bridge.setSubtitles(subtitleUrl ?? "");
-  return true;
+  return bridge.setSubtitles(subtitleUrl ?? "") === true;
 }
 
 export function setNativeVideoDisplayMode(mode: NativeVideoDisplayMode): void {
@@ -141,7 +140,7 @@ declare global {
       resume: () => void;
       seekTo: (positionMs: number) => void;
       stop: () => void;
-      setSubtitles?: (subtitleUrl: string) => void;
+      setSubtitles?: (subtitleUrl: string) => boolean;
       setVideoDisplayMode?: (mode: NativeVideoDisplayMode) => void;
       syncPlaybackState?: () => void;
       setWebOverlayAlpha?: (alpha: number) => void;
