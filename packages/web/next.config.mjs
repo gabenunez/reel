@@ -1,6 +1,37 @@
 // Runtime API port for /api rewrites — must NOT use the ephemeral prerender port (18197).
 const runtimeApiPort = process.env.MEDIA_RUNTIME_API_PORT ?? "8097";
 
+function buildImageRemotePatterns() {
+  /** @type {import('next').NextConfig['images']['remotePatterns']} */
+  const patterns = [
+    {
+      protocol: "https",
+      hostname: "image.tmdb.org",
+      pathname: "/**",
+    },
+  ];
+
+  for (const value of [
+    process.env.NEXT_PUBLIC_API_URL,
+    process.env.MEDIA_INTERNAL_API_URL,
+  ]) {
+    if (!value) continue;
+    try {
+      const parsed = new URL(value);
+      patterns.push({
+        protocol: parsed.protocol.replace(":", ""),
+        hostname: parsed.hostname,
+        ...(parsed.port ? { port: parsed.port } : {}),
+        pathname: "/api/images/**",
+      });
+    } catch {
+      // ignore invalid env URLs
+    }
+  }
+
+  return patterns;
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
@@ -16,7 +47,9 @@ const nextConfig = {
     ];
   },
   images: {
-    unoptimized: true,
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 86_400,
+    remotePatterns: buildImageRemotePatterns(),
   },
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? "",

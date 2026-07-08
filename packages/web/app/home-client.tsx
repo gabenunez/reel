@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { useTvMode } from "@/lib/tv-mode";
 import { TvHomeView } from "@/components/tv/views/home-view";
 import { preloadPosterList, prefetchPosterNavigation } from "@/lib/prefetch-artwork";
+import { MediaImage } from "@/components/media-image";
 import type { HomeData } from "@/lib/server-api";
 
 export function HomeClient({
@@ -224,21 +225,20 @@ function HomeDesktopClient({ initialData = null }: { initialData?: HomeData | nu
                   <Skeleton className="absolute inset-0 rounded-none" />
                 )}
                 {loaded && featuredImage ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <MediaImage
                     src={featuredImage}
                     alt={featured?.title ?? ""}
-                    loading="eager"
-                    decoding="async"
-                    fetchPriority="high"
+                    fill
+                    priority
+                    sizes="100vw"
                     onLoad={handleFeaturedImageLoad}
-                    ref={(node) => {
+                    ref={(node: HTMLImageElement | null) => {
                       if (node?.complete && node.naturalWidth > 0) {
                         setFeaturedImageReady(true);
                       }
                     }}
                     className={cn(
-                      "absolute inset-0 h-full w-full object-cover transition-opacity duration-500",
+                      "object-cover transition-opacity duration-500",
                       featuredImageReady ? "opacity-100" : "opacity-0",
                     )}
                   />

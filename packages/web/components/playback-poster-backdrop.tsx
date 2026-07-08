@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { usePreloadedImage } from "@/lib/use-preloaded-image";
+import { MediaImage } from "@/components/media-image";
 
 interface PlaybackPosterBackdropProps {
   posterUrl: string | null;
@@ -22,14 +23,14 @@ export function PlaybackPosterBackdrop({
   if (!visible || !posterUrl) return null;
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <MediaImage
       src={posterUrl}
       alt=""
-      decoding="sync"
-      fetchPriority="high"
+      fill
+      priority
+      sizes="100vw"
       className={cn(
-        "pointer-events-none absolute inset-0 z-[1] h-full w-full object-contain transition-opacity duration-150",
+        "pointer-events-none z-[1] object-contain transition-opacity duration-150",
         transparentBackground ? "bg-transparent" : "bg-black",
         ready ? "opacity-100" : "opacity-0",
         className,

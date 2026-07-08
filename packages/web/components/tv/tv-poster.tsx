@@ -10,6 +10,7 @@ import { prefetchPosterNavigation } from "@/lib/prefetch-artwork";
 import { cn } from "@/lib/utils";
 import { Clapperboard, Tv } from "lucide-react";
 import { isTvClient } from "@/lib/tv-mode-detect";
+import { MediaImage } from "@/components/media-image";
 
 interface TvPosterProps {
   item: MediaItem;
@@ -57,14 +58,13 @@ export const TvPoster = memo(function TvPoster({
       >
         <div className="tv-poster-art poster-shadow relative aspect-[2/3] overflow-hidden rounded-lg bg-muted">
           {imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <MediaImage
               src={imageUrl}
               alt=""
-              loading={loadImmediately ? "eager" : "lazy"}
-              decoding="async"
-              {...(loadImmediately ? { fetchPriority: "high" as const } : {})}
-              className="h-full w-full object-cover"
+              fill
+              priority={loadImmediately}
+              sizes="8rem"
+              className="object-cover"
             />
           ) : (
             <div className="signal-grid flex h-full flex-col items-center justify-center gap-2 p-3 text-center text-sm text-muted-foreground">

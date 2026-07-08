@@ -17,6 +17,7 @@ import { resolveNextEpisodeTarget } from "@/lib/playback-utils";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { focusEpisodeItem, focusFirstContentItem } from "@/lib/tv-focus";
 import { cn } from "@/lib/utils";
+import { MediaImage } from "@/components/media-image";
 import type { MediaItem } from "@/lib/api";
 import type { MediaDetail } from "@/app/media/types";
 import { useMediaPageData } from "@/lib/use-media-page-data";
@@ -167,13 +168,13 @@ function TvMediaViewContent({
       <section className="relative mb-5 overflow-hidden">
         <div className="relative h-[30vh] min-h-[220px] max-h-[320px] tv-media-hero">
           {backdropUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <MediaImage
               src={backdropUrl}
               alt=""
-              loading="eager"
-              decoding="async"
-              className="absolute inset-0 h-full w-full object-cover"
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover"
             />
           ) : (
             <div className="signal-grid absolute inset-0" />
@@ -189,12 +190,13 @@ function TvMediaViewContent({
           <div className="flex gap-4 sm:gap-5">
             <div className="w-[6.5rem] shrink-0 sm:w-28">
               {posterUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <MediaImage
                   src={posterUrl}
                   alt=""
-                  loading="eager"
-                  decoding="async"
+                  width={112}
+                  height={168}
+                  priority
+                  sizes="7rem"
                   className="aspect-[2/3] w-full rounded-md poster-shadow"
                 />
               ) : (
@@ -305,13 +307,13 @@ function TvMediaViewContent({
                 >
                   <div className="relative h-[3.75rem] w-[6.75rem] shrink-0 overflow-hidden rounded-md bg-muted">
                     {ep.stillPath ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={tvImageUrl(ep.stillPath) ?? ""}
+                      <MediaImage
+                        src={tvImageUrl(ep.stillPath)}
                         alt=""
-                        loading="eager"
-                        decoding="async"
-                        className="h-full w-full object-cover"
+                        fill
+                        priority
+                        sizes="6.75rem"
+                        className="object-cover"
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center font-mono text-base font-bold text-muted-foreground">

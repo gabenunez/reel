@@ -10,11 +10,11 @@
     "test": "vitest run --config vitest.config.mts"
   },
   "dependencies": {
+    "@media-app/shared": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-scroll-area": "^1.2.2",
     "@radix-ui/react-slot": "^1.1.1",
     "@radix-ui/react-tabs": "^1.1.2",
-    "@media-app/shared": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "hls.js": "^1.5.18",
@@ -23,6 +23,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-markdown": "^10.1.0",
+    "sharp": "^0.35.3",
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
@@ -30,10 +31,10 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.20",
+    "happy-dom": "^20.0.10",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
-    "happy-dom": "^20.0.10",
     "vitest": "^3.2.4"
   }
 }

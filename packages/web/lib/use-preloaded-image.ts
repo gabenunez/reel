@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { nextOptimizedImageUrl } from "@/lib/next-image-url";
 
 /** Preload a poster/artwork URL so it is decoded before first paint in playback. */
-export function usePreloadedImage(url: string | null | undefined): boolean {
+export function usePreloadedImage(
+  url: string | null | undefined,
+  width = 1280,
+): boolean {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -19,7 +23,7 @@ export function usePreloadedImage(url: string | null | undefined): boolean {
     const finish = () => setReady(true);
     img.onload = finish;
     img.onerror = finish;
-    img.src = url;
+    img.src = nextOptimizedImageUrl(url, width);
 
     if (img.complete && img.naturalWidth > 0) {
       finish();
@@ -29,7 +33,7 @@ export function usePreloadedImage(url: string | null | undefined): boolean {
       img.onload = null;
       img.onerror = null;
     };
-  }, [url]);
+  }, [url, width]);
 
   return ready;
 }

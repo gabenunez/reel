@@ -1,18 +1,24 @@
 import { api, type MediaItem } from "@/lib/api";
+import { nextOptimizedImageUrl } from "@/lib/next-image-url";
 import { prefetchMediaPage } from "@/lib/use-media-page-data";
 
 const inflight = new Set<string>();
 
 /** Warm the browser image cache for a poster/backdrop URL (deduped). */
-export function preloadImageUrl(url: string | null | undefined): void {
-  if (!url || inflight.has(url)) return;
-  inflight.add(url);
+export function preloadImageUrl(
+  url: string | null | undefined,
+  width = 384,
+): void {
+  if (!url) return;
+  const optimized = nextOptimizedImageUrl(url, width);
+  if (inflight.has(optimized)) return;
+  inflight.add(optimized);
   const img = new Image();
   img.decoding = "async";
-  const done = () => inflight.delete(url);
+  const done = () => inflight.delete(optimized);
   img.onload = done;
   img.onerror = done;
-  img.src = url;
+  img.src = optimized;
 }
 
 type PosterLike = Pick<MediaItem, "id" | "posterPath" | "backdropPath">;

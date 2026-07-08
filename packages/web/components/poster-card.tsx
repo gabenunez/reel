@@ -7,6 +7,7 @@ import { api, type MediaItem } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { prefetchPosterNavigation } from "@/lib/prefetch-artwork";
 import { cn } from "@/lib/utils";
+import { MediaImage } from "@/components/media-image";
 
 interface PosterCardProps {
   item: MediaItem;
@@ -46,15 +47,13 @@ export const PosterCard = memo(function PosterCard({
       <div className="poster-shadow relative aspect-[2/3] overflow-hidden rounded-md border border-white/10 bg-muted transition-transform duration-300 will-change-transform group-hover:-translate-y-1 group-hover:scale-[1.025]">
         <div className="absolute inset-y-0 left-0 z-10 w-1 bg-primary/0 transition-colors group-hover:bg-primary" />
         {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <MediaImage
             src={imageUrl}
             alt={item.title}
-            loading={loadImmediately ? "eager" : "lazy"}
-            decoding="async"
-            {...(loadImmediately ? { fetchPriority: "high" as const } : {})}
             width={342}
             height={513}
+            priority={loadImmediately}
+            sizes="(max-width: 640px) 33vw, (max-width: 1024px) 25vw, 342px"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (

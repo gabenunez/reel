@@ -8,6 +8,7 @@ import { routes } from "@/lib/routes";
 import { Button } from "@/components/ui/button";
 import { formatDuration, getPlaybackButtonLabel } from "@/lib/utils";
 import { resolveActiveSeasonIndex } from "@/lib/playback-utils";
+import { MediaImage } from "@/components/media-image";
 import type { MediaDetail } from "./types";
 
 export function MediaDesktopSeasons({ media }: { media: MediaDetail }) {
@@ -54,11 +55,12 @@ export function MediaDesktopSeasons({ media }: { media: MediaDetail }) {
               <div className="absolute inset-y-0 left-0 w-1 bg-primary/0 transition-colors group-hover:bg-primary" />
               <div className="relative flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
                 {ep.stillPath ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={api.imageUrl(ep.stillPath) ?? ""}
+                  <MediaImage
+                    src={api.imageUrl(ep.stillPath)}
                     alt=""
-                    className="h-full w-full object-cover"
+                    fill
+                    sizes="7rem"
+                    className="object-cover"
                   />
                 ) : (
                   <span className="font-mono text-2xl font-bold text-muted-foreground">

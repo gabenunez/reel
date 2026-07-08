@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Clapperboard, Film, Loader2, Search, Tv, X } from "lucide-react";
 import { api, type MediaItem } from "@/lib/api";
+import { MediaImage } from "@/components/media-image";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { useMediaSearch } from "@/lib/use-media-search";
@@ -243,12 +244,12 @@ function SearchResultPoster({ item }: { item: MediaItem }) {
   return (
     <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded border border-white/10 bg-muted">
       {imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <MediaImage
           src={imageUrl}
           alt=""
-          loading="lazy"
-          decoding="async"
+          width={40}
+          height={56}
+          sizes="40px"
           className="h-full w-full object-cover"
         />
       ) : (

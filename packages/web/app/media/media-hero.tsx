@@ -8,6 +8,7 @@ import { FavoriteButton } from "@/components/favorite-button";
 import { ThemeMusicWaveform } from "@/components/theme-music-player";
 import { formatDuration, getPlaybackButtonLabel } from "@/lib/utils";
 import { mediaImageUrl } from "@/lib/media-image-url";
+import { MediaImage } from "@/components/media-image";
 import type { MediaDetail } from "./types";
 
 export function MediaHero({ media }: { media: MediaDetail }) {
@@ -24,14 +25,13 @@ export function MediaHero({ media }: { media: MediaDetail }) {
   return (
     <section className="relative overflow-hidden border-b border-border/70">
       {backdropUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <MediaImage
           src={backdropUrl}
           alt=""
-          loading="eager"
-          decoding="async"
-          fetchPriority="high"
-          className="absolute inset-0 h-full w-full object-cover"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
         />
       )}
       {!backdropUrl && <div className="signal-grid absolute inset-0" />}
@@ -51,13 +51,13 @@ export function MediaHero({ media }: { media: MediaDetail }) {
         <div className="grid gap-7 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-end">
           <div className="w-36 sm:w-48">
             {posterUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <MediaImage
                 src={posterUrl}
                 alt={media.title}
-                loading="eager"
-                decoding="async"
-                fetchPriority="high"
+                width={192}
+                height={288}
+                priority
+                sizes="192px"
                 className="w-full rounded-md border border-white/10 poster-shadow"
               />
             ) : (
