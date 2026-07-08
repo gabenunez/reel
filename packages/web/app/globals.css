@@ -403,6 +403,12 @@
   .home-hero-title {
     position: relative;
     z-index: 1;
+    opacity: 0;
+    transition: opacity 150ms ease;
+  }
+
+  html.hero-fonts-ready .home-hero-title {
+    opacity: 1;
   }
 
   .home-hero-title-ghost {
@@ -583,6 +589,11 @@
     .home-hero-title-bang,
     .home-hero-telem-bar {
       animation: none;
+    }
+
+    .home-hero-title {
+      opacity: 1;
+      transition: none;
     }
 
     .home-hero-monitor {

@@ -12,9 +12,17 @@ interface MediaRowProps {
   items: MediaItem[];
   href?: string;
   hideHeader?: boolean;
+  /** How many leading posters get `priority` preload (default 8). */
+  priorityLimit?: number;
 }
 
-export function MediaRow({ title, items, href, hideHeader = false }: MediaRowProps) {
+export function MediaRow({
+  title,
+  items,
+  href,
+  hideHeader = false,
+  priorityLimit = 8,
+}: MediaRowProps) {
   if (!items.length) return null;
 
   return (
@@ -40,7 +48,7 @@ export function MediaRow({ title, items, href, hideHeader = false }: MediaRowPro
           <PosterCard
             key={item.id}
             item={item}
-            priority={index < 8}
+            priority={index < priorityLimit}
             className="w-36 shrink-0 snap-start sm:w-44"
           />
         ))}
@@ -52,9 +60,15 @@ export function MediaRow({ title, items, href, hideHeader = false }: MediaRowPro
 interface ContinueWatchingRowProps {
   items: ContinueWatchingItem[];
   hideHeader?: boolean;
+  /** How many leading posters get `priority` preload (default 6). */
+  priorityLimit?: number;
 }
 
-export function ContinueWatchingRow({ items, hideHeader = false }: ContinueWatchingRowProps) {
+export function ContinueWatchingRow({
+  items,
+  hideHeader = false,
+  priorityLimit = 6,
+}: ContinueWatchingRowProps) {
   if (!items.length) return null;
 
   return (
@@ -69,7 +83,7 @@ export function ContinueWatchingRow({ items, hideHeader = false }: ContinueWatch
         {items.map((item, index) => (
           <div key={item.id} className="w-44 shrink-0 snap-start sm:w-56">
             <PosterCard
-              priority={index < 6}
+              priority={index < priorityLimit}
               href={
                 item.itemType === "movie"
                   ? routes.watch("movie", item.itemId, item.mediaId)

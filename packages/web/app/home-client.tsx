@@ -307,7 +307,7 @@ function HomeDesktopClient({ initialData = null }: { initialData?: HomeData | nu
           {!loaded ? (
             <PosterRowSkeleton wide />
           ) : (
-            <ContinueWatchingRow items={continueWatching} hideHeader />
+            <ContinueWatchingRow items={continueWatching} hideHeader priorityLimit={2} />
           )}
         </section>
       )}
@@ -318,7 +318,7 @@ function HomeDesktopClient({ initialData = null }: { initialData?: HomeData | nu
           {!loaded ? (
             <PosterRowSkeleton />
           ) : (
-            <MediaRow title="Favorites" items={favorites} hideHeader />
+            <MediaRow title="Favorites" items={favorites} hideHeader priorityLimit={3} />
           )}
         </section>
       )}
@@ -331,7 +331,7 @@ function HomeDesktopClient({ initialData = null }: { initialData?: HomeData | nu
         {!loaded ? (
           <PosterRowSkeleton />
         ) : (
-          <MediaRow title="Recently Added" items={recentlyAdded} hideHeader />
+          <MediaRow title="Recently Added" items={recentlyAdded} hideHeader priorityLimit={3} />
         )}
       </section>
 
