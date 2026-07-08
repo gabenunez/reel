@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.101 — 2026-07-07
+
+### Fix
+
+- **Media pages** — remove `loading.tsx` from static ISR routes so prerendered hero HTML is visible immediately instead of a Suspense skeleton shell that waits for client hydration
+- **Build** — verify pre-rendered media HTML includes hero markup and warn when loading shells leak into static output
+
 ## 0.1.100 — 2026-07-07
 
 ### Performance
