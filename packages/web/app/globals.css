@@ -68,6 +68,10 @@
   html.tv-mode [data-web-only] {
     display: none !important;
   }
+
+  html:not(.tv-mode) [data-tv-only] {
+    display: none !important;
+  }
 }
 
 @layer utilities {

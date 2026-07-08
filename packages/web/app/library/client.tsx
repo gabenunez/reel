@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLibraryRouteContext } from "@/lib/use-route-params";
 import { useIsClient } from "@/lib/use-browser-pathname";
 import { api, type MediaItem } from "@/lib/api";
+import type { PaginatedPageData } from "@/lib/server-api";
 import { PosterCard } from "@/components/poster-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -13,21 +14,44 @@ import { useDocumentTitle } from "@/lib/use-document-title";
 import { useTvMode } from "@/lib/tv-mode";
 import { TvLibraryView } from "@/components/tv/views/library-view";
 
-export function LibraryClient() {
+type LibraryInitialList = {
+  kind: "library" | "deck";
+  id: number;
+  page: PaginatedPageData<MediaItem> | null;
+  title?: string;
+  subtitle?: string;
+};
+
+export function LibraryClient({
+  initialList = null,
+}: {
+  initialList?: LibraryInitialList | null;
+}) {
   const isTvMode = useTvMode();
   if (isTvMode) return <TvLibraryView />;
-  return <LibraryDesktopClient />;
+  return <LibraryDesktopClient initialList={initialList} />;
 }
 
-function LibraryDesktopClient() {
+function LibraryDesktopClient({
+  initialList = null,
+}: {
+  initialList?: LibraryInitialList | null;
+}) {
   const isClient = useIsClient();
   const { libraryId, deckId } = useLibraryRouteContext();
-  const [items, setItems] = useState<MediaItem[]>([]);
+  const seed =
+    initialList &&
+    ((initialList.kind === "library" && initialList.id === libraryId) ||
+      (initialList.kind === "deck" && initialList.id === deckId))
+      ? initialList
+      : null;
+
+  const [items, setItems] = useState(seed?.page?.items ?? []);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [title, setTitle] = useState("Browse Titles");
-  const [subtitle, setSubtitle] = useState("Library deck");
+  const [totalPages, setTotalPages] = useState(seed?.page?.totalPages ?? 1);
+  const [loading, setLoading] = useState(!seed?.page);
+  const [title, setTitle] = useState(seed?.title ?? "Browse Titles");
+  const [subtitle, setSubtitle] = useState(seed?.subtitle ?? "Library deck");
 
   const isDeck = !Number.isNaN(deckId) && deckId > 0;
   const isLibrary = !Number.isNaN(libraryId) && libraryId > 0;
@@ -40,6 +64,15 @@ function LibraryDesktopClient() {
 
   useEffect(() => {
     if (!isDeck && !isLibrary) return;
+
+    if (page === 1 && seed?.page) {
+      setItems(seed.page.items);
+      setTotalPages(seed.page.totalPages);
+      if (seed.title) setTitle(seed.title);
+      if (seed.subtitle) setSubtitle(seed.subtitle);
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
 
@@ -75,7 +108,7 @@ function LibraryDesktopClient() {
       })
       .catch((err) => console.warn("Failed to load library items", err))
       .finally(() => setLoading(false));
-  }, [libraryId, deckId, page, isDeck, isLibrary]);
+  }, [libraryId, deckId, page, isDeck, isLibrary, seed]);
 
   if (!isDeck && !isLibrary) {
     if (!isClient) {

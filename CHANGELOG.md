@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.100 — 2026-07-07
+
+### Performance
+
+- **App** — adopt Next.js App Router best practices: server-fetched home and list pages with ISR (`revalidate` 1 min), route-level `loading.tsx` for instant `<Link>` navigation, and shared server API helpers
+- **Media pages** — async RSC page with `loading.tsx`, server hero, Suspense-streamed related titles, and ISR caching (no client skeletons or hard navigation)
+
+### Fix
+
+- **Media pages** — show sign-in prompt instead of a blank page when SSR cannot read a password-protected library; fix internal API auth for related titles and other SSR paths
+- **Search** — wrap `useSearchParams` in Suspense to avoid client rendering bailout
+- **Middleware** — redirect legacy `/favorites/?type=` query URLs to canonical paths
+
+### UI
+
+- **App** — global `error.tsx` recovery UI; route metadata titles on home, library, favorites, settings, and other main routes
+
 ## 0.1.99 — 2026-07-07
 
 ### Fix

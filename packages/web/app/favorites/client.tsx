@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useFavoritesRouteFilter } from "@/lib/use-route-params";
 import { api, type MediaItem } from "@/lib/api";
+import type { PaginatedPageData } from "@/lib/server-api";
 import { routes } from "@/lib/routes";
 import { PosterCard } from "@/components/poster-card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,20 +16,28 @@ import { TvFavoritesView } from "@/components/tv/views/favorites-view";
 
 type FavoriteFilter = "all" | "movie" | "tv";
 
-export function FavoritesClient() {
+export function FavoritesClient({
+  initialPage = null,
+}: {
+  initialPage?: PaginatedPageData<MediaItem> | null;
+}) {
   const isTvMode = useTvMode();
   if (isTvMode) return <TvFavoritesView />;
-  return <FavoritesDesktopClient />;
+  return <FavoritesDesktopClient initialPage={initialPage} />;
 }
 
-function FavoritesDesktopClient() {
+function FavoritesDesktopClient({
+  initialPage = null,
+}: {
+  initialPage?: PaginatedPageData<MediaItem> | null;
+}) {
   const filterParam = useFavoritesRouteFilter();
   const filter: FavoriteFilter = filterParam;
 
-  const [items, setItems] = useState<MediaItem[]>([]);
+  const [items, setItems] = useState(initialPage?.items ?? []);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [totalPages, setTotalPages] = useState(initialPage?.totalPages ?? 1);
+  const [loading, setLoading] = useState(!initialPage);
 
   useDocumentTitle("Favorites");
 
@@ -37,6 +46,13 @@ function FavoritesDesktopClient() {
   }, [filter]);
 
   useEffect(() => {
+    if (page === 1 && initialPage) {
+      setItems(initialPage.items);
+      setTotalPages(initialPage.totalPages);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     api
       .getFavorites(page, filter === "all" ? undefined : filter)
@@ -46,7 +62,7 @@ function FavoritesDesktopClient() {
       })
       .catch((err) => console.warn("Failed to load favorites", err))
       .finally(() => setLoading(false));
-  }, [page, filter]);
+  }, [page, filter, initialPage]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">

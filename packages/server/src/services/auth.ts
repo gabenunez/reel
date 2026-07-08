@@ -234,18 +234,37 @@ export class AuthService {
 const INTERNAL_API_HEADER = "x-media-internal";
 const INTERNAL_API_TOKEN = "next-isr";
 
-export function isInternalMediaApiPath(pathname: string): boolean {
-  return (
+/** Read-only API paths Next.js may fetch during SSR/ISR (localhost or internal header). */
+export function isInternalNextApiPath(pathname: string): boolean {
+  if (
     pathname === "/api/media/ids" ||
-    /^\/api\/media\/\d+$/.test(pathname)
+    pathname === "/api/home" ||
+    pathname === "/api/libraries" ||
+    pathname === "/api/decks" ||
+    pathname === "/api/favorites" ||
+    pathname === "/api/continue-watching" ||
+    pathname === "/api/recent"
+  ) {
+    return true;
+  }
+
+  return (
+    /^\/api\/media\/\d+(?:\/related)?$/.test(pathname) ||
+    /^\/api\/libraries\/\d+\/items$/.test(pathname) ||
+    /^\/api\/decks\/\d+(?:\/items)?$/.test(pathname)
   );
+}
+
+/** @deprecated Use isInternalNextApiPath */
+export function isInternalMediaApiPath(pathname: string): boolean {
+  return isInternalNextApiPath(pathname);
 }
 
 export function isInternalMediaApiRequest(
   pathname: string,
   headers: Record<string, string | string[] | undefined>,
 ): boolean {
-  if (!isInternalMediaApiPath(pathname)) return false;
+  if (!isInternalNextApiPath(pathname)) return false;
   const token = headers[INTERNAL_API_HEADER] ?? headers[INTERNAL_API_HEADER.toLowerCase()];
   const value = Array.isArray(token) ? token[0] : token;
   return value === INTERNAL_API_TOKEN;

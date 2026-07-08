@@ -1,21 +1,15 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { LibraryClient } from "../library/client";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PosterGridLoadingSkeleton } from "@/lib/route-loading";
+
+export const metadata: Metadata = {
+  title: "Decks",
+};
 
 export default function DeckPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="mx-auto max-w-7xl px-6 py-10">
-          <Skeleton className="mb-8 h-10 w-48" />
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[2/3] rounded-md" />
-            ))}
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<PosterGridLoadingSkeleton />}>
       <LibraryClient />
     </Suspense>
   );

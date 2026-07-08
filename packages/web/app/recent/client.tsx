@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type MediaItem } from "@/lib/api";
+import type { PaginatedPageData } from "@/lib/server-api";
 import { PosterCard } from "@/components/poster-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -11,21 +12,36 @@ import { useDocumentTitle } from "@/lib/use-document-title";
 import { useTvMode } from "@/lib/tv-mode";
 import { TvRecentView } from "@/components/tv/views/recent-view";
 
-export function RecentClient() {
+export function RecentClient({
+  initialPage = null,
+}: {
+  initialPage?: PaginatedPageData<MediaItem> | null;
+}) {
   const isTvMode = useTvMode();
   if (isTvMode) return <TvRecentView />;
-  return <RecentDesktopClient />;
+  return <RecentDesktopClient initialPage={initialPage} />;
 }
 
-function RecentDesktopClient() {
-  const [items, setItems] = useState<MediaItem[]>([]);
+function RecentDesktopClient({
+  initialPage = null,
+}: {
+  initialPage?: PaginatedPageData<MediaItem> | null;
+}) {
+  const [items, setItems] = useState(initialPage?.items ?? []);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [totalPages, setTotalPages] = useState(initialPage?.totalPages ?? 1);
+  const [loading, setLoading] = useState(!initialPage);
 
   useDocumentTitle("Recently Added");
 
   useEffect(() => {
+    if (page === 1 && initialPage) {
+      setItems(initialPage.items);
+      setTotalPages(initialPage.totalPages);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     api
       .getRecentlyAdded(page)
@@ -35,7 +51,7 @@ function RecentDesktopClient() {
       })
       .catch((err) => console.warn("Failed to load recently added", err))
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [page, initialPage]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">

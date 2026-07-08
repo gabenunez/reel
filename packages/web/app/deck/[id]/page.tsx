@@ -1,24 +1,60 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { LibraryClient } from "../../library/client";
-import { Skeleton } from "@/components/ui/skeleton";
+import { fetchDeck, fetchDeckItems } from "@/lib/server-api";
+import { PosterGridLoadingSkeleton } from "@/lib/route-loading";
 
-function DeckPageSkeleton() {
-  return (
-    <div className="mx-auto max-w-7xl px-6 py-10">
-      <Skeleton className="mb-8 h-10 w-48" />
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <Skeleton key={i} className="aspect-[2/3] rounded-md" />
-        ))}
-      </div>
-    </div>
-  );
-}
+export const revalidate = 60;
 
-export default function DeckDetailPage() {
+export const metadata: Metadata = {
+  title: "Deck",
+};
+
+export default async function DeckDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const deckId = parseInt(id, 10);
+  if (!Number.isFinite(deckId)) {
+    return (
+      <Suspense fallback={<PosterGridLoadingSkeleton />}>
+        <LibraryClient />
+      </Suspense>
+    );
+  }
+
+  const [{ data: deck }, { data: items }] = await Promise.all([
+    fetchDeck(deckId),
+    fetchDeckItems(deckId, 1),
+  ]);
+
+  const deckRecord = deck as {
+    name?: string;
+    paths?: string[];
+    libraryNames?: string[];
+  } | null;
+
   return (
-    <Suspense fallback={<DeckPageSkeleton />}>
-      <LibraryClient />
+    <Suspense fallback={<PosterGridLoadingSkeleton />}>
+      <LibraryClient
+        initialList={
+          items
+            ? {
+                kind: "deck",
+                id: deckId,
+                page: items,
+                title: deckRecord?.name ?? "Deck",
+                subtitle: deckRecord
+                  ? `${deckRecord.paths?.length ?? 0} folder${
+                      (deckRecord.paths?.length ?? 0) === 1 ? "" : "s"
+                    } / ${deckRecord.libraryNames?.join(", ") || "Custom deck"}`
+                  : "Custom deck",
+              }
+            : null
+        }
+      />
     </Suspense>
   );
 }

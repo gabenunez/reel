@@ -1,22 +1,20 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { RecentClient } from "./client";
-import { Skeleton } from "@/components/ui/skeleton";
+import { fetchRecentlyAdded } from "@/lib/server-api";
+import { PosterGridLoadingSkeleton } from "@/lib/route-loading";
 
-export default function RecentPage() {
+export const revalidate = 60;
+
+export const metadata: Metadata = {
+  title: "Recently Added",
+};
+
+export default async function RecentPage() {
+  const { data: initialPage } = await fetchRecentlyAdded(1);
   return (
-    <Suspense
-      fallback={
-        <div className="mx-auto max-w-7xl px-6 py-10">
-          <Skeleton className="mb-8 h-10 w-56" />
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[2/3] rounded-md" />
-            ))}
-          </div>
-        </div>
-      }
-    >
-      <RecentClient />
+    <Suspense fallback={<PosterGridLoadingSkeleton />}>
+      <RecentClient initialPage={initialPage} />
     </Suspense>
   );
 }

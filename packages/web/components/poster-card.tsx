@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { memo } from "react";
+import Link from "next/link";
 import { Clapperboard, Play, Tv } from "lucide-react";
 import { api, type MediaItem } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
-import { prefetchMediaPage } from "@/lib/use-media-page-data";
 
 interface PosterCardProps {
   item: MediaItem;
@@ -25,15 +24,12 @@ export const PosterCard = memo(function PosterCard({
 }: PosterCardProps) {
   const imageUrl = api.imageUrl(item.posterPath);
   const targetHref = href ?? routes.media(item.id);
-  const prefetch = () => prefetchMediaPage(item.id);
 
   return (
     <Link
       href={targetHref}
       className={cn("group block", className)}
       aria-label={item.title}
-      onMouseEnter={prefetch}
-      onFocus={prefetch}
     >
       <div className="poster-shadow relative aspect-[2/3] overflow-hidden rounded-md border border-white/10 bg-muted transition-transform duration-300 will-change-transform group-hover:-translate-y-1 group-hover:scale-[1.025]">
         <div className="absolute inset-y-0 left-0 z-10 w-1 bg-primary/0 transition-colors group-hover:bg-primary" />

@@ -4,12 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useMediaRouteId } from "@/lib/use-route-params";
 import { useIsClient } from "@/lib/use-browser-pathname";
 import { Loader2, Play } from "lucide-react";
-import { api } from "@/lib/api";
 import { tvImageUrl } from "@/lib/tv-image";
 import { routes } from "@/lib/routes";
 import { TvFocusButton, TvFocusLink } from "@/components/tv/tv-focus-link";
 import { TvFavoriteButton } from "@/components/tv/tv-favorite-button";
-import { TvPageHeader, TvSectionLabel } from "@/components/tv/tv-page-header";
+import { TvSectionLabel } from "@/components/tv/tv-page-header";
 import { TvPoster } from "@/components/tv/tv-poster";
 import { TvRow, tvScrollRowClassName } from "@/components/tv/tv-row";
 import { ThemeMusicProvider, ThemeMusicWaveform } from "@/components/theme-music-player";
@@ -18,47 +17,23 @@ import { resolveNextEpisodeTarget } from "@/lib/playback-utils";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { focusEpisodeItem, focusFirstContentItem } from "@/lib/tv-focus";
 import { cn } from "@/lib/utils";
+import type { MediaItem } from "@/lib/api";
+import type { MediaDetail } from "@/app/media/types";
 import { useMediaPageData } from "@/lib/use-media-page-data";
 
-interface Episode {
-  id: number;
-  episodeNumber: number;
-  title?: string | null;
-  overview?: string | null;
-  durationMs?: number | null;
-  stillPath?: string | null;
-  watchProgress?: { positionMs: number; durationMs?: number | null } | null;
-}
-
-interface Season {
-  id: number;
-  seasonNumber: number;
-  name?: string | null;
-  episodes: Episode[];
-}
-
-interface MediaDetail {
-  id: number;
-  title: string;
-  overview?: string | null;
-  year?: number | null;
-  posterPath?: string | null;
-  backdropPath?: string | null;
-  type: "movie" | "tv";
-  isFavorite?: boolean;
-  hasThemeMusic?: boolean;
-  watchProgress?: { positionMs: number; durationMs?: number | null } | null;
-  files?: Array<{ id: number; durationMs?: number | null }>;
-  seasons?: Season[];
-}
-
 export function TvMediaView({
+  media: mediaProp,
   mediaId: mediaIdProp,
   initialMedia,
 }: {
+  media?: MediaDetail;
   mediaId?: number;
   initialMedia?: Record<string, unknown>;
 } = {}) {
+  if (mediaProp) {
+    return <TvMediaViewContent media={mediaProp} serverShell />;
+  }
+
   const hasResolvedId = mediaIdProp != null && Number.isFinite(mediaIdProp);
   if (!hasResolvedId) {
     return <TvMediaViewLegacy />;
@@ -111,19 +86,46 @@ function TvMediaViewResolved({
   mediaId: number;
   initialMedia?: Record<string, unknown>;
 }) {
-  const { media: mediaRecord, related, loading } = useMediaPageData(mediaId, initialMedia);
+  const { media: mediaRecord, related } = useMediaPageData(mediaId, initialMedia);
   const media = (mediaRecord ?? initialMedia) as unknown as MediaDetail | null;
+
+  if (!media) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Loader2 className="h-9 w-9 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <TvMediaViewContent
+      media={media}
+      related={related}
+      includeDocumentTitle
+      includeTheme
+    />
+  );
+}
+
+function TvMediaViewContent({
+  media,
+  related = [],
+  serverShell = false,
+  includeDocumentTitle = false,
+  includeTheme = false,
+}: {
+  media: MediaDetail;
+  related?: MediaItem[];
+  serverShell?: boolean;
+  includeDocumentTitle?: boolean;
+  includeTheme?: boolean;
+}) {
   const [selectedSeason, setSelectedSeason] = useState(0);
   const nextEpisodeIdRef = useRef<number | null>(null);
 
-  useDocumentTitle(media?.title ?? null);
+  useDocumentTitle(includeDocumentTitle ? media.title : null);
 
   useEffect(() => {
-    if (!media) {
-      setSelectedSeason(0);
-      nextEpisodeIdRef.current = null;
-      return;
-    }
     if (media.type === "tv" && media.seasons?.length) {
       const target = resolveNextEpisodeTarget(media.seasons);
       setSelectedSeason(target?.seasonIndex ?? 0);
@@ -135,8 +137,6 @@ function TvMediaViewResolved({
   }, [media]);
 
   useEffect(() => {
-    if (loading || !media) return;
-
     requestAnimationFrame(() => {
       const nextEpisodeId = nextEpisodeIdRef.current;
       if (media.type === "tv" && nextEpisodeId != null && focusEpisodeItem(nextEpisodeId)) {
@@ -144,31 +144,8 @@ function TvMediaViewResolved({
       }
       focusFirstContentItem();
     });
-  }, [loading, media]);
+  }, [media]);
 
-  if (loading && !media && !initialMedia) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 className="h-9 w-9 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!media) {
-    return (
-      <div className="px-6 py-16 text-center">
-        <p className="mb-4 text-muted-foreground">Not found</p>
-        <div data-tv-row="" data-tv-content-row="" className="flex justify-center">
-          <TvFocusLink
-            href={routes.home()}
-            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
-          >
-            Back to home
-          </TvFocusLink>
-        </div>
-      </div>
-    );
-  }
   const backdropUrl = tvImageUrl(media.backdropPath ?? media.posterPath);
   const posterUrl = tvImageUrl(media.posterPath);
   const seasons = media.seasons ?? [];
@@ -182,10 +159,11 @@ function TvMediaViewResolved({
     : "Play";
   const typeLabel = media.type === "movie" ? "Movie" : "Series";
   const metaLabel = [typeLabel, media.year].filter(Boolean).join(" · ");
+  const showRelated = !serverShell && related.length > 0;
+  const showThemeWaveform = media.hasThemeMusic && (includeTheme || serverShell);
 
   const page = (
     <div className="pb-6">
-      {/* Hero — compact cinematic strip, not a full desktop detail page */}
       <section className="relative mb-5 overflow-hidden">
         <div className="relative h-[30vh] min-h-[220px] max-h-[320px] tv-media-hero">
           {backdropUrl ? (
@@ -202,7 +180,7 @@ function TvMediaViewResolved({
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/20" />
           <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/50 to-transparent" />
-          {media.hasThemeMusic && (
+          {showThemeWaveform && (
             <ThemeMusicWaveform className="absolute inset-x-0 bottom-0 h-20 w-full [mask-image:linear-gradient(to_top,black_15%,transparent)]" />
           )}
         </div>
@@ -373,7 +351,7 @@ function TvMediaViewResolved({
         </section>
       )}
 
-      {related.length > 0 && (
+      {showRelated && (
         <TvRow
           title={
             media.type === "movie"
@@ -390,9 +368,9 @@ function TvMediaViewResolved({
     </div>
   );
 
-  return media.hasThemeMusic ? (
-    <ThemeMusicProvider mediaId={media.id}>{page}</ThemeMusicProvider>
-  ) : (
-    page
-  );
+  if (includeTheme && media.hasThemeMusic) {
+    return <ThemeMusicProvider mediaId={media.id}>{page}</ThemeMusicProvider>;
+  }
+
+  return page;
 }

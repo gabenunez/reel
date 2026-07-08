@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type ContinueWatchingItem } from "@/lib/api";
+import type { PaginatedPageData } from "@/lib/server-api";
 import { routes } from "@/lib/routes";
 import { PosterCard } from "@/components/poster-card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,21 +13,36 @@ import { useDocumentTitle } from "@/lib/use-document-title";
 import { useTvMode } from "@/lib/tv-mode";
 import { TvContinueView } from "@/components/tv/views/continue-view";
 
-export function ContinueWatchingClient() {
+export function ContinueWatchingClient({
+  initialPage = null,
+}: {
+  initialPage?: PaginatedPageData<ContinueWatchingItem> | null;
+}) {
   const isTvMode = useTvMode();
   if (isTvMode) return <TvContinueView />;
-  return <ContinueWatchingDesktopClient />;
+  return <ContinueWatchingDesktopClient initialPage={initialPage} />;
 }
 
-function ContinueWatchingDesktopClient() {
-  const [items, setItems] = useState<ContinueWatchingItem[]>([]);
+function ContinueWatchingDesktopClient({
+  initialPage = null,
+}: {
+  initialPage?: PaginatedPageData<ContinueWatchingItem> | null;
+}) {
+  const [items, setItems] = useState(initialPage?.items ?? []);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [totalPages, setTotalPages] = useState(initialPage?.totalPages ?? 1);
+  const [loading, setLoading] = useState(!initialPage);
 
   useDocumentTitle("Continue Watching");
 
   useEffect(() => {
+    if (page === 1 && initialPage) {
+      setItems(initialPage.items);
+      setTotalPages(initialPage.totalPages);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     api
       .getContinueWatching(page)
@@ -36,7 +52,7 @@ function ContinueWatchingDesktopClient() {
       })
       .catch((err) => console.warn("Failed to load continue watching", err))
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [page, initialPage]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">

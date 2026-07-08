@@ -1,22 +1,20 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ContinueWatchingClient } from "./client";
-import { Skeleton } from "@/components/ui/skeleton";
+import { fetchContinueWatching } from "@/lib/server-api";
+import { PosterGridLoadingSkeleton } from "@/lib/route-loading";
 
-export default function ContinueWatchingPage() {
+export const revalidate = 60;
+
+export const metadata: Metadata = {
+  title: "Continue Watching",
+};
+
+export default async function ContinueWatchingPage() {
+  const { data: initialPage } = await fetchContinueWatching(1);
   return (
-    <Suspense
-      fallback={
-        <div className="mx-auto max-w-7xl px-6 py-10">
-          <Skeleton className="mb-8 h-10 w-56" />
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[2/3] rounded-md" />
-            ))}
-          </div>
-        </div>
-      }
-    >
-      <ContinueWatchingClient />
+    <Suspense fallback={<PosterGridLoadingSkeleton />}>
+      <ContinueWatchingClient initialPage={initialPage} />
     </Suspense>
   );
 }

@@ -4,11 +4,11 @@ import { memo } from "react";
 import { tvImageUrl } from "@/lib/tv-image";
 import { routes } from "@/lib/routes";
 import type { MediaItem } from "@/lib/api";
-import { TvFocusLink } from "@/components/tv/tv-focus-link";
+import Link from "next/link";
+import { tvPosterLinkClassName } from "@/components/tv/tv-focus-link";
 import { cn } from "@/lib/utils";
 import { Clapperboard, Tv } from "lucide-react";
 import { isTvClient } from "@/lib/tv-mode-detect";
-import { prefetchMediaPage } from "@/lib/use-media-page-data";
 
 interface TvPosterProps {
   item: MediaItem;
@@ -34,16 +34,19 @@ export const TvPoster = memo(function TvPoster({
   const linkHref = href ?? routes.media(item.id);
   // Android TV WebView often never loads lazy images inside horizontal rows/grids.
   const loadImmediately = isTvClient() || priority;
-  const prefetch = () => prefetchMediaPage(item.id);
 
   return (
     <div className={cn("tv-poster-tile shrink-0", className)}>
-      <TvFocusLink
+      <Link
         href={linkHref}
-        variant="poster"
+        data-tv-item=""
+        tabIndex={0}
+        className={cn(
+          tvPosterLinkClassName,
+          "group w-[var(--tv-poster-width,7.5rem)]",
+          linkClassName,
+        )}
         aria-label={item.title}
-        className={cn("group w-[var(--tv-poster-width,7.5rem)]", linkClassName)}
-        onFocus={prefetch}
       >
         <div className="tv-poster-art poster-shadow relative aspect-[2/3] overflow-hidden rounded-lg bg-muted">
           {imageUrl ? (
@@ -84,7 +87,7 @@ export const TvPoster = memo(function TvPoster({
         {subtitle && (
           <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{subtitle}</p>
         )}
-      </TvFocusLink>
+      </Link>
     </div>
   );
 });

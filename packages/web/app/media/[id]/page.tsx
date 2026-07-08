@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { MediaClient } from "../client";
 import { MediaHeroServer } from "../media-hero-server";
+import { MediaPageBody } from "../media-page-body";
+import { MediaRelatedServer } from "../media-related-server";
+import { MediaDocumentTitle, MediaThemeShell } from "../media-chrome";
+import { MediaAuthRequired } from "../media-auth-required";
+import { asMediaDetail } from "../types";
 import { fetchMediaDetail, fetchMediaIds } from "@/lib/server-api";
 
 export const revalidate = 300;
@@ -37,38 +42,29 @@ export default async function MediaDetailPage({
   const mediaId = parseInt(id, 10);
   if (!Number.isFinite(mediaId) || mediaId <= 0) notFound();
 
-  const { media: initialMedia, unauthorized } = await fetchMediaDetail(mediaId);
-  if (!initialMedia && !unauthorized) notFound();
+  const { media: raw, unauthorized } = await fetchMediaDetail(mediaId);
+  if (!raw && !unauthorized) notFound();
+  if (unauthorized) return <MediaAuthRequired />;
+  if (!raw) return null;
 
-  return (
-    <div>
-      {initialMedia ? (
-        <div data-web-only>
-          <MediaHeroServer
-            media={
-              initialMedia as {
-                id: number;
-                title: string;
-                overview?: string | null;
-                year?: number | null;
-                posterPath?: string | null;
-                backdropPath?: string | null;
-                type: "movie" | "tv";
-                genres?: string | null;
-                rating?: number | null;
-                isFavorite?: boolean;
-                watchProgress?: { positionMs: number; durationMs?: number | null } | null;
-                files?: Array<{ id: number; durationMs?: number | null }>;
-              }
-            }
-          />
-        </div>
-      ) : null}
-      <MediaClient
-        mediaId={mediaId}
-        initialMedia={initialMedia ?? undefined}
-        heroOnServer={Boolean(initialMedia)}
-      />
-    </div>
+  const media = asMediaDetail(raw);
+
+  const page = (
+    <>
+      <MediaDocumentTitle title={media.title} />
+      <div data-web-only>
+        <MediaHeroServer media={media} />
+      </div>
+      <MediaPageBody media={media} />
+      <Suspense fallback={null}>
+        <MediaRelatedServer mediaId={mediaId} mediaType={media.type} />
+      </Suspense>
+    </>
   );
+
+  if (media.hasThemeMusic) {
+    return <MediaThemeShell mediaId={media.id}>{page}</MediaThemeShell>;
+  }
+
+  return page;
 }

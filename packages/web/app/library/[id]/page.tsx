@@ -1,24 +1,41 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { LibraryClient } from "../client";
-import { Skeleton } from "@/components/ui/skeleton";
+import { fetchLibraryItems } from "@/lib/server-api";
+import { PosterGridLoadingSkeleton } from "@/lib/route-loading";
 
-function LibraryPageSkeleton() {
-  return (
-    <div className="mx-auto max-w-7xl px-6 py-10">
-      <Skeleton className="mb-8 h-10 w-48" />
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <Skeleton key={i} className="aspect-[2/3] rounded-md" />
-        ))}
-      </div>
-    </div>
-  );
-}
+export const revalidate = 60;
 
-export default function LibraryDetailPage() {
+export const metadata: Metadata = {
+  title: "Library",
+};
+
+export default async function LibraryDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const libraryId = parseInt(id, 10);
+  const { data } = Number.isFinite(libraryId)
+    ? await fetchLibraryItems(libraryId, 1)
+    : { data: null };
+
   return (
-    <Suspense fallback={<LibraryPageSkeleton />}>
-      <LibraryClient />
+    <Suspense fallback={<PosterGridLoadingSkeleton />}>
+      <LibraryClient
+        initialList={
+          data
+            ? {
+                kind: "library",
+                id: libraryId,
+                page: data,
+                title: "Browse Titles",
+                subtitle: "Full library",
+              }
+            : null
+        }
+      />
     </Suspense>
   );
 }

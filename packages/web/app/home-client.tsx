@@ -25,31 +25,34 @@ import { LibraryIcon } from "@/components/navbar";
 import { cn } from "@/lib/utils";
 import { useTvMode } from "@/lib/tv-mode";
 import { TvHomeView } from "@/components/tv/views/home-view";
-import { prefetchMediaPage } from "@/lib/use-media-page-data";
+import type { HomeData } from "@/lib/server-api";
 
-export function HomeClient() {
+export function HomeClient({
+  initialData = null,
+}: {
+  initialData?: HomeData | null;
+}) {
   const isTvMode = useTvMode();
   if (isTvMode) return <TvHomeView />;
-  return <HomeDesktopClient />;
+  return <HomeDesktopClient initialData={initialData} />;
 }
 
-function HomeDesktopClient() {
+function HomeDesktopClient({ initialData = null }: { initialData?: HomeData | null }) {
   useDocumentTitle("Home");
-  const [data, setData] = useState<Awaited<ReturnType<typeof api.getHome>> | null>(
-    null,
-  );
-  const [loaded, setLoaded] = useState(false);
+  const [data, setData] = useState<HomeData | null>(initialData);
+  const [loaded, setLoaded] = useState(Boolean(initialData));
   const [featuredImageReady, setFeaturedImageReady] = useState(false);
   const { status, activeScan, isScanning } = useScanStatus();
   const wasScanningRef = useRef(false);
 
   useEffect(() => {
+    if (initialData) return;
     api
       .getHome()
       .then(setData)
       .catch((err) => console.warn("Failed to load home data", err))
       .finally(() => setLoaded(true));
-  }, []);
+  }, [initialData]);
 
   useEffect(() => {
     if (isScanning) {
@@ -93,11 +96,6 @@ function HomeDesktopClient() {
   useEffect(() => {
     setFeaturedImageReady(false);
   }, [featuredImage]);
-
-  useEffect(() => {
-    if (!featured?.id) return;
-    prefetchMediaPage(featured.id);
-  }, [featured?.id]);
 
   const handleFeaturedImageLoad = (event: SyntheticEvent<HTMLImageElement>) => {
     const img = event.currentTarget;
@@ -199,8 +197,6 @@ function HomeDesktopClient() {
                     href={routes.media(featured.id)}
                     className="absolute inset-0 z-30 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     aria-label={`Open ${featured.title}`}
-                    onMouseEnter={() => prefetchMediaPage(featured.id)}
-                    onFocus={() => prefetchMediaPage(featured.id)}
                   />
                 ) : null}
                 {(!loaded || (featuredImage && !featuredImageReady)) && (
