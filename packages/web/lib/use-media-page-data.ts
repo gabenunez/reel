@@ -14,52 +14,58 @@ function readCachedMedia(mediaId: number | null) {
   return peekApiCache<Record<string, unknown>>(`media:${mediaId}`) ?? null;
 }
 
+function readSeed(
+  mediaId: number | null,
+  initialMedia?: Record<string, unknown> | null,
+) {
+  return initialMedia ?? readCachedMedia(mediaId);
+}
+
 export function useMediaPageData(
   mediaId: number,
   initialMedia?: Record<string, unknown> | null,
 ) {
   const validId = Number.isFinite(mediaId) ? mediaId : null;
-  const [snapshot, setSnapshot] = useState(() => {
-    const seeded = initialMedia ?? readCachedMedia(validId);
-    return {
-      mediaId: validId,
-      media: seeded,
-      related: [] as MediaItem[],
-      loading: validId != null && !seeded,
-    };
-  });
+  const seed = readSeed(validId, initialMedia);
 
-  if (snapshot.mediaId !== validId) {
-    const seeded = initialMedia ?? readCachedMedia(validId);
+  const [snapshot, setSnapshot] = useState(() => ({
+    mediaId: validId,
+    media: seed,
+    related: [] as MediaItem[],
+    pending: validId != null && !seed,
+  }));
+
+  useEffect(() => {
+    if (validId == null) return;
+    const nextSeed = readSeed(validId, initialMedia);
     setSnapshot({
       mediaId: validId,
-      media: seeded,
+      media: nextSeed,
       related: [],
-      loading: validId != null && !seeded,
+      pending: !nextSeed,
     });
-  }
+  }, [validId, initialMedia]);
 
   useEffect(() => {
     if (validId == null) return;
 
     let cancelled = false;
-    const hadSeed = Boolean(initialMedia ?? readCachedMedia(validId));
+    const hadSeed = Boolean(readSeed(validId, initialMedia));
 
     void api
       .getMedia(validId)
       .then((data) => {
         if (cancelled) return;
-        setSnapshot((prev) => ({ ...prev, media: data }));
+        setSnapshot((prev) => ({ ...prev, media: data, pending: false }));
       })
       .catch((err) => {
         console.error(err);
-        if (!cancelled && !hadSeed) {
-          setSnapshot((prev) => ({ ...prev, media: null }));
-        }
-      })
-      .finally(() => {
         if (!cancelled) {
-          setSnapshot((prev) => ({ ...prev, loading: false }));
+          setSnapshot((prev) => ({
+            ...prev,
+            media: hadSeed ? prev.media : null,
+            pending: false,
+          }));
         }
       });
 
@@ -77,9 +83,14 @@ export function useMediaPageData(
     };
   }, [validId]);
 
+  const media =
+    snapshot.mediaId === validId ? snapshot.media ?? seed : seed;
+  const related = snapshot.mediaId === validId ? snapshot.related : [];
+  const loading = validId != null && !media && snapshot.pending;
+
   return {
-    media: snapshot.media,
-    related: snapshot.related,
-    loading: snapshot.loading,
+    media,
+    related,
+    loading,
   };
 }

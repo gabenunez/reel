@@ -15,7 +15,7 @@ import { streamRoutes, subtitleRoutes } from "./routes/stream.js";
 import { subtitleSearchRoutes } from "./routes/subtitles-search.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { castRoutes } from "./routes/cast.js";
-import { AuthService, isCastMediaPath, isPrerenderBuildPath, isPublicPath } from "./services/auth.js";
+import { AuthService, isCastMediaPath, isInternalMediaApiPath, isPublicPath } from "./services/auth.js";
 import { authRoutes } from "./routes/auth.js";
 import { updateRoutes } from "./routes/updates.js";
 import { resolveLegacyRouteRedirect, resolveSpaIndexFile } from "@media-app/shared";
@@ -48,7 +48,7 @@ async function main() {
       request.ip === "::1" ||
       request.ip === "::ffff:127.0.0.1";
 
-    if (isLocalClient && isPrerenderBuildPath(pathname)) {
+    if (isLocalClient && isInternalMediaApiPath(pathname)) {
       return;
     }
 

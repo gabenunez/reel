@@ -84,9 +84,21 @@ export function MediaClient({
 
   if (hasResolvedId) {
     if (isTvMode) {
-      return <TvMediaView mediaId={mediaIdProp} initialMedia={initialMedia} />;
+      return (
+        <TvMediaView
+          key={mediaIdProp}
+          mediaId={mediaIdProp}
+          initialMedia={initialMedia}
+        />
+      );
     }
-    return <MediaDesktopClient mediaId={mediaIdProp} initialMedia={initialMedia} />;
+    return (
+      <MediaDesktopClient
+        key={mediaIdProp}
+        mediaId={mediaIdProp}
+        initialMedia={initialMedia}
+      />
+    );
   }
 
   return (

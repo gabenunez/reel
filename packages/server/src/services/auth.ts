@@ -231,12 +231,17 @@ export class AuthService {
   }
 }
 
-export function isPrerenderBuildPath(pathname: string): boolean {
-  if (process.env.MEDIA_PRERENDER_BUILD !== "1") return false;
+export function isInternalMediaApiPath(pathname: string): boolean {
   return (
     pathname === "/api/media/ids" ||
     /^\/api\/media\/\d+$/.test(pathname)
   );
+}
+
+/** @deprecated Use isInternalMediaApiPath; kept for build scripts that set MEDIA_PRERENDER_BUILD */
+export function isPrerenderBuildPath(pathname: string): boolean {
+  if (process.env.MEDIA_PRERENDER_BUILD !== "1") return false;
+  return isInternalMediaApiPath(pathname);
 }
 
 export function isPublicPath(pathname: string, passwordRequired: boolean): boolean {

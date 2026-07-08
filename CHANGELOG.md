@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.98 — 2026-07-07
+
+### Fix
+
+- **Media pages** — stop loading skeletons on password-protected servers by allowing Next's localhost internal API reads; seed hero data from server props and prefetch cache on client navigation
+- **Deploy** — clear build-time API env vars in `start-prod.sh` so production does not proxy to the prerender port
+
 ## 0.1.97 — 2026-07-07
 
 ### Performance

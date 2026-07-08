@@ -13,6 +13,8 @@ read_config_port() {
 
 CONFIG_PORT="$(read_config_port || true)"
 PUBLIC_PORT="${MEDIA_PORT:-${CONFIG_PORT:-8096}}"
+# Drop build-only env so a prior `pnpm build` cannot point runtime at the prerender API.
+unset MEDIA_PRERENDER_BUILD MEDIA_PRERENDER_API_PORT MEDIA_INTERNAL_API_URL
 API_PORT="${MEDIA_INTERNAL_API_PORT:-$((PUBLIC_PORT + 1))}"
 HOST="${MEDIA_HOST:-0.0.0.0}"
 

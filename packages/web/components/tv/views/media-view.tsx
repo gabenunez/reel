@@ -65,7 +65,11 @@ export function TvMediaView({
   }
 
   return (
-    <TvMediaViewResolved mediaId={mediaIdProp} initialMedia={initialMedia} />
+    <TvMediaViewResolved
+      key={mediaIdProp}
+      mediaId={mediaIdProp}
+      initialMedia={initialMedia}
+    />
   );
 }
 
@@ -97,7 +101,7 @@ function TvMediaViewLegacy() {
     );
   }
 
-  return <TvMediaViewResolved mediaId={mediaId} />;
+  return <TvMediaViewResolved key={mediaId} mediaId={mediaId} />;
 }
 
 function TvMediaViewResolved({
