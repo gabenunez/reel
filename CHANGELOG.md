@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.113 — 2026-07-08
+
+### Fix
+
+- **Settings** — stop MEDIA! before prefix rebuilds, handle systemd restarts cleanly, log to `restart.log`, and ignore stale `MEDIA_PUBLIC_PREFIX` env
+
 ## 0.1.112 — 2026-07-08
 
 ### Fix
