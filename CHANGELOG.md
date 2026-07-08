@@ -1,6 +1,18 @@
 # Changelog
 
-## 0.1.113 — 2026-07-08
+## 0.1.114 — 2026-07-08
+
+### TV
+
+- **Playback** — prefer native direct play on Android TV; fix black-screen overlay during loading; sync subtitles reliably and apply saved styles at start
+- **Playback** — Back dismisses controls whenever they are visible; exit only when controls are hidden
+- **UI** — center sidebar logo; MEDIA! startup splash until the web UI is ready
+- **Android TV app** — launcher icon matches in-app branding; voice search via system recognizer (no mic permission)
+
+### Fix
+
+- **Playback** — do not treat ExoPlayer idle state as buffering on native TV
+
 
 ### Fix
 
