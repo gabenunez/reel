@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.104 — 2026-07-07
+
+### Performance
+
+- **Images** — serve posters, backdrops, and stills through the Next.js image optimizer (AVIF/WebP via sharp) instead of full-size JPEGs
+- **Images** — shared `MediaImage` component with responsive `sizes`; prefetch and playback preload warm optimized `/_next/image` URLs
+
+### TV
+
+- **Images** — TV posters and episode stills keep eager priority loading through `next/image`
+
 ## 0.1.103 — 2026-07-07
 
 ### Performance
