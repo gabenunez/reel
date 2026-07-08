@@ -27,6 +27,13 @@ describe("gateway", () => {
       search: "",
     });
 
+    vi.stubEnv("MEDIA_GATEWAY_PREFIX", "/reel");
+    const runtime = await import("./gateway");
+    expect(runtime.resolveGatewayRewritePath("/", "?__p=%2Fapi%2Fstatus")).toEqual({
+      pathname: "/api/status",
+      search: "",
+    });
+
     vi.unstubAllEnvs();
   });
 });

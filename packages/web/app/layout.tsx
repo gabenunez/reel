@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 import { APP_NAME } from "@/lib/document-title";
-import { GATEWAY_ASSET_BOOTSTRAP_SCRIPT, gatewayEnabled } from "@/lib/gateway";
+import { gatewayAssetBootstrapScript, gatewayEnabled } from "@/lib/gateway";
 import { TV_CRITICAL_CSS, TV_MODE_BOOTSTRAP_SCRIPT } from "@/lib/tv-mode-detect";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -33,8 +33,8 @@ export default function RootLayout({
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        {gatewayEnabled() && GATEWAY_ASSET_BOOTSTRAP_SCRIPT ? (
-          <script dangerouslySetInnerHTML={{ __html: GATEWAY_ASSET_BOOTSTRAP_SCRIPT }} />
+        {gatewayEnabled() ? (
+          <script dangerouslySetInnerHTML={{ __html: gatewayAssetBootstrapScript() }} />
         ) : null}
         <style dangerouslySetInnerHTML={{ __html: TV_CRITICAL_CSS }} />
         <script dangerouslySetInnerHTML={{ __html: TV_MODE_BOOTSTRAP_SCRIPT }} />

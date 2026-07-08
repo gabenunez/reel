@@ -8,17 +8,18 @@ function normalizeGatewayPrefix(value: string | undefined): string {
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }
 
-function readGatewayPrefix(): string {
+/** Runtime gateway prefix — prefer MEDIA_GATEWAY_PREFIX over build-inlined NEXT_PUBLIC_*. */
+export function getGatewayPrefix(): string {
   return normalizeGatewayPrefix(
-    process.env.NEXT_PUBLIC_GATEWAY_PREFIX ?? process.env.MEDIA_GATEWAY_PREFIX,
+    process.env.MEDIA_GATEWAY_PREFIX ?? process.env.NEXT_PUBLIC_GATEWAY_PREFIX,
   );
 }
 
-/** Public entry path when behind a broken subpath proxy (e.g. /reel). Empty when disabled. */
-export const GATEWAY_PREFIX = readGatewayPrefix();
+/** @deprecated Use getGatewayPrefix() — kept for tests and gradual migration. */
+export const GATEWAY_PREFIX = getGatewayPrefix();
 
 export function gatewayEnabled(): boolean {
-  return GATEWAY_PREFIX.length > 0;
+  return getGatewayPrefix().length > 0;
 }
 
 function normalizeAppPath(path: string): string {
@@ -27,14 +28,26 @@ function normalizeAppPath(path: string): string {
   return withLeading.endsWith("/") ? withLeading : `${withLeading}/`;
 }
 
+function hasGatewayTarget(search: string): boolean {
+  const outer = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  const target = outer.get(GATEWAY_QUERY_KEY);
+  return Boolean(target?.startsWith("/"));
+}
+
+function isGatewayEntryPath(pathname: string): boolean {
+  const entry = getGatewayPrefix();
+  return pathname === entry || pathname === `${entry}/` || (pathname === "/" && entry.length > 0);
+}
+
 /**
  * Map an internal app path to the URL the browser should request.
  * Home is the bare entry path; everything else uses ?__p=.
  */
 export function toGatewayUrl(path: string): string {
-  if (!gatewayEnabled()) return path;
+  const entry = getGatewayPrefix();
+  if (!entry) return path;
 
-  if (!path || path === "/") return GATEWAY_PREFIX;
+  if (!path || path === "/") return entry;
 
   const absolute = path.startsWith("http://") || path.startsWith("https://");
   if (absolute) {
@@ -49,15 +62,14 @@ export function toGatewayUrl(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const params = new URLSearchParams();
   params.set(GATEWAY_QUERY_KEY, normalized);
-  return `${GATEWAY_PREFIX}?${params.toString()}`;
+  return `${entry}?${params.toString()}`;
 }
 
 /** Resolve the in-app pathname from a browser URL when gateway mode is active. */
 export function pathnameFromGatewayUrl(pathname: string, search: string): string | null {
   if (!gatewayEnabled()) return null;
-
-  const entry = GATEWAY_PREFIX;
-  if (pathname !== entry && pathname !== `${entry}/`) return null;
+  if (!isGatewayEntryPath(pathname)) return null;
+  if (pathname === "/" && !hasGatewayTarget(search)) return null;
 
   const outer = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const target = outer.get(GATEWAY_QUERY_KEY);
@@ -101,6 +113,8 @@ export function resolveGatewayRewritePath(
   search: string,
 ): { pathname: string; search: string } | null {
   if (!gatewayEnabled()) return null;
+  if (!isGatewayEntryPath(pathname)) return null;
+  if (pathname === "/" && !hasGatewayTarget(search)) return null;
 
   const outer = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const target = outer.get(GATEWAY_QUERY_KEY);
@@ -120,7 +134,8 @@ export function publicUrl(path: string): string {
   return toGatewayUrl(path);
 }
 
-/** Rewrite /_next asset tags as they appear (dynamic SSR chunks). */
-export const GATEWAY_ASSET_BOOTSTRAP_SCRIPT = gatewayEnabled()
-  ? `(function(){try{var e=${JSON.stringify(GATEWAY_PREFIX)};function r(n){var a=n.tagName==="LINK"?"href":"src",v=n.getAttribute(a);if(!v||v.indexOf("/_next/")!==0)return;n.setAttribute(a,e+"?__p="+encodeURIComponent(v))}function s(root){root.querySelectorAll('link[href^="/_next/"],script[src^="/_next/"]').forEach(r)}s(document.documentElement);new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType!==1)return;if(n.matches&&n.matches('link[href^="/_next/"],script[src^="/_next/"]'))r(n);if(n.querySelectorAll)s(n)})})}).observe(document.documentElement,{childList:true,subtree:true})}catch(x){}})();`
-  : "";
+export function gatewayAssetBootstrapScript(): string {
+  const entry = getGatewayPrefix();
+  if (!entry) return "";
+  return `(function(){try{var e=${JSON.stringify(entry)};function r(n){var a=n.tagName==="LINK"?"href":"src",v=n.getAttribute(a);if(!v||v.indexOf("/_next/")!==0)return;n.setAttribute(a,e+"?__p="+encodeURIComponent(v))}function s(root){root.querySelectorAll('link[href^="/_next/"],script[src^="/_next/"]').forEach(r)}s(document.documentElement);new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType!==1)return;if(n.matches&&n.matches('link[href^="/_next/"],script[src^="/_next/"]'))r(n);if(n.querySelectorAll)s(n)})})}).observe(document.documentElement,{childList:true,subtree:true})}catch(x){}})();`;
+}

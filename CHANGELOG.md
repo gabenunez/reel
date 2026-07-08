@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.108 — 2026-07-08
+
+### Fix
+
+- **Reverse proxy** — gateway routing reads runtime `MEDIA_GATEWAY_PREFIX` and handles Apache stripping `/reel` to `/`
+
 ## 0.1.107 — 2026-07-08
 
 ### Fix

@@ -182,8 +182,20 @@ build_app() {
     ${gateway_export}
     rm -rf packages/web/.next packages/web/.turbo packages/web/out
     pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+    if [[ -n \"\${MEDIA_GATEWAY_PREFIX:-}\" ]]; then
+      export TURBO_FORCE=1
+    fi
     pnpm build
   "
+
+  if [[ -n "${MEDIA_GATEWAY_PREFIX:-}" ]]; then
+    run_as_install_user "$user" "
+      set -euo pipefail
+      cd '$dir/packages/web'
+      export MEDIA_GATEWAY_PREFIX='${MEDIA_GATEWAY_PREFIX}'
+      node scripts/apply-gateway-assets.mjs
+    "
+  fi
 }
 
 ensure_startup_script() {
