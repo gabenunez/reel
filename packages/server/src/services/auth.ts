@@ -231,6 +231,14 @@ export class AuthService {
   }
 }
 
+export function isPrerenderBuildPath(pathname: string): boolean {
+  if (process.env.MEDIA_PRERENDER_BUILD !== "1") return false;
+  return (
+    pathname === "/api/media/ids" ||
+    /^\/api\/media\/\d+$/.test(pathname)
+  );
+}
+
 export function isPublicPath(pathname: string, passwordRequired: boolean): boolean {
   if (
     pathname === "/api/auth/status" ||

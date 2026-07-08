@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.97 — 2026-07-07
+
+### Performance
+
+- **Media pages** — pre-render all library titles at build time via `generateStaticParams`; new titles added after deploy still generate on first visit with ISR (`revalidate` 5 min)
+
 ## 0.1.96 — 2026-07-07
 
 ### Fix

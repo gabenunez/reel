@@ -10,6 +10,20 @@ async function internalApiFetch(path: string, init?: RequestInit): Promise<Respo
   return fetch(`${internalApiBase()}${path}`, init);
 }
 
+export async function fetchMediaIds(): Promise<number[]> {
+  try {
+    const res = await internalApiFetch("/api/media/ids");
+    if (!res.ok) return [];
+    const data = (await res.json()) as { ids?: unknown };
+    if (!Array.isArray(data.ids)) return [];
+    return data.ids
+      .map((id) => (typeof id === "number" ? id : parseInt(String(id), 10)))
+      .filter((id) => Number.isFinite(id) && id > 0);
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchMediaDetail(
   mediaId: number,
   revalidateSeconds = 300,

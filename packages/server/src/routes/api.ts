@@ -227,6 +227,14 @@ export async function apiRoutes(
     },
   );
 
+  app.get("/api/media/ids", async () => {
+    const rows = await db
+      .select({ id: mediaItems.id })
+      .from(mediaItems)
+      .orderBy(desc(mediaItems.updatedAt));
+    return { ids: rows.map((row) => row.id) };
+  });
+
   app.get<{ Params: { id: string } }>("/api/media/:id/theme", async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const item = await db.query.mediaItems.findFirst({
