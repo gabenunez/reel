@@ -311,6 +311,8 @@ function WatchDesktopClient() {
       })),
     );
   }, [usingHlsPlayback]);
+  const updateBufferedPositionRef = useRef(updateBufferedPosition);
+  updateBufferedPositionRef.current = updateBufferedPosition;
 
   const saveProgress = useCallback(() => {
     const video = videoRef.current;
@@ -560,7 +562,7 @@ function WatchDesktopClient() {
           usingHls,
           startAt,
           onFatalError,
-          onBufferUpdate: updateBufferedPosition,
+          onBufferUpdate: () => updateBufferedPositionRef.current(),
           onSeekComplete: (seconds) => setCurrentTime(seconds),
           onSourceReady: notifyWebPlaybackSourceReady,
         });
@@ -589,7 +591,7 @@ function WatchDesktopClient() {
         void api.stopStream(fileId, type).catch(() => {});
       }
     };
-  }, [fileId, type, quality, streamGeneration, initialResumeSeconds, streamInfo, updateBufferedPosition]);
+  }, [fileId, type, quality, streamGeneration, initialResumeSeconds, streamInfo]);
 
   useEffect(() => {
     const onPageHide = () => {

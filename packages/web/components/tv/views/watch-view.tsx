@@ -526,6 +526,8 @@ export function TvWatchView() {
       })),
     );
   }, [usingHlsPlayback]);
+  const updateBufferedPositionRef = useRef(updateBufferedPosition);
+  updateBufferedPositionRef.current = updateBufferedPosition;
 
   const saveProgress = useCallback(() => {
     if (!fileId) return;
@@ -1071,7 +1073,7 @@ export function TvWatchView() {
           startAt,
           tv: true,
           onFatalError,
-          onBufferUpdate: updateBufferedPosition,
+          onBufferUpdate: () => updateBufferedPositionRef.current(),
           onSeekComplete: (seconds) => setCurrentTime(seconds),
           onSourceReady: notifyWebPlaybackSourceReady,
         });
@@ -1108,8 +1110,6 @@ export function TvWatchView() {
     streamGeneration,
     initialResumeSeconds,
     streamInfo,
-    updateBufferedPosition,
-    sourceDurationMs,
     usesNativePlayer,
     forceRemux,
   ]);
