@@ -13,6 +13,7 @@ import {
   getVideoBufferedRanges,
   getVideoSeekableEnd,
   PROGRESS_SAVE_MS,
+  resolvePlaybackStartSeconds,
   resolveInitialStreamQuality,
   resolvePlaybackStream,
   type PlaybackMediaDetail,
@@ -409,9 +410,7 @@ export function TvWatchView() {
     const absoluteTime = usingHlsRef.current
       ? hlsStartOffsetRef.current + currentTimeRef.current
       : currentTimeRef.current;
-    if (absoluteTime > 0) {
-      setStreamStartSeconds(absoluteTime);
-    }
+    setStreamStartSeconds(Math.max(0, absoluteTime));
   }, []);
 
   /** HLS transcode/remux sessions expire server-side after idle — restart at current position. */
@@ -550,7 +549,7 @@ export function TvWatchView() {
         const absoluteTime = usingHlsPlayback
           ? hlsStartOffset + currentTime
           : currentTime;
-        if (absoluteTime > 0) {
+        if (absoluteTime >= 0) {
           setStreamStartSeconds(absoluteTime);
         }
       } else {
@@ -871,11 +870,6 @@ export function TvWatchView() {
           if (percent > 0.02 && percent < 0.95) {
             const resumeSeconds = positionMs / 1000;
             setInitialResumeSeconds(resumeSeconds);
-            const playback = resolvePlaybackStream(initial.quality, info);
-            if (playback.usingHls) {
-              hlsStartOffsetRef.current = resumeSeconds;
-              setHlsStartOffset(resumeSeconds);
-            }
             return;
           }
         }
@@ -922,7 +916,14 @@ export function TvWatchView() {
       return;
     }
 
-    const startAt = streamStartSeconds ?? initialResumeSeconds ?? 0;
+    const startAt = resolvePlaybackStartSeconds({
+      streamStartSeconds,
+      initialResumeSeconds,
+      streamGeneration,
+      currentAbsoluteSeconds: usingHlsRef.current
+        ? hlsStartOffsetRef.current + currentTimeRef.current
+        : currentTimeRef.current,
+    });
     const stream = resolvePlaybackStream(quality, streamInfo, { forceRemux });
     const usingHls = stream.usingHls;
 

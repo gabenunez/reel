@@ -15,6 +15,31 @@ import {
 
 export const PROGRESS_SAVE_MS = 10_000;
 
+/**
+ * Pick where to start or restart playback on the absolute timeline.
+ * The first open may use saved resume progress; later restarts must follow
+ * the live playhead and never fall back to stale initialResumeSeconds.
+ */
+export function resolvePlaybackStartSeconds({
+  streamStartSeconds,
+  initialResumeSeconds,
+  streamGeneration,
+  currentAbsoluteSeconds,
+}: {
+  streamStartSeconds: number | null;
+  initialResumeSeconds: number | null;
+  streamGeneration: number;
+  currentAbsoluteSeconds: number;
+}): number {
+  if (streamStartSeconds !== null) {
+    return streamStartSeconds;
+  }
+  if (streamGeneration > 0) {
+    return Math.max(0, currentAbsoluteSeconds);
+  }
+  return initialResumeSeconds ?? 0;
+}
+
 export type PlaybackHlsQuality = StreamQuality | "remux";
 
 import { isTvClient } from "@/lib/tv-mode-detect";

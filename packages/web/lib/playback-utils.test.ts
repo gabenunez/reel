@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StreamInfo } from "./api.js";
 import {
   resolveInitialStreamQuality,
+  resolvePlaybackStartSeconds,
   resolvePlaybackStream,
 } from "./playback-utils.js";
 
@@ -128,5 +129,40 @@ describe("resolvePlaybackStream with native TV player", () => {
       usingHls: false,
       audioCompatNotice: null,
     });
+  });
+});
+
+describe("resolvePlaybackStartSeconds", () => {
+  it("uses saved resume on the first open", () => {
+    expect(
+      resolvePlaybackStartSeconds({
+        streamStartSeconds: null,
+        initialResumeSeconds: 1200,
+        streamGeneration: 0,
+        currentAbsoluteSeconds: 0,
+      }),
+    ).toBe(1200);
+  });
+
+  it("uses the live playhead on stream restarts instead of stale resume", () => {
+    expect(
+      resolvePlaybackStartSeconds({
+        streamStartSeconds: null,
+        initialResumeSeconds: 1200,
+        streamGeneration: 2,
+        currentAbsoluteSeconds: 180,
+      }),
+    ).toBe(180);
+  });
+
+  it("prefers an explicit restart position when provided", () => {
+    expect(
+      resolvePlaybackStartSeconds({
+        streamStartSeconds: 420,
+        initialResumeSeconds: 1200,
+        streamGeneration: 3,
+        currentAbsoluteSeconds: 180,
+      }),
+    ).toBe(420);
   });
 });

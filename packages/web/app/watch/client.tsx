@@ -28,6 +28,7 @@ import {
   getVideoBufferedRanges,
   getVideoSeekableEnd,
   resolveInitialStreamQuality,
+  resolvePlaybackStartSeconds,
   resolvePlaybackStream,
   buildPlaybackTitle,
   findEpisode,
@@ -338,7 +339,7 @@ function WatchDesktopClient() {
         const absoluteTime = usingHlsPlayback
           ? hlsStartOffset + video.currentTime
           : video.currentTime;
-        if (absoluteTime > 0) {
+        if (absoluteTime >= 0) {
           setStreamStartSeconds(absoluteTime);
         }
       }
@@ -489,9 +490,17 @@ function WatchDesktopClient() {
     video.removeAttribute("src");
     video.load();
 
-    const startAt = streamStartSeconds ?? initialResumeSeconds ?? 0;
     const stream = resolvePlaybackStream(quality, streamInfo);
     const usingHls = stream.usingHls;
+
+    const startAt = resolvePlaybackStartSeconds({
+      streamStartSeconds,
+      initialResumeSeconds,
+      streamGeneration,
+      currentAbsoluteSeconds: usingHls
+        ? hlsStartOffsetRef.current + video.currentTime
+        : video.currentTime,
+    });
 
     hlsStartOffsetRef.current = usingHls ? startAt : 0;
     if (usingHls) {
