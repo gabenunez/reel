@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.131 — 2026-07-09
+
+### Fix
+
+- **Build** — detect `#EXT-X-ENDLIST` from the playlist m3u8 text instead of the untyped `details.endList` field (fixes CI typecheck)
+
 ## 0.1.130 — 2026-07-09
 
 ### Fix
