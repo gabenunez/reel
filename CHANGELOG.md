@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.118 — 2026-07-09
+
+### Fix
+
+- **Playback** — stop buffering recoveries from jumping to the end of the buffered range when the player briefly reports the buffer edge instead of the real playhead
+
+### TV
+
+- **Playback** — same stable-playhead restart fix on Android TV
+
 ## 0.1.117 — 2026-07-09
 
 ### Fix
