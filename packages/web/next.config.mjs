@@ -1,5 +1,8 @@
 // Runtime API port for /api rewrites — must NOT use the ephemeral prerender port (18197).
-const runtimeApiPort = process.env.MEDIA_RUNTIME_API_PORT ?? "8097";
+const runtimeApiPort =
+  process.env.MEDIA_INTERNAL_API_PORT ??
+  process.env.MEDIA_RUNTIME_API_PORT ??
+  "8097";
 
 function normalizePublicPrefix(value) {
   if (!value || value === "/") return "";

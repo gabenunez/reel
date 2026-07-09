@@ -235,11 +235,20 @@ read_config_public_prefix() {
 
 verify_web_runtime() {
   local install_dir="$1"
-  local port
+  local port api_port
   port="$(read_config_port "$install_dir/config.yaml")"
   port="${port:-8096}"
+  api_port=$((port + 1))
 
   sleep 3
+  if curl -sf -m 15 "http://127.0.0.1:${api_port}/api/status" >/dev/null 2>&1; then
+    media_ok "API is responding on port ${api_port}"
+  else
+    media_warn "API is not responding on http://127.0.0.1:${api_port}/api/status"
+    media_warn "The web UI will load but library data will be empty until the API is fixed"
+    return 1
+  fi
+
   local headers
   headers="$(curl -sI -m 15 "http://127.0.0.1:${port}/media/1/" 2>/dev/null || true)"
 

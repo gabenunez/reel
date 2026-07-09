@@ -39,16 +39,30 @@ fi
 MEDIA_API_ONLY=1 MEDIA_INTERNAL_API_PORT="$API_PORT" MEDIA_WEB_INTERNAL_URL="http://127.0.0.1:${PUBLIC_PORT}" node packages/server/dist/index.js &
 API_PID=$!
 
-for _ in $(seq 1 60); do
+api_ready=false
+for _ in $(seq 1 120); do
   if curl -sf "http://127.0.0.1:${API_PORT}/api/status" >/dev/null 2>&1; then
+    api_ready=true
     break
+  fi
+  if ! kill -0 "$API_PID" 2>/dev/null; then
+    echo "MEDIA! API process exited before becoming ready (pid $API_PID)" >&2
+    wait "$API_PID" 2>/dev/null || true
+    exit 1
   fi
   sleep 0.25
 done
 
+if [[ "$api_ready" != "true" ]]; then
+  echo "MEDIA! API did not respond on http://127.0.0.1:${API_PORT}/api/status within 30s" >&2
+  kill "$API_PID" 2>/dev/null || true
+  exit 1
+fi
+
 HOSTNAME="$HOST" PORT="$PUBLIC_PORT" \
   MEDIA_INTERNAL_API_URL="http://127.0.0.1:${API_PORT}" \
   MEDIA_INTERNAL_API_PORT="$API_PORT" \
+  MEDIA_RUNTIME_API_PORT="$API_PORT" \
   MEDIA_PUBLIC_PREFIX="$PUBLIC_PREFIX" \
   NEXT_PUBLIC_BASE_PATH="$PUBLIC_PREFIX" \
   node packages/web/.next/standalone/packages/web/server.js &

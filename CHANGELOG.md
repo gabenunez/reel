@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.126 — 2026-07-09
+
+### Fix
+
+- **Deploy** — do not start the Next.js web server when the internal API fails to become ready; exit and let systemd restart instead of serving an empty library
+- **Deploy** — align `/api` rewrite port with `MEDIA_INTERNAL_API_PORT` and verify the API responds after updates
+
 ## 0.1.125 — 2026-07-09
 
 ### Fix
