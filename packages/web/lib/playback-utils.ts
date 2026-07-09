@@ -29,7 +29,9 @@ export function getPlaybackAbsoluteSeconds({
 
 /**
  * Resolve a safe restart position. During rebuffer/recovery the player may
- * briefly report the buffer edge instead of the real playhead.
+ * briefly report the buffer edge instead of the real playhead — only reject
+ * jumps ahead of the last stable position, never snap back forward when the
+ * live clock is behind (backward seek or player reset).
  */
 export function getPlaybackRestartSeconds({
   usingHls,
@@ -47,9 +49,6 @@ export function getPlaybackRestartSeconds({
   if (live > stableAbsoluteSeconds + 3) {
     return stableAbsoluteSeconds;
   }
-  if (stableAbsoluteSeconds > live + 3) {
-    return stableAbsoluteSeconds;
-  }
   return live;
 }
 
@@ -57,6 +56,7 @@ export function getPlaybackRestartSeconds({
  * Pick where to start or restart playback on the absolute timeline.
  * The first open may use saved resume progress; later restarts must follow
  * the live playhead and never fall back to stale initialResumeSeconds.
+ * An explicit streamStartSeconds is consumed once per restart (user seek).
  */
 export function resolvePlaybackStartSeconds({
   streamStartSeconds,
@@ -74,19 +74,25 @@ export function resolvePlaybackStartSeconds({
   hlsStartOffset: number;
   relativeSeconds: number;
   stableAbsoluteSeconds: number;
-}): number {
-  if (streamStartSeconds !== null) {
-    return streamStartSeconds;
+}): { startSeconds: number; consumedExplicitSeek: boolean } {
+  if (streamStartSeconds !== null && streamGeneration > 0) {
+    return { startSeconds: streamStartSeconds, consumedExplicitSeek: true };
   }
   if (streamGeneration > 0) {
-    return getPlaybackRestartSeconds({
-      usingHls,
-      hlsStartOffset,
-      relativeSeconds,
-      stableAbsoluteSeconds,
-    });
+    return {
+      startSeconds: getPlaybackRestartSeconds({
+        usingHls,
+        hlsStartOffset,
+        relativeSeconds,
+        stableAbsoluteSeconds,
+      }),
+      consumedExplicitSeek: false,
+    };
   }
-  return initialResumeSeconds ?? 0;
+  return {
+    startSeconds: initialResumeSeconds ?? 0,
+    consumedExplicitSeek: false,
+  };
 }
 
 export type PlaybackHlsQuality = StreamQuality | "remux";

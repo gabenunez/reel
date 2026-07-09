@@ -257,6 +257,10 @@ export function TvWatchView() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [playbackHasBegun, setPlaybackHasBegun] = useState(false);
   const [scrubPreview, setScrubPreview] = useState<number | null>(null);
+  const scrubPreviewRef = useRef<number | null>(null);
+  useEffect(() => {
+    scrubPreviewRef.current = scrubPreview;
+  }, [scrubPreview]);
   const [videoDisplayMode, setVideoDisplayMode] = useState<VideoDisplayMode>("fit");
 
   useEffect(() => {
@@ -926,7 +930,7 @@ export function TvWatchView() {
       return;
     }
 
-    const startAt = resolvePlaybackStartSeconds({
+    const { startSeconds: startAt, consumedExplicitSeek } = resolvePlaybackStartSeconds({
       streamStartSeconds,
       initialResumeSeconds,
       streamGeneration,
@@ -935,6 +939,9 @@ export function TvWatchView() {
       relativeSeconds: currentTimeRef.current,
       stableAbsoluteSeconds: lastStableAbsoluteSecondsRef.current,
     });
+    if (consumedExplicitSeek) {
+      setStreamStartSeconds(null);
+    }
     const stream = resolvePlaybackStream(quality, streamInfo, { forceRemux });
     const usingHls = stream.usingHls;
 
@@ -1208,10 +1215,13 @@ export function TvWatchView() {
         }
 
         const relativeTarget = usingHlsPlayback ? clamped - hlsStartOffset : clamped;
-        const bufferedEnd =
-          bufferedRanges.length > 0 ? bufferedRanges[bufferedRanges.length - 1].end : 0;
+        const inBufferedRange =
+          !usingHlsPlayback ||
+          bufferedRanges.some(
+            (range) => clamped >= range.start - 0.5 && clamped <= range.end + 0.5,
+          );
 
-        if (usingHlsPlayback && clamped > bufferedEnd + 0.5) {
+        if (usingHlsPlayback && !inBufferedRange) {
           setStreamStartSeconds(clamped);
           setStreamGeneration((g) => g + 1);
           setBuffering(true);
@@ -2063,7 +2073,17 @@ export function TvWatchView() {
                       aria-label="Progress"
                       onClick={() => revealControls(false)}
                       onFocus={() => setScrubPreview(displayedProgress)}
-                      onBlur={() => setScrubPreview(null)}
+                      onBlur={() => {
+                        const preview = scrubPreviewRef.current;
+                        if (
+                          preview !== null &&
+                          Math.abs(preview - progressRef.current) > 0.5
+                        ) {
+                          handleScrubCommit(preview);
+                          return;
+                        }
+                        setScrubPreview(null);
+                      }}
                       className="absolute inset-x-0 top-1/2 z-[3] h-5 w-full -translate-y-1/2 border-2 border-transparent bg-transparent p-0"
                     />
                   </div>

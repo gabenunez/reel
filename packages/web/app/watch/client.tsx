@@ -499,7 +499,7 @@ function WatchDesktopClient() {
     const stream = resolvePlaybackStream(quality, streamInfo);
     const usingHls = stream.usingHls;
 
-    const startAt = resolvePlaybackStartSeconds({
+    const { startSeconds: startAt, consumedExplicitSeek } = resolvePlaybackStartSeconds({
       streamStartSeconds,
       initialResumeSeconds,
       streamGeneration,
@@ -508,6 +508,9 @@ function WatchDesktopClient() {
       relativeSeconds: video.currentTime,
       stableAbsoluteSeconds: lastStableAbsoluteSecondsRef.current,
     });
+    if (consumedExplicitSeek) {
+      setStreamStartSeconds(null);
+    }
 
     hlsStartOffsetRef.current = usingHls ? startAt : 0;
     if (usingHls) {
