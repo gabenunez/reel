@@ -44,7 +44,7 @@ export function recoverHlsPlaybackAtPlaylistEnd(
   video: HTMLVideoElement,
   hls: Hls | null,
 ): void {
-  const resumeAt = Math.max(0, video.currentTime - 0.1);
+  const resumeAt = Math.max(0, video.currentTime - 0.25);
   if (hls) {
     try {
       if (hls.currentLevel >= 0) {
@@ -55,6 +55,8 @@ export function recoverHlsPlaybackAtPlaylistEnd(
     }
     hls.startLoad(resumeAt);
   }
+  // Browsers keep ended=true until the playhead moves after a seek.
+  video.pause();
   video.currentTime = resumeAt;
   void video.play().catch(() => {});
 }
@@ -65,9 +67,6 @@ export function catchUpHlsPlayback(
   hls: Hls | null,
 ): void {
   if (!hls) {
-    if (video.ended) {
-      recoverHlsPlaybackAtPlaylistEnd(video, null);
-    }
     return;
   }
 

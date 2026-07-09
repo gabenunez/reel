@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.127 — 2026-07-09
+
+### Fix
+
+- **Deploy** — auto-restart the web + API stack when either process dies or the API stops responding (shared hosting)
+- **Playback** — recover cleanly from premature HLS `ended` events at transcode boundaries; full stream restart after repeated failures
+- **Playback** — only mark transcodes complete with `#EXT-X-ENDLIST` when ffmpeg exits successfully
+
 ## 0.1.126 — 2026-07-09
 
 ### Fix

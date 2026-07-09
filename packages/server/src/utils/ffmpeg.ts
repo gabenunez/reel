@@ -271,10 +271,14 @@ function readExitCode(outputDir: string): number | null {
 
 function isTranscodeOutputComplete(outputDir: string): boolean {
   const exitCode = readExitCode(outputDir);
-  if (exitCode === null) {
-    return hasCompleteHlsPlaylist(outputDir);
+  if (exitCode !== null) {
+    return exitCode === 0;
   }
-  return exitCode === 0;
+  // Legacy cache dirs from before .exit-code tracking — require segments too.
+  if (!hasCompleteHlsPlaylist(outputDir)) {
+    return false;
+  }
+  return listHlsSegments(outputDir).length > 0;
 }
 
 export function clearTranscodeOutput(outputDir: string): void {

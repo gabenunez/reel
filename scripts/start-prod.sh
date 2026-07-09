@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -36,48 +36,97 @@ if [[ ! -f "$ROOT/packages/web/.next/standalone/packages/web/server.js" ]]; then
   exit 1
 fi
 
-MEDIA_API_ONLY=1 MEDIA_INTERNAL_API_PORT="$API_PORT" MEDIA_WEB_INTERNAL_URL="http://127.0.0.1:${PUBLIC_PORT}" node packages/server/dist/index.js &
-API_PID=$!
+API_PID=""
+WEB_PID=""
 
-api_ready=false
-for _ in $(seq 1 120); do
-  if curl -sf "http://127.0.0.1:${API_PORT}/api/status" >/dev/null 2>&1; then
-    api_ready=true
-    break
+cleanup_children() {
+  if [[ -n "$WEB_PID" ]] && kill -0 "$WEB_PID" 2>/dev/null; then
+    kill "$WEB_PID" 2>/dev/null || true
+    wait "$WEB_PID" 2>/dev/null || true
   fi
-  if ! kill -0 "$API_PID" 2>/dev/null; then
-    echo "MEDIA! API process exited before becoming ready (pid $API_PID)" >&2
+  if [[ -n "$API_PID" ]] && kill -0 "$API_PID" 2>/dev/null; then
+    kill "$API_PID" 2>/dev/null || true
     wait "$API_PID" 2>/dev/null || true
-    exit 1
   fi
-  sleep 0.25
-done
-
-if [[ "$api_ready" != "true" ]]; then
-  echo "MEDIA! API did not respond on http://127.0.0.1:${API_PORT}/api/status within 30s" >&2
-  kill "$API_PID" 2>/dev/null || true
-  exit 1
-fi
-
-HOSTNAME="$HOST" PORT="$PUBLIC_PORT" \
-  MEDIA_INTERNAL_API_URL="http://127.0.0.1:${API_PORT}" \
-  MEDIA_INTERNAL_API_PORT="$API_PORT" \
-  MEDIA_RUNTIME_API_PORT="$API_PORT" \
-  MEDIA_PUBLIC_PREFIX="$PUBLIC_PREFIX" \
-  NEXT_PUBLIC_BASE_PATH="$PUBLIC_PREFIX" \
-  node packages/web/.next/standalone/packages/web/server.js &
-WEB_PID=$!
-
-cleanup() {
-  kill "$API_PID" "$WEB_PID" 2>/dev/null || true
+  WEB_PID=""
+  API_PID=""
 }
 
-trap cleanup EXIT INT TERM
+trap cleanup_children EXIT INT TERM
 
-echo ""
-echo "MEDIA! running:"
-echo "  Web: http://localhost:${PUBLIC_PORT}"
-echo "  API: http://127.0.0.1:${API_PORT}"
-echo ""
+start_api() {
+  MEDIA_API_ONLY=1 MEDIA_INTERNAL_API_PORT="$API_PORT" MEDIA_WEB_INTERNAL_URL="http://127.0.0.1:${PUBLIC_PORT}" \
+    node packages/server/dist/index.js &
+  API_PID=$!
+}
 
-wait "$API_PID" "$WEB_PID"
+start_web() {
+  HOSTNAME="$HOST" PORT="$PUBLIC_PORT" \
+    MEDIA_INTERNAL_API_URL="http://127.0.0.1:${API_PORT}" \
+    MEDIA_INTERNAL_API_PORT="$API_PORT" \
+    MEDIA_RUNTIME_API_PORT="$API_PORT" \
+    MEDIA_PUBLIC_PREFIX="$PUBLIC_PREFIX" \
+    NEXT_PUBLIC_BASE_PATH="$PUBLIC_PREFIX" \
+    node packages/web/.next/standalone/packages/web/server.js &
+  WEB_PID=$!
+}
+
+wait_for_api() {
+  for _ in $(seq 1 120); do
+    if curl -sf "http://127.0.0.1:${API_PORT}/api/status" >/dev/null 2>&1; then
+      return 0
+    fi
+    if ! kill -0 "$API_PID" 2>/dev/null; then
+      wait "$API_PID" 2>/dev/null || true
+      return 1
+    fi
+    sleep 0.25
+  done
+  return 1
+}
+
+monitor_stack() {
+  local api_failures=0
+
+  while kill -0 "$API_PID" 2>/dev/null && kill -0 "$WEB_PID" 2>/dev/null; do
+    sleep 10
+
+    if curl -sf "http://127.0.0.1:${API_PORT}/api/status" >/dev/null 2>&1; then
+      api_failures=0
+      continue
+    fi
+
+    api_failures=$((api_failures + 1))
+    if [[ "$api_failures" -ge 3 ]]; then
+      echo "MEDIA! API stopped responding — restarting stack" >&2
+      return 1
+    fi
+  done
+
+  return 1
+}
+
+while true; do
+  cleanup_children
+  start_api
+
+  if ! wait_for_api; then
+    echo "MEDIA! API failed to start — retrying in 5s" >&2
+    cleanup_children
+    sleep 5
+    continue
+  fi
+
+  start_web
+
+  echo ""
+  echo "MEDIA! running:"
+  echo "  Web: http://localhost:${PUBLIC_PORT}"
+  echo "  API: http://127.0.0.1:${API_PORT}"
+  echo ""
+
+  monitor_stack || true
+  echo "MEDIA! restarting stack in 2s..." >&2
+  cleanup_children
+  sleep 2
+done

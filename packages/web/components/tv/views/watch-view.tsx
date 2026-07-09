@@ -196,6 +196,7 @@ export function TvWatchView() {
   const titleRef = useRef("");
   const playbackStreamRef = useRef<ReturnType<typeof resolvePlaybackStream> | null>(null);
   const playbackFatalHandledRef = useRef(-1);
+  const spuriousHlsRecoveryRef = useRef(0);
   const nativePlaySessionRef = useRef(0);
   const nativeErrorHandledSessionRef = useRef(0);
   const nativeWasPlayingRef = useRef(false);
@@ -1046,6 +1047,7 @@ export function TvWatchView() {
     setBuffering(true);
     setBufferingMidPlayback(false);
     setBufferedRanges([]);
+    spuriousHlsRecoveryRef.current = 0;
 
     if (hlsRef.current) {
       destroyHlsInstance(hlsRef.current);
@@ -1427,16 +1429,22 @@ export function TvWatchView() {
             playlistRelativeSeconds: video.duration,
           })
         ) {
+          const absoluteResume = hlsStartOffsetRef.current + video.currentTime;
+          spuriousHlsRecoveryRef.current += 1;
           setBuffering(true);
-          if (hlsRef.current) {
+          if (
+            hlsRef.current &&
+            spuriousHlsRecoveryRef.current <= 3
+          ) {
             recoverHlsPlaybackAtPlaylistEnd(video, hlsRef.current);
           } else {
-            pendingStreamStartRef.current =
-              hlsStartOffsetRef.current + video.currentTime;
+            spuriousHlsRecoveryRef.current = 0;
+            pendingStreamStartRef.current = absoluteResume;
             setStreamGeneration((generation) => generation + 1);
           }
           return;
         }
+        spuriousHlsRecoveryRef.current = 0;
         setIsPlaying(false);
         startNextEpisodeCountdown();
       },

@@ -113,6 +113,7 @@ function WatchDesktopClient() {
   const tryFallbackQualityRef = useRef<() => boolean>(() => false);
   const playbackStreamRef = useRef<ReturnType<typeof resolvePlaybackStream> | null>(null);
   const playbackFatalHandledRef = useRef(-1);
+  const spuriousHlsRecoveryRef = useRef(0);
   const volumeBeforeMuteRef = useRef(1);
 
   const [quality, setQuality] = useState<StreamQuality>("original");
@@ -496,6 +497,7 @@ function WatchDesktopClient() {
     setBuffering(true);
     setBufferedRanges([]);
     setBufferingMidPlayback(false);
+    spuriousHlsRecoveryRef.current = 0;
 
     if (hlsRef.current) {
       destroyHlsInstance(hlsRef.current);
@@ -668,16 +670,22 @@ function WatchDesktopClient() {
             playlistRelativeSeconds: video.duration,
           })
         ) {
+          const absoluteResume = hlsStartOffsetRef.current + video.currentTime;
+          spuriousHlsRecoveryRef.current += 1;
           setBuffering(true);
-          if (hlsRef.current) {
+          if (
+            hlsRef.current &&
+            spuriousHlsRecoveryRef.current <= 3
+          ) {
             recoverHlsPlaybackAtPlaylistEnd(video, hlsRef.current);
           } else {
-            pendingStreamStartRef.current =
-              hlsStartOffsetRef.current + video.currentTime;
+            spuriousHlsRecoveryRef.current = 0;
+            pendingStreamStartRef.current = absoluteResume;
             setStreamGeneration((current) => current + 1);
           }
           return;
         }
+        spuriousHlsRecoveryRef.current = 0;
         setIsPlaying(false);
         startNextEpisodeCountdown();
       },
