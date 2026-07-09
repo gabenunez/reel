@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.119 — 2026-07-09
+
+### Fix
+
+- **Build** — remove duplicate import in TV watch view that broke the production Next.js build and left the site unstyled (CSS chunks returned 500)
+
 ## 0.1.118 — 2026-07-09
 
 ### Fix
