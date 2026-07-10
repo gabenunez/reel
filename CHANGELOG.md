@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.133 — 2026-07-09
+
+### Fix
+
+- **Playback** — fix infinite buffering after the first transcode window: keep manifest polling through premature `ended`, use contiguous buffer runway (ignore prefetch islands), poll every 2s until ENDLIST, recover on stall at growing playlist edge
+- **Server** — mark in-progress HLS playlists as `#EXT-X-PLAYLIST-TYPE:EVENT`; skip segment 304 while transcode is still running
+
 ## 0.1.132 — 2026-07-09
 
 ### Fix
