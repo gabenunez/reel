@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.139 — 2026-07-10
+
+### Fix
+
+- **Subtitles** — preserve fractional resume offsets (ms precision) end-to-end so native HLS and web cue overlays stay aligned after mid-movie resume
+- **Subtitles** — poll web cue overlay at 100ms while playing so short cues are not missed between sparse `timeupdate` events
+- **Subtitles** — shared `convertSrtToVtt` with BOM/CRLF handling; VTT timestamp formatting rounds via total milliseconds
+
+### TV
+
+- **Watch UI** — circular 52px transport buttons with centered Lucide icons and dedicated `watch` focus variant
+
 ## 0.1.138 — 2026-07-10
 
 ### Fix
