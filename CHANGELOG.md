@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.138 — 2026-07-10
+
+### Fix
+
+- **Playback** — poll `video.buffered` every 500ms so the scrubber buffer bar stays accurate while paused (desktop + TV)
+
+### TV
+
+- **Watch UI** — polish transport controls (consistent focus/selected states, sizing, subtitle and quality menu styling)
+- **Native player** — black ExoPlayer background to avoid flash during direct play
+
+### Tooling
+
+- **Android TV** — add `scripts/deploy-android-tv.sh` and `pnpm tv-deploy` / `tv-deploy:release` for local APK deploy over adb
+
 ## 0.1.137 — 2026-07-09
 
 ### Fix
