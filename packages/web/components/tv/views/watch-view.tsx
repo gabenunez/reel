@@ -1122,10 +1122,6 @@ export function TvWatchView() {
           tv: true,
           onFatalError,
           onBufferUpdate: () => updateBufferedPositionRef.current(),
-          onBuffering: (nextBuffering, midPlayback) => {
-            setBuffering(nextBuffering);
-            setBufferingMidPlayback(midPlayback);
-          },
           onSeekComplete: (seconds) => setCurrentTime(seconds),
           onSourceReady: notifyWebPlaybackSourceReady,
         });

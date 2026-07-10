@@ -604,11 +604,6 @@ function WatchDesktopClient() {
           startAt,
           onFatalError,
           onBufferUpdate: () => updateBufferedPositionRef.current(),
-          onBuffering: (nextBuffering, midPlayback) => {
-            playbackBufferingRef.current = nextBuffering || midPlayback;
-            setBuffering(nextBuffering);
-            setBufferingMidPlayback(midPlayback);
-          },
           onSeekComplete: (seconds) => setCurrentTime(seconds),
           onSourceReady: notifyWebPlaybackSourceReady,
         });

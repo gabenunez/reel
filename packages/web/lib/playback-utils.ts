@@ -699,66 +699,6 @@ export const STALL_MAX_WAIT_GROW_TICKS = 30;
 export const STALL_MAX_NUDGES_BEFORE_RESET = 3;
 export const STALL_MAX_NUDGES_BEFORE_FATAL = 6;
 
-/** Growing HLS buffer gate — keep a consistent runway ahead of the playhead. */
-export const HLS_MIN_START_BUFFER_SECONDS = 18;
-export const HLS_MIN_PLAY_BUFFER_SECONDS = 8;
-export const HLS_RESUME_BUFFER_SECONDS = 24;
-export const HLS_START_BUFFER_TIMEOUT_MS = 45_000;
-export const HLS_START_BUFFER_FALLBACK_SECONDS = 6;
-
-export type BufferGateAction = "wait" | "play" | "hold" | "resume";
-
-/**
- * Decide whether to hold playback while the forward buffer refills.
- * Keeps growing-transcode streams from stuttering segment-by-segment.
- */
-export function resolveBufferGateAction(options: {
-  bufferAheadSeconds: number;
-  playlistHasEndList: boolean;
-  hasStartedPlayback: boolean;
-  holdingForBuffer: boolean;
-  userWantsPlay: boolean;
-  msSinceLoad: number;
-  minStartBufferSeconds?: number;
-  minPlayBufferSeconds?: number;
-  resumeBufferSeconds?: number;
-  startBufferTimeoutMs?: number;
-  startBufferFallbackSeconds?: number;
-}): BufferGateAction {
-  if (!options.userWantsPlay) return "wait";
-
-  const minStart = options.minStartBufferSeconds ?? HLS_MIN_START_BUFFER_SECONDS;
-  const minPlay = options.minPlayBufferSeconds ?? HLS_MIN_PLAY_BUFFER_SECONDS;
-  const resumeAt = options.resumeBufferSeconds ?? HLS_RESUME_BUFFER_SECONDS;
-  const startTimeout = options.startBufferTimeoutMs ?? HLS_START_BUFFER_TIMEOUT_MS;
-  const startFallback =
-    options.startBufferFallbackSeconds ?? HLS_START_BUFFER_FALLBACK_SECONDS;
-
-  // Finished stream: never hold for more buffer.
-  if (options.playlistHasEndList) {
-    if (!options.hasStartedPlayback) return "play";
-    return options.holdingForBuffer ? "resume" : "play";
-  }
-
-  if (!options.hasStartedPlayback) {
-    if (options.bufferAheadSeconds >= minStart) return "play";
-    if (
-      options.msSinceLoad >= startTimeout &&
-      options.bufferAheadSeconds >= startFallback
-    ) {
-      return "play";
-    }
-    return "wait";
-  }
-
-  if (options.holdingForBuffer) {
-    return options.bufferAheadSeconds >= resumeAt ? "resume" : "hold";
-  }
-
-  if (options.bufferAheadSeconds < minPlay) return "hold";
-  return "play";
-}
-
 export function resolveStallWatchdogAction(options: {
   msSinceAdvance: number;
   bufferAheadSeconds: number;

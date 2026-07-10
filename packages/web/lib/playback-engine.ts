@@ -4,7 +4,6 @@ import {
   getContiguousBufferedAhead,
   playlistM3u8HasEndList,
   RECOVERY_FORGIVE_PROGRESS_SECONDS,
-  resolveBufferGateAction,
   resolveRecoveryBudget,
   resolveStallWatchdogAction,
   startDirectPlaybackWithResume,
@@ -28,8 +27,6 @@ export interface WebPlaybackOptions {
   tv?: boolean;
   onFatalError: () => void;
   onBufferUpdate: () => void;
-  /** True when the engine is holding playback to fill the forward buffer. */
-  onBuffering?: (buffering: boolean, midPlayback: boolean) => void;
   onSeekComplete?: (seconds: number) => void;
   onSourceReady?: () => void;
 }
@@ -94,7 +91,6 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
     tv,
     onFatalError,
     onBufferUpdate,
-    onBuffering,
     onSeekComplete,
     onSourceReady,
   } = options;
@@ -106,28 +102,12 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
   const maxHlsRecoveryAttempts = 4;
   let didAttemptPipelineReset = false;
   let stallWatchdog: ReturnType<typeof setInterval> | null = null;
-  let bufferGateTimer: ReturnType<typeof setInterval> | null = null;
   let lastPlaybackAdvanceMs = Date.now();
   let lastPlaybackPosition = 0;
   let consecutiveStallNudges = 0;
   let waitGrowTicks = 0;
   let playlistHasEndList = false;
-  let hasStartedPlayback = false;
-  let holdingForBuffer = false;
   let userWantsPlay = true;
-  let loadStartedAtMs = Date.now();
-
-  const BUFFER_GATE_ATTR = "data-buffer-gate";
-
-  const setBufferGateHold = (holding: boolean, midPlayback: boolean) => {
-    holdingForBuffer = holding;
-    if (holding) {
-      video.setAttribute(BUFFER_GATE_ATTR, "1");
-    } else {
-      video.removeAttribute(BUFFER_GATE_ATTR);
-    }
-    onBuffering?.(holding, midPlayback);
-  };
 
   const onManifestSawEndList = (m3u8: string) => {
     if (!playlistHasEndList && playlistM3u8HasEndList(m3u8)) {
@@ -139,10 +119,6 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
     if (stallWatchdog) {
       clearInterval(stallWatchdog);
       stallWatchdog = null;
-    }
-    if (bufferGateTimer) {
-      clearInterval(bufferGateTimer);
-      bufferGateTimer = null;
     }
   };
 
@@ -181,56 +157,16 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
     }
   };
 
-  const applyBufferGate = () => {
-    if (!hls) return;
-    const bufferAheadSeconds = getContiguousBufferedAhead(video);
-    const action = resolveBufferGateAction({
-      bufferAheadSeconds,
-      playlistHasEndList,
-      hasStartedPlayback,
-      holdingForBuffer,
-      userWantsPlay,
-      msSinceLoad: Date.now() - loadStartedAtMs,
-    });
-
-    if (action === "wait") {
-      if (!video.paused) video.pause();
-      setBufferGateHold(true, false);
-      onBufferUpdate();
-      return;
-    }
-
-    if (action === "hold") {
-      if (!video.paused) video.pause();
-      setBufferGateHold(true, true);
-      onBufferUpdate();
-      return;
-    }
-
-    if (action === "play" || action === "resume") {
-      if (!hasStartedPlayback) hasStartedPlayback = true;
-      if (holdingForBuffer) setBufferGateHold(false, true);
-      if (userWantsPlay && (video.paused || video.ended)) {
-        void video.play().catch(() => {});
-      }
-      onBufferUpdate();
-    }
-  };
-
   const onTimeUpdate = () => {
     trackPlaybackAdvance();
     onBufferUpdate();
-    applyBufferGate();
   };
 
   const onUserPlay = () => {
     userWantsPlay = true;
-    applyBufferGate();
   };
 
   const onUserPause = () => {
-    // Ignore engine-driven holds so we don't clear userWantsPlay.
-    if (video.getAttribute(BUFFER_GATE_ATTR) === "1") return;
     userWantsPlay = false;
   };
 
@@ -243,36 +179,40 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
       hls = createPlaybackHls(HlsConstructor, { tv });
       hls.attachMedia(video);
       hls.loadSource(url);
-      loadStartedAtMs = Date.now();
       video.addEventListener("error", onVideoError);
       video.addEventListener("timeupdate", onTimeUpdate);
       video.addEventListener("play", onUserPlay);
       video.addEventListener("pause", onUserPause);
 
       hls.on(HlsConstructor.Events.MANIFEST_PARSED, () => {
-        // Load from relative 0 (server already applied -ss). Do not play yet —
-        // wait for the buffer gate so we start with a runway, not one segment.
+        // Load from relative 0 (server already applied -ss). Let hls.js own
+        // buffer growth; a client-side pause gate can become an infinite hold
+        // when an encoder is producing segments near real time.
         hls?.startLoad(0);
         lastPlaybackPosition = video.currentTime;
         lastPlaybackAdvanceMs = Date.now();
         onSourceReady?.();
-        setBufferGateHold(true, false);
-        applyBufferGate();
+        video.play().catch(() => {});
       });
 
-      hls.on(HlsConstructor.Events.FRAG_BUFFERED, () => {
+      const resumeAfterFragment = () => {
         onBufferUpdate();
-        applyBufferGate();
-      });
+        // A growing playlist can briefly exhaust the current buffer. Once the
+        // next fragment lands, resume only if the viewer had been playing.
+        if (userWantsPlay && video.paused && !video.ended) {
+          video.play().catch(() => {});
+        }
+      };
+
+      hls.on(HlsConstructor.Events.FRAG_PARSED, resumeAfterFragment);
+      hls.on(HlsConstructor.Events.FRAG_BUFFERED, resumeAfterFragment);
       hls.on(HlsConstructor.Events.BUFFER_APPENDED, () => {
         onBufferUpdate();
-        applyBufferGate();
       });
 
       hls.on(HlsConstructor.Events.LEVEL_UPDATED, (_, data) => {
         onManifestSawEndList(data.details.m3u8);
         onBufferUpdate();
-        applyBufferGate();
       });
 
       hls.on(HlsConstructor.Events.ERROR, (_, data) => {
@@ -316,25 +256,15 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
         onFatalError();
       });
 
-      bufferGateTimer = setInterval(() => {
-        applyBufferGate();
-      }, 400);
-
-      // Never seeks. Buffer underruns → gate hold; wedged decoder → soft
-      // media recovery at the same playhead; no +0.1s nudges / rewinds.
+      // Never seeks. Buffer underruns are handled by the media element/hls.js;
+      // the watchdog only records a genuine wedge and performs soft recovery.
       stallWatchdog = setInterval(() => {
         if (!hls) return;
-        if (holdingForBuffer) return;
-        if (video.paused && !video.ended) {
-          // Still want play but waiting on buffer gate — re-evaluate only.
-          if (userWantsPlay) applyBufferGate();
-          return;
-        }
+        if (video.paused && !video.ended) return;
         if (video.seeking) return;
         if (video.ended) {
           if (!playlistHasEndList) {
             recoverHlsPlaybackAtPlaylistEnd(video, hls);
-            applyBufferGate();
           }
           return;
         }
@@ -361,20 +291,14 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
 
         if (decision.action === "none") return;
 
-        if (
-          decision.action === "wait-grow" ||
-          decision.action === "nudge" ||
-          decision.action === "pipeline-reset"
-        ) {
-          // Hold for buffer / re-issue play at the same spot — never seek.
-          applyBufferGate();
-          if (
-            decision.action === "pipeline-reset" &&
-            !didAttemptPipelineReset
-          ) {
+        if (decision.action === "wait-grow" || decision.action === "nudge") {
+          lastPlaybackAdvanceMs = Date.now();
+          return;
+        }
+
+        if (decision.action === "pipeline-reset") {
+          if (!didAttemptPipelineReset) {
             attemptSoftMediaRecovery();
-          } else if (userWantsPlay && video.paused && !holdingForBuffer) {
-            void video.play().catch(() => {});
           }
           lastPlaybackAdvanceMs = Date.now();
           return;
@@ -406,7 +330,6 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
     hls,
     cleanup: () => {
       clearTimers();
-      video.removeAttribute(BUFFER_GATE_ATTR);
       video.removeEventListener("error", onVideoError);
       video.removeEventListener("timeupdate", onTimeUpdate);
       video.removeEventListener("play", onUserPlay);

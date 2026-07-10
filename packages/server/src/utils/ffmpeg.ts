@@ -663,10 +663,6 @@ export function startHlsRemux(
     "hls",
     "-hls_time",
     String(segmentDuration),
-    // Allow segment cuts off keyframes so long-GOP HEVC sources still produce
-    // roughly hls_time-sized segments (copy mode can't force keyframes).
-    "-break_non_keyframes",
-    "1",
     "-hls_list_size",
     "0",
     "-hls_playlist_type",
