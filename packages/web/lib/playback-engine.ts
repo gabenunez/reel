@@ -1,12 +1,9 @@
 import type Hls from "hls.js";
 import {
   createPlaybackHls,
-  getContiguousBufferedAhead,
-  getVideoBufferedEnd,
   playlistM3u8HasEndList,
   RECOVERY_FORGIVE_PROGRESS_SECONDS,
   resolveRecoveryBudget,
-  shouldRefreshGrowingPlaylist as decideShouldRefreshGrowingPlaylist,
   startDirectPlaybackWithResume,
 } from "@/lib/playback-utils";
 
@@ -44,26 +41,31 @@ export function destroyHlsInstance(hls: Hls | null): void {
   hls.destroy();
 }
 
-/** Resume after a premature `ended` at a growing transcode playlist boundary. */
+/**
+ * Resume after a premature `ended` fired at a growing-transcode boundary
+ * (the playlist had no `#EXT-X-ENDLIST` yet, so this isn't the true file end).
+ *
+ * hls.js keeps its live-playlist reload timer running, so the next segment is
+ * discovered automatically; here we only need to clear the element's `ended`
+ * latch. A tiny backward seek moves the playhead so the browser drops
+ * `ended`, then playback continues once hls.js appends the newly-available
+ * segment. We deliberately do NOT call `hls.startLoad()` — that aborts and
+ * resets hls.js's fragment loader, throwing away buffered-ahead data.
+ */
 export function recoverHlsPlaybackAtPlaylistEnd(
   video: HTMLVideoElement,
-  hls: Hls | null,
+  _hls: Hls | null,
 ): void {
-  const resumeAt = Math.max(0, video.currentTime - 0.25);
-  if (hls) {
-    try {
-      hls.startLoad(resumeAt);
-    } catch {
-      // ignore — next poll will retry
-    }
-  }
-  // Browsers keep ended=true until the playhead moves after a seek.
-  video.pause();
+  const resumeAt = Math.max(0, video.currentTime - 0.05);
   video.currentTime = resumeAt;
   void video.play().catch(() => {});
 }
 
-/** Nudge HLS loading after returning to a foreground tab or pausing near the buffer edge. */
+/**
+ * Nudge playback after returning to a foreground tab. hls.js keeps buffering
+ * on its own; we only need to resume the element if it was paused/stalled by
+ * the browser while backgrounded, or clear a premature `ended`.
+ */
 export function catchUpHlsPlayback(
   video: HTMLVideoElement,
   hls: Hls | null,
@@ -77,49 +79,9 @@ export function catchUpHlsPlayback(
     return;
   }
 
-  const bufferedAhead = getContiguousBufferedAhead(video);
-  if (bufferedAhead >= 45 && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
-    return;
+  if (video.paused) {
+    void video.play().catch(() => {});
   }
-
-  try {
-    hls.startLoad(video.currentTime);
-  } catch {
-    // ignore — next poll will retry
-  }
-}
-
-/**
- * Reload the growing playlist so new segments are discovered.
- *
- * Re-assigning `hls.loadLevel`/`nextLevel`/`currentLevel` to the level it's
- * already on is a guaranteed no-op in hls.js — the level-controller's setter
- * bails out early whenever the target level index is unchanged, which is
- * always true here since this app never runs multi-variant ABR (every
- * session is a single level). `startLoad` is the one public entry point that
- * actually re-arms the level-controller's playlist reload regardless of
- * whether its internal timer has already elapsed.
- */
-function refreshHlsPlaylist(video: HTMLVideoElement, hls: Hls): void {
-  try {
-    hls.startLoad(video.currentTime);
-  } catch {
-    // ignore — next poll will retry
-  }
-}
-
-function isNearBufferEdge(video: HTMLVideoElement): boolean {
-  const bufferedEnd = getVideoBufferedEnd(video);
-  if (bufferedEnd <= 0) return false;
-  return video.currentTime >= bufferedEnd - 1.25;
-}
-
-function needsMoreMediaData(video: HTMLVideoElement): boolean {
-  return (
-    !video.ended &&
-    !video.paused &&
-    video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA
-  );
 }
 
 export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle {
@@ -148,24 +110,19 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
   // Last-ditch media pipeline reset (detach + reattach + reload) tried once
   // before surfacing a fatal error to the UI.
   let didAttemptPipelineReset = false;
-  // Consecutive stall-watchdog passes that refreshed the playlist without the
-  // playhead advancing. After too many, the pipeline is wedged and we
-  // escalate beyond plain playlist refresh.
-  let consecutiveStallRecoveries = 0;
-  let lastStallProbePosition = 0;
-  const maxStallRecoveriesBeforeEscalation = 6;
-  let manifestPollTimer: ReturnType<typeof setInterval> | null = null;
   let stallWatchdog: ReturnType<typeof setInterval> | null = null;
-  let waitingRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
   let lastPlaybackAdvanceMs = Date.now();
   let lastPlaybackPosition = 0;
+  // Number of consecutive stall-watchdog nudges that didn't unstick the
+  // playhead. Escalates: small nudge → pipeline reset → fatal (quality
+  // fallback), so playback never hangs forever.
+  let consecutiveStallNudges = 0;
+  const maxStallNudgesBeforeReset = 3;
+  const maxStallNudgesBeforeFatal = 6;
   // Whether `#EXT-X-ENDLIST` has appeared in the loaded manifest. Once true,
   // this must never be reverted to false — LevelUpdated callbacks can still
   // fire with an older/stale manifest string during hls.js reload races.
   let playlistHasEndList = false;
-  // ENDLIST, when present, may appear in a manifest that gets replaced by a
-  // poll from a still-growing session. Track the first time we observe
-  // #EXT-X-ENDLIST so we never revert on a stale poll.
   const onManifestSawEndList = (m3u8: string) => {
     if (!playlistHasEndList && playlistM3u8HasEndList(m3u8)) {
       playlistHasEndList = true;
@@ -173,17 +130,9 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
   };
 
   const clearTimers = () => {
-    if (manifestPollTimer) {
-      clearInterval(manifestPollTimer);
-      manifestPollTimer = null;
-    }
     if (stallWatchdog) {
       clearInterval(stallWatchdog);
       stallWatchdog = null;
-    }
-    if (waitingRecoveryTimer) {
-      clearTimeout(waitingRecoveryTimer);
-      waitingRecoveryTimer = null;
     }
   };
 
@@ -195,6 +144,7 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
     if (video.currentTime > lastPlaybackPosition + 0.05) {
       lastPlaybackPosition = video.currentTime;
       lastPlaybackAdvanceMs = Date.now();
+      consecutiveStallNudges = 0;
       // A pipeline reset that led to sustained healthy playback is re-armed
       // so a later, unrelated wedge can be recovered the same way instead of
       // going straight to fatal.
@@ -208,60 +158,27 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
     }
   };
 
-  const shouldRefreshGrowingPlaylist = () => {
+  // Full media-pipeline reset: detach + reattach + reload from the current
+  // position. Clears a wedged SourceBuffer that recoverMediaError can't.
+  // Returns false if the reset threw.
+  const attemptPipelineReset = (): boolean => {
     if (!hls) return false;
-    // Premature `ended` at a growing playlist boundary must not stop manifest
-    // polling — recovery depends on discovering new segments.
-    if (video.ended && playlistHasEndList) return false;
-    return decideShouldRefreshGrowingPlaylist({
-      playlistHasEndList,
-      playlistDurationSeconds: video.duration,
-      currentTimeSeconds: video.currentTime,
-      bufferedAheadSeconds: getContiguousBufferedAhead(video),
-      waitingForData:
-        !video.paused && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA,
-      isNearBufferEdge: isNearBufferEdge(video),
-    });
-  };
-
-  const maybeRefreshPlaylist = () => {
-    if (!shouldRefreshGrowingPlaylist()) return;
-    refreshHlsPlaylist(video, hls!);
-  };
-
-  const scheduleWaitingRecovery = () => {
-    if (!hls) return;
-    if (video.ended && playlistHasEndList) return;
-    if (waitingRecoveryTimer) clearTimeout(waitingRecoveryTimer);
-    if (isNearBufferEdge(video) || !playlistHasEndList) {
-      maybeRefreshPlaylist();
+    didAttemptPipelineReset = true;
+    positionAtLastRecovery = video.currentTime;
+    const resumeAt = Math.max(0, video.currentTime - 0.25);
+    try {
+      hls.detachMedia();
+      hls.attachMedia(video);
+      hls.startLoad(resumeAt);
+      return true;
+    } catch {
+      return false;
     }
-    waitingRecoveryTimer = setTimeout(() => {
-      waitingRecoveryTimer = null;
-      if (video.ended && playlistHasEndList) return;
-      if (!needsMoreMediaData(video) && playlistHasEndList) return;
-      maybeRefreshPlaylist();
-    }, 300);
-  };
-
-  const onWaiting = () => {
-    scheduleWaitingRecovery();
   };
 
   const onTimeUpdate = () => {
     trackPlaybackAdvance();
     onBufferUpdate();
-  };
-
-  const startManifestPolling = () => {
-    if (manifestPollTimer) return;
-    manifestPollTimer = setInterval(() => {
-      if (!hls) return;
-      if (video.ended && playlistHasEndList) return;
-      const pausedNearEdge = video.paused && isNearBufferEdge(video);
-      if (video.paused && !pausedNearEdge && playlistHasEndList) return;
-      maybeRefreshPlaylist();
-    }, 2000);
   };
 
   if (usingHls) {
@@ -271,24 +188,27 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
     }
     if (HlsConstructor.isSupported()) {
       hls = createPlaybackHls(HlsConstructor, { tv });
-      hls.loadSource(url);
       hls.attachMedia(video);
+      hls.loadSource(url);
       video.addEventListener("error", onVideoError);
-      video.addEventListener("waiting", onWaiting);
       video.addEventListener("timeupdate", onTimeUpdate);
 
       hls.on(HlsConstructor.Events.MANIFEST_PARSED, () => {
-        // startLoad(0) after MANIFEST_PARSED ensures the first frag fetch
-        // fires synchronously on schedule — required when the player raced
-        // ahead of the transcode and the playlist contains only 1 frag so far.
+        // Kick off loading from the start of the HLS timeline. The HLS session
+        // is created with the server-side `-ss startAt` seek, so the playlist
+        // itself begins at 0 == absolute `startAt`; we must load from relative
+        // position 0, not `startAt`.
+        //
+        // hls.js then buffers ahead up to maxBufferLength on its own and, for
+        // a growing (live, no-ENDLIST) playlist, reloads the manifest on its
+        // native timer to discover new segments. We must NOT poll startLoad()
+        // ourselves — startLoad() aborts and resets the fragment loader, which
+        // throws away buffered-ahead data and prevents the buffer from ever
+        // growing past one segment.
         hls?.startLoad(0);
-        lastPlaybackPosition = 0;
+        lastPlaybackPosition = video.currentTime;
         lastPlaybackAdvanceMs = Date.now();
-        startManifestPolling();
         onSourceReady?.();
-        // Don't call play() here — the element may not yet have its source
-        // buffer attached (FRAG not parsed). Let the first FRAG_PARSED or
-        // BUFFER_APPENDED trigger playback, with this as fallback.
         video.play().catch(() => {});
       });
 
@@ -305,19 +225,12 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
 
       hls.on(HlsConstructor.Events.ERROR, (_, data) => {
         if (!data.fatal) {
-          if (data.details === HlsConstructor.ErrorDetails.BUFFER_STALLED_ERROR) {
-            maybeRefreshPlaylist();
-            return;
-          }
-          if (
-            hls &&
-            (data.details === HlsConstructor.ErrorDetails.FRAG_LOAD_ERROR ||
-              data.details === HlsConstructor.ErrorDetails.FRAG_LOAD_TIMEOUT ||
-              data.details === HlsConstructor.ErrorDetails.LEVEL_LOAD_ERROR ||
-              data.details === HlsConstructor.ErrorDetails.LEVEL_PARSING_ERROR)
-          ) {
-            maybeRefreshPlaylist();
-          }
+          // Non-fatal errors (transient frag/level load failures on a growing
+          // transcode where a segment isn't written yet) are retried by
+          // hls.js internally per its *LoadingMaxRetry config, and the live
+          // playlist reload picks up new segments. Nothing to do here — do
+          // NOT call startLoad(), which would reset the loader and drop the
+          // buffer.
           return;
         }
 
@@ -339,11 +252,7 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
               positionAtLastRecovery = video.currentTime;
 
               if (data.type === HlsConstructor.ErrorTypes.NETWORK_ERROR) {
-                // Network failure during a growing transcode — refresh
-                // manifest rather than bailing straight to fatal; segments
-                // may just not exist yet.
                 hls.startLoad();
-                maybeRefreshPlaylist();
                 return;
               }
               // MEDIA_ERROR
@@ -352,25 +261,10 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
             }
           }
 
-          // A non-recoverable error type (OTHER_ERROR / MUX_ERROR), or a
-          // network/media error that keeps recurring without healthy playback
-          // in between: try one full media-pipeline reset (detach + reattach +
-          // reload from the current position) before surfacing a fatal error
-          // to the UI. This clears a wedged SourceBuffer that
-          // recoverMediaError alone can't.
-          if (!didAttemptPipelineReset) {
-            didAttemptPipelineReset = true;
-            positionAtLastRecovery = video.currentTime;
-            const resumeAt = Math.max(0, video.currentTime - 0.25);
-            try {
-              hls.detachMedia();
-              hls.attachMedia(video);
-              hls.startLoad(resumeAt);
-              maybeRefreshPlaylist();
-              return;
-            } catch {
-              // fall through to fatal
-            }
+          // Budget exhausted, or a non-recoverable type (OTHER/MUX): one full
+          // media-pipeline reset before surfacing a fatal error.
+          if (!didAttemptPipelineReset && attemptPipelineReset()) {
+            return;
           }
         }
 
@@ -380,56 +274,60 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
       hls.on(HlsConstructor.Events.FRAG_BUFFERED, onBufferUpdate);
       hls.on(HlsConstructor.Events.BUFFER_APPENDED, onBufferUpdate);
 
+      // Safety-net watchdog for a genuinely wedged playhead. hls.js handles
+      // normal buffering/reloading and most gap-nudging (nudgeOnVideoHole);
+      // this only fires when playback has not advanced for a sustained period
+      // while it should be playing. It never "refreshes" via startLoad (that
+      // resets the loader). It escalates: micro-nudge → pipeline reset →
+      // fatal (quality fallback), so playback can never hang forever.
       stallWatchdog = setInterval(() => {
         if (!hls) return;
         if (video.paused) return;
-        if (video.ended && playlistHasEndList) return;
+        if (video.seeking) return;
+        // A premature `ended` at a growing edge: clear the ended latch so
+        // hls.js's already-running loader/reload can continue.
+        if (video.ended) {
+          if (!playlistHasEndList) {
+            recoverHlsPlaybackAtPlaylistEnd(video, hls);
+          }
+          return;
+        }
 
-        const positionBefore = video.currentTime;
         trackPlaybackAdvance();
 
-        if (!isNearBufferEdge(video) && playlistHasEndList) return;
-        if (Date.now() - lastPlaybackAdvanceMs < 2000) return;
-        if (!needsMoreMediaData(video) && playlistHasEndList) return;
+        // Playing normally — nothing to do.
+        if (Date.now() - lastPlaybackAdvanceMs < 4000) return;
+        // The player has buffered data ahead but simply isn't advancing (e.g.
+        // decoder hiccup) — a tiny nudge unsticks it.
+        const stuckWithData =
+          video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
 
-        // Refresh made progress since the previous stalled pass — reset the
-        // escalation counter and let normal playback resume.
-        if (positionBefore > lastStallProbePosition + 0.05) {
-          consecutiveStallRecoveries = 0;
+        consecutiveStallNudges += 1;
+
+        if (consecutiveStallNudges >= maxStallNudgesBeforeFatal) {
+          consecutiveStallNudges = 0;
+          onFatalError();
+          lastPlaybackAdvanceMs = Date.now();
+          return;
         }
-        lastStallProbePosition = positionBefore;
 
-        maybeRefreshPlaylist();
-        if (video.ended && !playlistHasEndList) {
-          recoverHlsPlaybackAtPlaylistEnd(video, hls);
-        }
-
-        consecutiveStallRecoveries += 1;
-        // Refreshing the playlist repeatedly hasn't unstuck the playhead —
-        // the media pipeline is wedged (bad segment append, SourceBuffer
-        // gap hls.js can't nudge past). Escalate to a full detach/reattach
-        // reload once, then to a fatal error (which triggers quality
-        // fallback) so playback never silently hangs forever.
-        if (consecutiveStallRecoveries >= maxStallRecoveriesBeforeEscalation) {
-          consecutiveStallRecoveries = 0;
+        if (consecutiveStallNudges >= maxStallNudgesBeforeReset) {
           if (!didAttemptPipelineReset) {
-            didAttemptPipelineReset = true;
-            positionAtLastRecovery = video.currentTime;
-            const resumeAt = Math.max(0, video.currentTime - 0.25);
-            try {
-              hls.detachMedia();
-              hls.attachMedia(video);
-              hls.startLoad(resumeAt);
-            } catch {
-              onFatalError();
-            }
+            attemptPipelineReset();
           } else {
             onFatalError();
           }
+          lastPlaybackAdvanceMs = Date.now();
+          return;
         }
 
+        // Micro-nudge: skip past a tiny buffer hole / kick the decoder.
+        if (stuckWithData) {
+          video.currentTime = video.currentTime + 0.1;
+        }
+        void video.play().catch(() => {});
         lastPlaybackAdvanceMs = Date.now();
-      }, 1500);
+      }, 2000);
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = url;
       video.addEventListener("error", onVideoError);
@@ -452,7 +350,6 @@ export function startWebPlayback(options: WebPlaybackOptions): WebPlaybackHandle
     cleanup: () => {
       clearTimers();
       video.removeEventListener("error", onVideoError);
-      video.removeEventListener("waiting", onWaiting);
       video.removeEventListener("timeupdate", onTimeUpdate);
       stopDirectPlayback?.();
       destroyHlsInstance(hls);

@@ -618,50 +618,6 @@ export function playlistM3u8HasEndList(m3u8: string): boolean {
   return m3u8.includes("#EXT-X-ENDLIST");
 }
 
-/**
- * Whether the growing-transcode manifest should be reloaded to discover new
- * segments. `playlistHasEndList` must reflect whether `#EXT-X-ENDLIST` has
- * been seen — not hls.js's `live` flag, which is false for VoD-style growing
- * transcodes. `video.duration` alone can't tell "reached the true end of the
- * file" apart from "reached the edge of however much has been transcoded so
- * far."
- */
-export function shouldRefreshGrowingPlaylist({
-  playlistHasEndList,
-  playlistDurationSeconds,
-  currentTimeSeconds,
-  bufferedAheadSeconds,
-  waitingForData,
-  isNearBufferEdge,
-}: {
-  playlistHasEndList: boolean;
-  playlistDurationSeconds: number;
-  currentTimeSeconds: number;
-  bufferedAheadSeconds: number;
-  waitingForData: boolean;
-  isNearBufferEdge: boolean;
-}): boolean {
-  const atSourceEnd =
-    playlistHasEndList &&
-    Number.isFinite(playlistDurationSeconds) &&
-    playlistDurationSeconds > 0 &&
-    currentTimeSeconds >= playlistDurationSeconds - 0.5;
-  if (atSourceEnd) return false;
-
-  // Growing transcode: keep polling until ENDLIST appears. A healthy buffer
-  // does not mean ffmpeg has finished encoding — new segments must still be
-  // discovered even when prefetch islands inflate raw bufferedAhead.
-  if (!playlistHasEndList) {
-    return (
-      waitingForData ||
-      isNearBufferEdge ||
-      bufferedAheadSeconds < 120
-    );
-  }
-
-  return waitingForData || isNearBufferEdge || bufferedAheadSeconds < 45;
-}
-
 /** End of the buffered range containing the current playhead (or before it in a gap). */
 export function getVideoBufferedEnd(video: HTMLVideoElement): number {
   const ranges = video.buffered;
@@ -921,32 +877,46 @@ export function createPlaybackHls(
 ) {
   const tv = options?.tv ?? isTvClient();
 
+  // The server serves a growing HLS playlist (VOD content produced by an
+  // on-demand transcode; no #EXT-X-ENDLIST until complete). hls.js treats a
+  // no-ENDLIST playlist as "live" and reloads it on its own timer to discover
+  // new segments — exactly what we want. We deliberately let hls.js manage
+  // buffering and playlist reloads natively; the app must NOT poll
+  // startLoad() (that resets the fragment loader and prevents the buffer from
+  // ever growing past one segment).
   return new HlsConstructor({
     startPosition: 0,
     backBufferLength: tv ? 120 : 90,
-    maxBufferLength: tv ? 180 : 120,
+    // Buffer generously ahead of the playhead. With accurate segment
+    // durations from the server, hls.js fills this without creating holes.
+    maxBufferLength: 60,
     maxMaxBufferLength: tv ? 360 : 600,
     maxBufferSize: tv ? 300 * 1000 * 1000 : 100 * 1000 * 1000,
-    maxBufferHole: tv ? 2 : 4,
+    maxBufferHole: 0.5,
+    highBufferWatchdogPeriod: 2,
     nudgeOnVideoHole: true,
-    nudgeOffset: 0.15,
-    nudgeMaxRetry: 5,
-    liveDurationInfinity: true,
+    nudgeOffset: 0.2,
+    nudgeMaxRetry: 8,
+    // Keep video.duration finite (the growing playlist length) so the seek
+    // bar and premature-`ended` detection work.
+    liveDurationInfinity: false,
     enableWorker: true,
     progressive: false,
-    // Prefetching ahead of the playhead creates buffer holes on growing transcodes.
-    startFragPrefetch: false,
-    // Load sequentially from the buffer end, not from the live edge.
+    // Buffer ahead from the buffer end rather than hugging the live edge —
+    // this is VOD-shaped content, we want a deep forward buffer.
     liveSyncMode: "buffered",
-    liveSyncDurationCount: 3,
+    liveSyncDurationCount: 10,
     liveMaxLatencyDurationCount: Number.POSITIVE_INFINITY,
     maxLiveSyncPlaybackRate: 1,
-    manifestLoadingMaxRetry: 6,
+    manifestLoadingMaxRetry: 8,
     manifestLoadingRetryDelay: 1000,
-    levelLoadingMaxRetry: 6,
-    levelLoadingRetryDelay: 800,
-    fragLoadingMaxRetry: 8,
-    fragLoadingRetryDelay: 800,
+    manifestLoadingMaxRetryTimeout: 64000,
+    levelLoadingMaxRetry: 8,
+    levelLoadingRetryDelay: 1000,
+    levelLoadingMaxRetryTimeout: 64000,
+    fragLoadingMaxRetry: 10,
+    fragLoadingRetryDelay: 1000,
+    fragLoadingMaxRetryTimeout: 64000,
     appendErrorMaxRetry: 6,
     xhrSetup: (xhr) => {
       xhr.withCredentials = true;

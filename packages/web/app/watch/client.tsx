@@ -339,9 +339,24 @@ function WatchDesktopClient() {
     );
     if (!durationMs) return;
 
-    const positionSeconds = usingHlsPlayback
+    const liveSeconds = usingHlsPlayback
       ? hlsStartOffsetRef.current + video.currentTime
       : video.currentTime;
+
+    // Never persist a regressed position. On a stream restart/recovery the
+    // media element can momentarily report currentTime = 0 (or the HLS offset)
+    // before the real playhead is restored; saveProgress runs in the playback
+    // effect cleanup during exactly those restarts. lastStableAbsoluteSeconds
+    // is only ever advanced by real playback or an explicit user seek (which
+    // writes it directly, including backward seeks), so it is the trustworthy
+    // floor for what to persist — this guarantees a user never loses their
+    // spot to a transient reset.
+    const stableSeconds = lastStableAbsoluteSecondsRef.current;
+    const positionSeconds = Math.max(liveSeconds, stableSeconds);
+
+    // Guard against a bogus tiny position when we know we were further along.
+    if (positionSeconds <= 0) return;
+
     api.saveProgress({
       itemType: type === "movie" ? "movie" : "episode",
       itemId: fileId,
@@ -632,9 +647,13 @@ function WatchDesktopClient() {
       );
       if (!durationMs) return;
 
-      const positionSeconds = usingHlsPlayback
+      const liveSeconds = usingHlsPlayback
         ? hlsStartOffsetRef.current + video.currentTime
         : video.currentTime;
+      // Same regression guard as saveProgress — never persist a spot behind
+      // the last known-good position.
+      const positionSeconds = Math.max(liveSeconds, lastStableAbsoluteSecondsRef.current);
+      if (positionSeconds <= 0) return;
 
       void api
         .saveProgress(

@@ -14,7 +14,6 @@ import {
   resolveInitialStreamQuality,
   resolvePlaybackStartSeconds,
   resolvePlaybackStream,
-  shouldRefreshGrowingPlaylist,
 } from "./playback-utils.js";
 
 vi.mock("./android-bridge.js", () => ({
@@ -344,73 +343,6 @@ describe("getContiguousBufferedAhead", () => {
     } as HTMLVideoElement;
 
     expect(getContiguousBufferedAhead(video)).toBeCloseTo(4, 1);
-  });
-});
-
-describe("shouldRefreshGrowingPlaylist", () => {
-  it("keeps refreshing once playback catches up to the partial duration while ENDLIST is absent", () => {
-    expect(
-      shouldRefreshGrowingPlaylist({
-        playlistHasEndList: false,
-        playlistDurationSeconds: 24,
-        currentTimeSeconds: 23.8,
-        bufferedAheadSeconds: 0.2,
-        waitingForData: true,
-        isNearBufferEdge: true,
-      }),
-    ).toBe(true);
-  });
-
-  it("stops refreshing once the manifest confirms the real end of file (ENDLIST seen)", () => {
-    expect(
-      shouldRefreshGrowingPlaylist({
-        playlistHasEndList: true,
-        playlistDurationSeconds: 24,
-        currentTimeSeconds: 23.8,
-        bufferedAheadSeconds: 0.2,
-        waitingForData: true,
-        isNearBufferEdge: true,
-      }),
-    ).toBe(false);
-  });
-
-  it("does not refresh mid-playback with a healthy buffer once ENDLIST is present", () => {
-    expect(
-      shouldRefreshGrowingPlaylist({
-        playlistHasEndList: true,
-        playlistDurationSeconds: 600,
-        currentTimeSeconds: 100,
-        bufferedAheadSeconds: 60,
-        waitingForData: false,
-        isNearBufferEdge: false,
-      }),
-    ).toBe(false);
-  });
-
-  it("keeps refreshing during an in-progress transcode even with a large buffer", () => {
-    expect(
-      shouldRefreshGrowingPlaylist({
-        playlistHasEndList: false,
-        playlistDurationSeconds: 600,
-        currentTimeSeconds: 100,
-        bufferedAheadSeconds: 60,
-        waitingForData: false,
-        isNearBufferEdge: false,
-      }),
-    ).toBe(true);
-  });
-
-  it("refreshes when the buffer runs low even mid-playlist", () => {
-    expect(
-      shouldRefreshGrowingPlaylist({
-        playlistHasEndList: false,
-        playlistDurationSeconds: 600,
-        currentTimeSeconds: 100,
-        bufferedAheadSeconds: 30,
-        waitingForData: false,
-        isNearBufferEdge: false,
-      }),
-    ).toBe(true);
   });
 });
 

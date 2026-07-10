@@ -553,9 +553,13 @@ export function TvWatchView() {
     );
     if (!durationMs) return;
 
-    const positionSeconds = usingHlsPlayback
+    const liveSeconds = usingHlsPlayback
       ? hlsStartOffsetRef.current + currentTime
       : currentTime;
+    // Never persist a spot behind the last known-good position (guards
+    // against a transient reset during restart/recovery).
+    const positionSeconds = Math.max(liveSeconds, lastStableAbsoluteSecondsRef.current);
+    if (positionSeconds <= 0) return;
 
     api
       .saveProgress({
