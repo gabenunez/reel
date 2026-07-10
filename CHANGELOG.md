@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.137 — 2026-07-09
+
+### Fix
+
+- **Server** — never emit `#EXT-X-ENDLIST` for SIGTERM'd or short partial transcodes; only when produced duration actually covers the source
+- **Server** — resume dead-but-incomplete transcode sessions on playlist requests instead of serving a frozen ~20s partial playlist forever
+- **Server** — protect actively-serving transcode sessions from capacity/cleanup kills during playlist polls; return 503 on mid-flush instead of stopping ffmpeg
+
 ## 0.1.136 — 2026-07-09
 
 ### Fix
