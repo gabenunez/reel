@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.147 — 2026-07-10
+
+### Fix
+
+- **TV** — remove theme music mute button from media banner; theme music always plays on TV (ignores desktop mute preference)
+
 ## 0.1.146 — 2026-07-10
 
 ### Fix

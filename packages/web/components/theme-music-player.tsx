@@ -11,6 +11,7 @@ import {
 import { api } from "@/lib/api";
 import { ensureAudioUnlocked, getSharedAudioContext } from "@/lib/audio-unlock";
 import { useThemeMusicSettings } from "@/components/theme-music-settings";
+import { isTvClient } from "@/lib/tv-mode-detect";
 
 const TARGET_VOLUME = 0.38;
 const FADE_MS = 1800;
@@ -98,6 +99,7 @@ export function ThemeMusicProvider({
   children,
 }: ThemeMusicProviderProps) {
   const { enabled: themeMusicEnabled } = useThemeMusicSettings();
+  const playThemeMusic = isTvClient() || themeMusicEnabled;
   const [isPlaying, setIsPlaying] = useState(false);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const stopFadeRef = useRef<(() => void) | null>(null);
@@ -105,13 +107,13 @@ export function ThemeMusicProvider({
   const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    if (!themeMusicEnabled) {
+    if (!playThemeMusic) {
       cleanupRef.current?.();
     }
-  }, [themeMusicEnabled]);
+  }, [playThemeMusic]);
 
   useEffect(() => {
-    if (!enabled || !mediaId || !themeMusicEnabled) return;
+    if (!enabled || !mediaId || !playThemeMusic) return;
 
     const session = Symbol("theme-session");
     let activeSession: symbol | null = session;
@@ -284,7 +286,7 @@ export function ThemeMusicProvider({
       cleanup();
       cleanupRef.current = null;
     };
-  }, [mediaId, enabled, themeMusicEnabled]);
+  }, [mediaId, enabled, playThemeMusic]);
 
   return (
     <ThemeMusicContext.Provider value={{ isPlaying, analyser }}>

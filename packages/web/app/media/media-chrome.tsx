@@ -18,7 +18,9 @@ export function MediaThemeShell({
 }) {
   return (
     <ThemeMusicProvider mediaId={mediaId}>
-      <ThemeMusicMuteButton className="fixed top-20 right-4 z-50 sm:right-6" />
+      <div data-web-only>
+        <ThemeMusicMuteButton className="fixed top-20 right-4 z-50 sm:right-6" />
+      </div>
       {children}
     </ThemeMusicProvider>
   );
