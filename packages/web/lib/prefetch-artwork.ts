@@ -2,6 +2,7 @@ import { api, type MediaItem } from "@/lib/api";
 import { nextOptimizedImageUrl } from "@/lib/next-image-url";
 import { prefetchMediaPage } from "@/lib/use-media-page-data";
 import { prefetchThemeMusic } from "@/components/theme-music-player";
+import { tvImageUrl } from "@/lib/tv-image";
 
 const inflight = new Set<string>();
 
@@ -30,7 +31,9 @@ export function prefetchPosterNavigation(item: PosterLike): void {
   prefetchMediaPage(item.id);
   prefetchThemeMusic(item.id);
   preloadImageUrl(api.imageUrl(item.posterPath));
-  preloadImageUrl(api.imageUrl(item.backdropPath ?? item.posterPath));
+  // Media heroes use `sizes="100vw"`, so a 384px warm-up does not match the
+  // eventual image request. Warm the desktop/TV hero-sized variant instead.
+  preloadImageUrl(tvImageUrl(item.backdropPath ?? item.posterPath), 1920);
 }
 
 export function preloadPosterList(

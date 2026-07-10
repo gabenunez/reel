@@ -1,4 +1,6 @@
-const DEFAULT_QUALITY = 75;
+import { withBasePath } from "./base-path";
+
+const DEFAULT_QUALITY = 80;
 
 /** Build a `/_next/image` URL for warming the optimizer cache before navigation. */
 export function nextOptimizedImageUrl(
@@ -11,5 +13,5 @@ export function nextOptimizedImageUrl(
     w: String(width),
     q: String(quality),
   });
-  return `/_next/image?${params.toString()}`;
+  return withBasePath(`/_next/image?${params.toString()}`);
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.150 — 2026-07-10
+
+### Fix
+
+- **Performance** — poster prefetch warms hero-sized backdrop images (1920px) so media pages do not refetch after navigation
+- **Performance** — `/_next/image` prefetch URLs respect `basePath` for subpath installs
+
 ## 0.1.149 — 2026-07-10
 
 ### Fix
