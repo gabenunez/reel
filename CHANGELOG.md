@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.143 — 2026-07-10
+
+### Fix
+
+- **Playback** — remove client-side HLS buffer gate that could infinite-hold when the encoder runs near real time; let hls.js own buffer growth and resume after new fragments land
+- **Server** — revert remux `-break_non_keyframes` (was producing invalid segment boundaries on long-GOP HEVC)
+
 ## 0.1.142 — 2026-07-10
 
 ### Fix
