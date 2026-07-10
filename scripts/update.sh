@@ -199,7 +199,7 @@ ensure_startup_script() {
   local startup="${HOME}/.startup/reel"
 
   mkdir -p "${HOME}/.startup"
-  if [[ -x "$startup" ]] && grep -q "start-prod.sh" "$startup" 2>/dev/null; then
+  if [[ -x "$startup" ]] && grep -q "MEDIA_STARTUP_V2" "$startup" 2>/dev/null; then
     return 0
   fi
 
@@ -210,13 +210,38 @@ ensure_startup_script() {
 
   cat >"$startup" <<EOF
 #!/usr/bin/env bash
+# MEDIA_STARTUP_V2 — seedbox boot: stop old stack, wait for ports, start supervisor.
 set -euo pipefail
-cd "$install_dir"
 export PATH="\${HOME}/node/bin:\${PATH:-}"
-exec bash scripts/start-prod.sh
+INSTALL="$install_dir"
+PID_FILE="\${HOME}/.config/reel/reel.pid"
+LOG_FILE="\${HOME}/.config/reel/reel.log"
+mkdir -p "\${HOME}/.config/reel"
+cd "\$INSTALL"
+
+if [[ -f "\$PID_FILE" ]]; then
+  old_pid="\$(cat "\$PID_FILE" 2>/dev/null || true)"
+  if [[ -n "\$old_pid" ]] && kill -0 "\$old_pid" 2>/dev/null; then
+    kill "\$old_pid" 2>/dev/null || true
+    for _ in \$(seq 1 40); do kill -0 "\$old_pid" 2>/dev/null || break; sleep 0.25; done
+    kill -9 "\$old_pid" 2>/dev/null || true
+  fi
+  rm -f "\$PID_FILE"
+fi
+pkill -f "packages/server/dist/index.js" 2>/dev/null || true
+pkill -f "packages/web/.next/standalone/packages/web/server.js" 2>/dev/null || true
+pkill -f "scripts/start-prod.sh" 2>/dev/null || true
+for _ in \$(seq 1 40); do
+  ss -ltnp 2>/dev/null | grep -qE ":8096 |:8097 " && sleep 0.25 || break
+done
+rm -rf "\$INSTALL/data/.start-prod.lock"
+
+nohup bash scripts/start-prod.sh >> "\$LOG_FILE" 2>&1 &
+echo \$! > "\$PID_FILE"
+echo "MEDIA! started (pid \$(cat "\$PID_FILE"))"
 EOF
   chmod +x "$startup"
-  media_ok "Configured ~/.startup/reel to run scripts/start-prod.sh"
+  media_ok "Configured ~/.startup/reel (MEDIA_STARTUP_V2)"
 }
 
 read_config_port() {
@@ -266,8 +291,9 @@ verify_web_runtime() {
 }
 
 stop_running_reel() {
-  local config_dir pid_file pid
+  local config_dir pid_file pid install_dir
   config_dir="$(media_config_dir)"
+  install_dir="$(detect_install_dir)"
   pid_file="$config_dir/reel.pid"
   pid=""
   if [[ -f "$pid_file" ]]; then
@@ -282,12 +308,25 @@ stop_running_reel() {
   if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
     media_ok "Stopping MEDIA! (pid $pid)..."
     kill "$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
-    sleep 2
+    for _ in $(seq 1 40); do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.25
+    done
+    kill -9 "$pid" 2>/dev/null || true
   fi
-  pkill -f "node packages/server/dist/index.js" 2>/dev/null || true
+  pkill -f "packages/server/dist/index.js" 2>/dev/null || true
   pkill -f "packages/web/.next/standalone/packages/web/server.js" 2>/dev/null || true
   pkill -f "scripts/start-prod.sh" 2>/dev/null || true
-  sleep 1
+  for _ in $(seq 1 40); do
+    if pgrep -f "packages/server/dist/index.js" >/dev/null 2>&1 ||
+      pgrep -f "packages/web/.next/standalone/packages/web/server.js" >/dev/null 2>&1 ||
+      pgrep -f "scripts/start-prod.sh" >/dev/null 2>&1; then
+      sleep 0.25
+      continue
+    fi
+    break
+  done
+  rm -rf "$install_dir/data/.start-prod.lock"
   rm -f "$config_dir/reel.pid" "${HOME}/.config/media-app/reel.pid" "${HOME}/.config/reel/reel.pid"
 }
 
@@ -307,9 +346,10 @@ restart_service() {
     fi
   elif [[ -x "${HOME}/.startup/reel" ]] || [[ -d "${HOME}/.startup" ]]; then
     ensure_startup_script "$(detect_install_dir)"
-    media_ok "Restarting via ~/.startup/reel..."
-    stop_running_reel
-    "${HOME}/.startup/reel"
+    media_ok "Restarting production stack..."
+    export PATH="${HOME}/node/bin:${PATH:-}"
+    cd "$(detect_install_dir)"
+    bash scripts/restart-prod.sh
   else
     local config_dir pid_file install_dir
     config_dir="$(media_config_dir)"

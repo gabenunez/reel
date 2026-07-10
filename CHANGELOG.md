@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.145 — 2026-07-10
+
+### Fix
+
+- **Deploy** — in-app update uses `restart-prod.sh` with a full stop/wait loop so ports 8096/8097 are free before the new stack starts (fixes EADDRINUSE and stuck “Restarting…” installs)
+- **Deploy** — replace legacy `~/.startup/reel` scripts that only slept 1s after kill; new MEDIA_STARTUP_V2 template waits for API/web processes to exit
+- **Deploy** — broaden process cleanup patterns so full-path node servers are stopped during restart
+
 ## 0.1.144 — 2026-07-10
 
 ### Fix

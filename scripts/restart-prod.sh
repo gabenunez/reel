@@ -50,18 +50,18 @@ stop_running_reel() {
     fi
     # systemd may be stopped while an older non-systemd owner is still alive.
     sleep 1
-    pkill -f "node packages/server/dist/index.js" 2>/dev/null || true
+    pkill -f "packages/server/dist/index.js" 2>/dev/null || true
     pkill -f "packages/web/.next/standalone/packages/web/server.js" 2>/dev/null || true
     pkill -f "scripts/start-prod.sh" 2>/dev/null || true
     for _ in $(seq 1 40); do
-      if ! pgrep -f "node packages/server/dist/index.js" >/dev/null 2>&1 &&
+      if ! pgrep -f "packages/server/dist/index.js" >/dev/null 2>&1 &&
         ! pgrep -f "packages/web/.next/standalone/packages/web/server.js" >/dev/null 2>&1 &&
         ! pgrep -f "scripts/start-prod.sh" >/dev/null 2>&1; then
         break
       fi
       sleep 0.25
     done
-    if pgrep -f "node packages/server/dist/index.js" >/dev/null 2>&1 ||
+    if pgrep -f "packages/server/dist/index.js" >/dev/null 2>&1 ||
       pgrep -f "packages/web/.next/standalone/packages/web/server.js" >/dev/null 2>&1 ||
       pgrep -f "scripts/start-prod.sh" >/dev/null 2>&1; then
       echo "Could not stop all MEDIA! processes cleanly; refusing to start a duplicate." >&2
@@ -88,14 +88,14 @@ stop_running_reel() {
     kill "$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
     sleep 2
   fi
-  pkill -f "node packages/server/dist/index.js" 2>/dev/null || true
+  pkill -f "packages/server/dist/index.js" 2>/dev/null || true
   pkill -f "packages/web/.next/standalone/packages/web/server.js" 2>/dev/null || true
   pkill -f "scripts/start-prod.sh" 2>/dev/null || true
 
   # Do not start a replacement until every old process has actually exited.
   # A short fixed sleep allowed orphaned API processes to retain port 8097.
   for _ in $(seq 1 40); do
-    if ! pgrep -f "node packages/server/dist/index.js" >/dev/null 2>&1 &&
+    if ! pgrep -f "packages/server/dist/index.js" >/dev/null 2>&1 &&
       ! pgrep -f "packages/web/.next/standalone/packages/web/server.js" >/dev/null 2>&1 &&
       ! pgrep -f "scripts/start-prod.sh" >/dev/null 2>&1; then
       break
@@ -103,7 +103,7 @@ stop_running_reel() {
     sleep 0.25
   done
 
-  if pgrep -f "node packages/server/dist/index.js" >/dev/null 2>&1 ||
+  if pgrep -f "packages/server/dist/index.js" >/dev/null 2>&1 ||
     pgrep -f "packages/web/.next/standalone/packages/web/server.js" >/dev/null 2>&1 ||
     pgrep -f "scripts/start-prod.sh" >/dev/null 2>&1; then
     echo "Could not stop all MEDIA! processes cleanly; refusing to start a duplicate." >&2
@@ -122,16 +122,12 @@ start_running_reel() {
     return 0
   fi
 
-  if [[ -x "${HOME}/.startup/reel" ]]; then
-    "${HOME}/.startup/reel"
-    return 0
-  fi
-
   local config_dir pid_file
   config_dir="$(media_config_dir)"
   mkdir -p "$config_dir"
   pid_file="$config_dir/reel.pid"
   export PATH="${HOME}/node/bin:${PATH:-}"
+  rm -rf "$ROOT/data/.start-prod.lock"
   nohup bash scripts/start-prod.sh >>"$config_dir/reel.log" 2>&1 &
   echo $! >"$pid_file"
 }
