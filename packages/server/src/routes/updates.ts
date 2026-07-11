@@ -6,6 +6,7 @@ import {
   prepareUpdateApply,
   triggerUpdate,
 } from "../services/updates.js";
+import { errorMessage } from "./util.js";
 
 export async function updateRoutes(app: FastifyInstance) {
   app.get("/api/updates/progress", async () => ({
@@ -31,7 +32,7 @@ export async function updateRoutes(app: FastifyInstance) {
           releaseTag,
         };
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to start update";
+        const message = errorMessage(err, "Failed to start update");
         const statusCode =
           message === "An update is already in progress"
             ? 409

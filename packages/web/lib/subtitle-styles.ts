@@ -243,24 +243,6 @@ export function subtitleCueAppearance(
   };
 }
 
-/** @deprecated Use subtitleCueAppearance or previewSubtitleAppearance */
-export function previewSubtitleStyles(styles: SubtitleStyles): {
-  color: string;
-  backgroundColor: string;
-  fontSize: string;
-  fontFamily: string;
-  textShadow: string;
-} {
-  const appearance = previewSubtitleAppearance(styles);
-  return {
-    color: appearance.color,
-    backgroundColor: appearance.backgroundColor,
-    fontSize: appearance.fontSize,
-    fontFamily: appearance.fontFamily,
-    textShadow: appearance.textShadow,
-  };
-}
-
 /** Mini player-frame preview (uses container query units). */
 export function previewSubtitleAppearance(
   styles: SubtitleStyles,

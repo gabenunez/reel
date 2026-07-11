@@ -1,16 +1,10 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { detectInstallDir } from "./updates.js";
+import { resolveConfigDir } from "../utils/paths.js";
 
-function getConfigDir(): string {
-  const mediaAppDir = path.join(os.homedir(), ".config/media-app");
-  if (fs.existsSync(mediaAppDir)) return mediaAppDir;
-  const legacyDir = path.join(os.homedir(), ".config/reel");
-  if (fs.existsSync(legacyDir)) return legacyDir;
-  return mediaAppDir;
-}
+const getConfigDir = resolveConfigDir;
 
 export function scheduleServerRestart(options: { rebuild?: boolean } = {}): void {
   const installDir = detectInstallDir();

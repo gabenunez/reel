@@ -40,13 +40,6 @@ export function getLanBaseUrl(port: number): string {
   return `http://${address}:${port}`;
 }
 
-export function getRequestBaseUrl(
-  request: FastifyRequest,
-  config: AppConfig,
-): string {
-  return getCastBaseUrl(request, config);
-}
-
 export function getCastBaseUrl(
   request: FastifyRequest,
   config: AppConfig,

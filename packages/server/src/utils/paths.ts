@@ -2,6 +2,18 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+/**
+ * Resolve the app config directory, preferring the current `media-app` path
+ * and falling back to the legacy `reel` path when it already exists.
+ */
+export function resolveConfigDir(): string {
+  const mediaAppDir = path.join(os.homedir(), ".config/media-app");
+  if (fs.existsSync(mediaAppDir)) return mediaAppDir;
+  const legacyDir = path.join(os.homedir(), ".config/reel");
+  if (fs.existsSync(legacyDir)) return legacyDir;
+  return mediaAppDir;
+}
+
 export interface BrowseEntry {
   name: string;
   path: string;

@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { GITHUB_REPO, compareVersions, isNewerVersion, normalizeVersion } from "@media-app/shared";
+import { resolveConfigDir } from "../utils/paths.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -156,13 +157,7 @@ export function getCurrentVersion(installDir = detectInstallDir()): string {
   return "0.0.0";
 }
 
-function getConfigDir(): string {
-  const mediaAppDir = path.join(os.homedir(), ".config/media-app");
-  if (fs.existsSync(mediaAppDir)) return mediaAppDir;
-  const legacyDir = path.join(os.homedir(), ".config/reel");
-  if (fs.existsSync(legacyDir)) return legacyDir;
-  return mediaAppDir;
-}
+const getConfigDir = resolveConfigDir;
 
 function getUpdateLogPath(): string {
   return path.join(getConfigDir(), "update.log");

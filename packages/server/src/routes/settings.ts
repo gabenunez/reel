@@ -23,6 +23,17 @@ import {
   previewPlexImport,
 } from "../services/plex-import.js";
 import { scheduleServerRestart } from "../services/restart.js";
+import { errorMessage } from "./util.js";
+
+/** Report whether an API key is set (not the placeholder) and its masked preview. */
+function maskApiKey(raw?: string | null): { configured: boolean; preview: string } {
+  const key = raw?.trim() ?? "";
+  const configured = Boolean(key && key !== "YOUR_KEY_HERE");
+  const preview = configured
+    ? `${key.slice(0, 4)}${"•".repeat(Math.max(0, key.length - 8))}${key.slice(-4)}`
+    : "";
+  return { configured, preview };
+}
 
 function normalizePublicPrefixInput(value: unknown): string {
   if (value === undefined || value === null) return "";
@@ -61,12 +72,9 @@ export async function settingsRoutes(
       pathExists: validateLibraryPath(lib.path).valid,
     }));
 
-    const key = config.metadata.tmdb_api_key?.trim() ?? "";
-    const hasKey = Boolean(key && key !== "YOUR_KEY_HERE");
-    const fanartKey = config.metadata.fanart_api_key?.trim() ?? "";
-    const hasFanartKey = Boolean(fanartKey && fanartKey !== "YOUR_KEY_HERE");
-    const osKey = config.subtitles?.opensubtitles_api_key?.trim() ?? "";
-    const hasOsKey = Boolean(osKey && osKey !== "YOUR_KEY_HERE");
+    const tmdb = maskApiKey(config.metadata.tmdb_api_key);
+    const fanart = maskApiKey(config.metadata.fanart_api_key);
+    const opensubtitles = maskApiKey(config.subtitles?.opensubtitles_api_key);
 
     return {
       ffmpegAvailable,
@@ -75,21 +83,15 @@ export async function settingsRoutes(
       passwordConfigured: Boolean(config.auth?.password_hash?.trim()),
       publicPrefix: config.server.public_prefix ?? "",
       metadata: {
-        tmdbConfigured: hasKey,
-        tmdbApiKeyPreview: hasKey
-          ? `${key.slice(0, 4)}${"•".repeat(Math.max(0, key.length - 8))}${key.slice(-4)}`
-          : "",
-        fanartConfigured: hasFanartKey,
-        fanartApiKeyPreview: hasFanartKey
-          ? `${fanartKey.slice(0, 4)}${"•".repeat(Math.max(0, fanartKey.length - 8))}${fanartKey.slice(-4)}`
-          : "",
+        tmdbConfigured: tmdb.configured,
+        tmdbApiKeyPreview: tmdb.preview,
+        fanartConfigured: fanart.configured,
+        fanartApiKeyPreview: fanart.preview,
         language: config.metadata.language,
       },
       subtitles: {
-        opensubtitlesConfigured: hasOsKey,
-        opensubtitlesApiKeyPreview: hasOsKey
-          ? `${osKey.slice(0, 4)}${"•".repeat(Math.max(0, osKey.length - 8))}${osKey.slice(-4)}`
-          : "",
+        opensubtitlesConfigured: opensubtitles.configured,
+        opensubtitlesApiKeyPreview: opensubtitles.preview,
       },
       browseShortcuts: getBrowseShortcuts(),
     };
@@ -117,7 +119,7 @@ export async function settingsRoutes(
         };
       } catch (err) {
         return reply.status(400).send({
-          error: err instanceof Error ? err.message : "Invalid public_prefix",
+          error: errorMessage(err, "Invalid public_prefix"),
         });
       }
     },
@@ -170,7 +172,7 @@ export async function settingsRoutes(
         };
       } catch (err) {
         return reply.status(400).send({
-          error: err instanceof Error ? err.message : "Failed to create deck",
+          error: errorMessage(err, "Failed to create deck"),
         });
       }
     },
@@ -196,7 +198,7 @@ export async function settingsRoutes(
       };
     } catch (err) {
       return reply.status(400).send({
-        error: err instanceof Error ? err.message : "Failed to update deck",
+        error: errorMessage(err, "Failed to update deck"),
       });
     }
   });
@@ -208,7 +210,7 @@ export async function settingsRoutes(
       return { success: true };
     } catch (err) {
       return reply.status(400).send({
-        error: err instanceof Error ? err.message : "Failed to delete deck",
+        error: errorMessage(err, "Failed to delete deck"),
       });
     }
   });
@@ -250,7 +252,7 @@ export async function settingsRoutes(
       return { success: true, library: lib };
     } catch (err) {
       return reply.status(400).send({
-        error: err instanceof Error ? err.message : "Failed to create library",
+        error: errorMessage(err, "Failed to create library"),
       });
     }
   });
@@ -284,7 +286,7 @@ export async function settingsRoutes(
       return { success: true, library: lib };
     } catch (err) {
       return reply.status(400).send({
-        error: err instanceof Error ? err.message : "Failed to update library",
+        error: errorMessage(err, "Failed to update library"),
       });
     }
   });
@@ -298,7 +300,7 @@ export async function settingsRoutes(
         return { success: true };
       } catch (err) {
         return reply.status(400).send({
-          error: err instanceof Error ? err.message : "Failed to delete library",
+          error: errorMessage(err, "Failed to delete library"),
         });
       }
     },
@@ -404,7 +406,7 @@ export async function settingsRoutes(
         return result;
       } catch (err) {
         return reply.status(400).send({
-          error: err instanceof Error ? err.message : "Plex import failed",
+          error: errorMessage(err, "Plex import failed"),
         });
       }
     },

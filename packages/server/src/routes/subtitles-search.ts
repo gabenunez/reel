@@ -12,6 +12,7 @@ import {
   tvEpisodes,
   tvSeasons,
 } from "../db/schema.js";
+import { errorMessage } from "./util.js";
 
 async function resolvePlaybackContext(
   db: DatabaseInstance,
@@ -173,7 +174,7 @@ export async function subtitleSearchRoutes(
       ({ content } = await openSubtitles.downloadSubtitleFile(opensubtitlesFileId));
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Failed to download subtitle file";
+        errorMessage(err, "Failed to download subtitle file");
       return reply.status(400).send({ error: message });
     }
 
@@ -189,7 +190,7 @@ export async function subtitleSearchRoutes(
 
       return { success: true, track };
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to save subtitle";
+      const message = errorMessage(err, "Failed to save subtitle");
       if (message.includes("no dialogue") || message.includes("persist")) {
         return reply.status(400).send({ error: message });
       }

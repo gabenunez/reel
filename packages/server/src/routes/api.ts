@@ -28,6 +28,7 @@ import {
 import { listLibrariesWithCounts, getLibraryItemCounts } from "../services/library-stats.js";
 import { loadTvSeasonsWithEpisodes } from "../services/media-detail.js";
 import { checkFfmpegAvailable } from "../utils/ffmpeg.js";
+import { errorMessage, parsePagination } from "./util.js";
 import {
   libraries,
   mediaItems,
@@ -106,8 +107,7 @@ export async function apiRoutes(
   app.get<{ Querystring: { page?: string; limit?: string; type?: string } }>(
     "/api/favorites",
     async (request) => {
-      const page = parseInt(request.query.page ?? "1", 10);
-      const limit = parseInt(request.query.limit ?? "48", 10);
+      const { page, limit } = parsePagination(request.query);
       const type =
         request.query.type === "movie" || request.query.type === "tv"
           ? request.query.type
@@ -127,7 +127,7 @@ export async function apiRoutes(
       await addFavorite(db, mediaItemId);
       return { success: true };
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to add favorite";
+      const message = errorMessage(err, "Failed to add favorite");
       if (message === "Media item not found") {
         return reply.status(404).send({ error: message });
       }
@@ -152,8 +152,7 @@ export async function apiRoutes(
     "/api/decks/:id/items",
     async (request, reply) => {
       const deckId = parseInt(request.params.id, 10);
-      const page = parseInt(request.query.page ?? "1", 10);
-      const limit = parseInt(request.query.limit ?? "48", 10);
+      const { page, limit } = parsePagination(request.query);
 
       const deck = await db.query.libraryDecks.findFirst({
         where: eq(libraryDecks.id, deckId),
@@ -201,8 +200,7 @@ export async function apiRoutes(
     "/api/libraries/:id/items",
     async (request) => {
       const libraryId = parseInt(request.params.id, 10);
-      const page = parseInt(request.query.page ?? "1", 10);
-      const limit = parseInt(request.query.limit ?? "48", 10);
+      const { page, limit } = parsePagination(request.query);
       const offset = (page - 1) * limit;
 
       const items = await db.query.mediaItems.findMany({
@@ -359,8 +357,7 @@ export async function apiRoutes(
   app.get<{ Querystring: { page?: string; limit?: string } }>(
     "/api/continue-watching",
     async (request) => {
-      const page = parseInt(request.query.page ?? "1", 10);
-      const limit = parseInt(request.query.limit ?? "48", 10);
+      const { page, limit } = parsePagination(request.query);
       return listContinueWatching(db, { page, limit });
     },
   );
@@ -368,8 +365,7 @@ export async function apiRoutes(
   app.get<{ Querystring: { page?: string; limit?: string } }>(
     "/api/recent",
     async (request) => {
-      const page = parseInt(request.query.page ?? "1", 10);
-      const limit = parseInt(request.query.limit ?? "48", 10);
+      const { page, limit } = parsePagination(request.query);
       return listRecentlyAdded(db, { page, limit });
     },
   );

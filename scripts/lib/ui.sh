@@ -73,6 +73,25 @@ media_config_dir() {
   fi
 }
 
+# Read a value from config.yaml's `server:` block. Usage:
+#   media_read_config_field <config-path> <field>
+media_read_config_field() {
+  local config="$1" field="$2"
+  [[ -f "$config" ]] || return 0
+  awk -v field="  $field:" '
+    /^server:/ { found = 1 }
+    found && index($0, field) == 1 { sub(/"/, "", $2); gsub(/"/, "", $2); print $2; exit }
+  ' "$config"
+}
+
+media_read_config_port() {
+  media_read_config_field "$1" "port"
+}
+
+media_read_config_public_prefix() {
+  media_read_config_field "$1" "public_prefix"
+}
+
 media_progress() {
   local phase="$1"
   local message="$2"

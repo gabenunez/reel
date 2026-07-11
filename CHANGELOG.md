@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.157 — 2026-07-10
+
+### Refactor
+
+- **Server** — shared route helpers (`errorMessage`, `parsePagination`, `parseIdParam`) and centralized config-dir resolution
+- **Server** — `maskApiKey` helper for settings API key previews
+- **Scripts** — shared `media_read_config_port` / `media_read_config_public_prefix` in `ui.sh`
+- **Web** — remove `media-image-url` shim; use `api.imageUrl` directly in media hero
+
 ## 0.1.156 — 2026-07-10
 
 ### Fix

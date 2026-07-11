@@ -245,17 +245,11 @@ EOF
 }
 
 read_config_port() {
-  local config="$1"
-  if [[ -f "$config" ]]; then
-    awk '/^server:/{found=1} found && /^  port:/{print $2; exit}' "$config"
-  fi
+  media_read_config_port "$1"
 }
 
 read_config_public_prefix() {
-  local config="$1"
-  if [[ -f "$config" ]]; then
-    awk '/^server:/{found=1} found && /^  public_prefix:/{gsub(/"/, "", $2); print $2; exit}' "$config"
-  fi
+  media_read_config_public_prefix "$1"
 }
 
 verify_web_runtime() {

@@ -25,17 +25,11 @@ echo $$ >"$LOCK_FILE"
 trap 'rm -f "$LOCK_FILE"' EXIT
 
 read_config_public_prefix() {
-  local config="$ROOT/config.yaml"
-  if [[ -f "$config" ]]; then
-    awk '/^server:/{found=1} found && /^  public_prefix:/{gsub(/"/, "", $2); print $2; exit}' "$config"
-  fi
+  media_read_config_public_prefix "$ROOT/config.yaml"
 }
 
 read_config_port() {
-  local config="$ROOT/config.yaml"
-  if [[ -f "$config" ]]; then
-    awk '/^server:/{found=1} found && /^  port:/{print $2; exit}' "$config"
-  fi
+  media_read_config_port "$ROOT/config.yaml"
 }
 
 uses_systemd() {

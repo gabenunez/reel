@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/favorite-button";
 import { ThemeMusicWaveform } from "@/components/theme-music-player";
 import { formatDuration, getPlaybackButtonLabel } from "@/lib/utils";
-import { mediaImageUrl } from "@/lib/media-image-url";
+import { api } from "@/lib/api";
 import { MediaImage } from "@/components/media-image";
 import type { MediaDetail } from "./types";
 
 export function MediaHero({ media }: { media: MediaDetail }) {
-  const backdropUrl = mediaImageUrl(media.backdropPath ?? media.posterPath);
-  const posterUrl = mediaImageUrl(media.posterPath);
+  const backdropUrl = api.imageUrl(media.backdropPath ?? media.posterPath);
+  const posterUrl = api.imageUrl(media.posterPath);
   const movieFile = media.files?.[0];
   const moviePlaybackLabel = movieFile
     ? getPlaybackButtonLabel(
