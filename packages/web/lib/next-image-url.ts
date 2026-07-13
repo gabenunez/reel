@@ -1,6 +1,7 @@
 import { withBasePath } from "./base-path";
 
-const DEFAULT_QUALITY = 80;
+/** Next 16 default allowlist is `[75]`; keep preload URLs on an allowed quality. */
+const DEFAULT_QUALITY = 75;
 
 /** Widths Next.js `/_next/image` accepts by default (deviceSizes + imageSizes). */
 export const NEXT_IMAGE_WIDTHS = [

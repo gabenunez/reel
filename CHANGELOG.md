@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.173 — 2026-07-13
+
+### Fix
+
+- **Images** — allow Next 16 image qualities (`75`/`80`) and preload with `q=75` (default allowlist rejected `q=80` as HTTP 400)
+
 ## 0.1.172 — 2026-07-13
 
 ### Fix

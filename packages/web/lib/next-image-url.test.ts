@@ -11,8 +11,11 @@ describe("snapNextImageWidth", () => {
 });
 
 describe("nextOptimizedImageUrl", () => {
-  it("never emits a disallowed w parameter", () => {
-    expect(nextOptimizedImageUrl("/api/images/foo.jpg", 1280)).toContain("w=1200");
-    expect(nextOptimizedImageUrl("/api/images/foo.jpg", 1280)).not.toContain("w=1280");
+  it("never emits a disallowed w or q parameter", () => {
+    const url = nextOptimizedImageUrl("/api/images/foo.jpg", 1280);
+    expect(url).toContain("w=1200");
+    expect(url).not.toContain("w=1280");
+    expect(url).toContain("q=75");
+    expect(url).not.toContain("q=80");
   });
 });

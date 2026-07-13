@@ -75,6 +75,8 @@ const nextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
+    // Next 16 defaults to [75]; preload URLs and any custom quality must be listed.
+    qualities: [75, 80],
     minimumCacheTTL: 86_400,
     localPatterns: localImagePaths.map((pathname) => ({ pathname })),
     remotePatterns: buildImageRemotePatterns(),
