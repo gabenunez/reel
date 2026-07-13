@@ -72,6 +72,9 @@ export async function apiRoutes(
   metadata: MetadataService,
   themes: ThemeService,
 ) {
+  // Always public — used by start-prod / Docker healthchecks without a session.
+  app.get("/api/health", async () => ({ ok: true }));
+
   app.get("/api/status", async () => {
     const ffmpegAvailable = await checkFfmpegAvailable();
     const libraryStats = await listLibrariesWithCounts(db);

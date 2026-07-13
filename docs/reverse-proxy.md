@@ -36,7 +36,7 @@ After the host updates config:
 
 ```bash
 curl -sI 'https://your-host/reel/_next/static/chunks/' | head -5
-curl -s  'https://your-host/reel/api/status'
+curl -s  'https://your-host/reel/api/health'
 ```
 
 Both should return 200 (or 308 within `/reel`), not 404 at the site root.

@@ -260,10 +260,10 @@ verify_web_runtime() {
   api_port=$((port + 1))
 
   sleep 3
-  if curl -sf -m 15 "http://127.0.0.1:${api_port}/api/status" >/dev/null 2>&1; then
+  if curl -sf -m 15 "http://127.0.0.1:${api_port}/api/health" >/dev/null 2>&1; then
     media_ok "API is responding on port ${api_port}"
   else
-    media_warn "API is not responding on http://127.0.0.1:${api_port}/api/status"
+    media_warn "API is not responding on http://127.0.0.1:${api_port}/api/health"
     media_warn "The web UI will load but library data will be empty until the API is fixed"
     return 1
   fi

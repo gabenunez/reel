@@ -95,7 +95,7 @@ start_web() {
 
 wait_for_api() {
   for _ in $(seq 1 120); do
-    if curl -sf "http://127.0.0.1:${API_PORT}/api/status" >/dev/null 2>&1; then
+    if curl -sf "http://127.0.0.1:${API_PORT}/api/health" >/dev/null 2>&1; then
       return 0
     fi
     if ! kill -0 "$API_PID" 2>/dev/null; then
@@ -113,7 +113,7 @@ monitor_stack() {
   while kill -0 "$API_PID" 2>/dev/null && kill -0 "$WEB_PID" 2>/dev/null; do
     sleep 10
 
-    if curl -sf "http://127.0.0.1:${API_PORT}/api/status" >/dev/null 2>&1; then
+    if curl -sf "http://127.0.0.1:${API_PORT}/api/health" >/dev/null 2>&1; then
       api_failures=0
       continue
     fi

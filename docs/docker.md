@@ -31,7 +31,7 @@ simple image pull — nothing is lost.
          - /path/to/movies:/media/movies:ro
          - /path/to/tv:/media/tv:ro
        healthcheck:
-         test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8096/api/status"]
+         test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8096/api/health"]
          interval: 30s
          timeout: 5s
          retries: 3
@@ -152,7 +152,7 @@ Or with compose — uncomment `build: .` (and comment out `image:`) in
 
 - **Health:** `docker inspect --format '{{.State.Health.Status}}' media`
 - **Logs:** `docker compose logs -f media`
-- **API check:** `curl http://localhost:8096/api/status`
+- **API check:** `curl http://localhost:8096/api/health`
 - **No posters?** Set a TMDB API key in Settings, then rescan.
 - **Library empty?** Confirm the library path matches the **container** mount
   path, and that the media volume is readable.

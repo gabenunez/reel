@@ -284,6 +284,7 @@ export function isPrerenderBuildPath(pathname: string): boolean {
 
 export function isPublicPath(pathname: string, passwordRequired: boolean): boolean {
   if (
+    pathname === "/api/health" ||
     pathname === "/api/auth/status" ||
     pathname === "/api/auth/login"
   ) {

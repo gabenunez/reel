@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.164 — 2026-07-13
+
+### Fix
+
+- **Deploy** — add public `/api/health` and point start-prod / update / Docker probes at it so password-protected installs no longer restart-loop after locking `/api/status`
+
 ## 0.1.163 — 2026-07-13
 
 ### Fix

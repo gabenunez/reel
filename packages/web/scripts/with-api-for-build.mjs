@@ -28,7 +28,7 @@ async function waitForApi(maxMs = 30_000) {
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
     try {
-      const status = await fetch(`http://127.0.0.1:${apiPort}/api/status`);
+      const status = await fetch(`http://127.0.0.1:${apiPort}/api/health`);
       const ids = await fetch(`http://127.0.0.1:${apiPort}/api/media/ids`);
       if (status.ok && ids.ok) return true;
     } catch {
