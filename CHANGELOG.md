@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.174 — 2026-07-13
+
+### Fix
+
+- **Cast** — treat HLS as BUFFERED VOD (not LIVE), reset Cast framework load failures so retries work, and stop double-decoding the cast base URL query param
+
 ## 0.1.173 — 2026-07-13
 
 ### Fix

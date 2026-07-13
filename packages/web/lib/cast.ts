@@ -26,7 +26,7 @@ export function loadCastFramework(): Promise<void> {
     return castFrameworkLoading;
   }
 
-  castFrameworkLoading = new Promise((resolve, reject) => {
+  const loading = new Promise<void>((resolve, reject) => {
     const finishInit = () => {
       try {
         initializeCastContext();
@@ -77,6 +77,11 @@ export function loadCastFramework(): Promise<void> {
       setTimeout(poll, 100);
     };
     poll();
+  });
+
+  castFrameworkLoading = loading.catch((err) => {
+    castFrameworkLoading = null;
+    throw err;
   });
 
   return castFrameworkLoading;
@@ -248,9 +253,8 @@ export async function castMedia(options: CastMediaOptions): Promise<void> {
   const isHls =
     options.contentType.includes("mpegurl") ||
     options.contentUrl.includes(".m3u8");
-  mediaInfo.streamType = isHls
-    ? chrome.cast.media.StreamType.LIVE
-    : chrome.cast.media.StreamType.BUFFERED;
+  // The server emits finite HLS VOD playlists, not live streams.
+  mediaInfo.streamType = chrome.cast.media.StreamType.BUFFERED;
   mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
   mediaInfo.metadata.title = options.title;
 

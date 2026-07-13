@@ -694,7 +694,7 @@ export async function streamRoutes(
       const useAbsolute = request.query.cast === "1";
       const baseUrl = useAbsolute
         ? (request.query.base
-            ? decodeURIComponent(request.query.base)
+            ? request.query.base
             : getCastBaseUrl(request, config))
         : "";
       const castToken = request.query.castToken;
