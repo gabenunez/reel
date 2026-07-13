@@ -672,6 +672,7 @@ export function TvWatchView() {
         durationMs: sourceDurationMs || info.durationMs || 0,
         isHls: usingHls,
         isHdr: needsHdrToneMap(info.dynamicRange),
+        dolbyVision: info.dynamicRange?.dolbyVision ?? false,
         subtitleUrl,
       });
 
@@ -1034,6 +1035,7 @@ export function TvWatchView() {
         durationMs: sourceDurationMs || streamInfo.durationMs || 0,
         isHls: usingHls,
         isHdr: needsHdrToneMap(streamInfo.dynamicRange),
+        dolbyVision: streamInfo.dynamicRange?.dolbyVision ?? false,
         subtitleUrl:
           activeSubtitle != null
             ? toAbsoluteMediaUrl(api.subtitleUrl(activeSubtitle, usingHls ? startAt : 0))

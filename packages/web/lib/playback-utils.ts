@@ -211,13 +211,16 @@ function effectiveOriginalPlaybackMode(
       audioCodec: streamInfo.audioCodec,
       videoCodec: streamInfo.videoCodec,
       transcodingEnabled: streamInfo.transcodingEnabled,
+      dolbyVision: streamInfo.dynamicRange?.dolbyVision ?? false,
     });
 
     if (
       options?.forceRemux &&
       nativeMode === "direct" &&
       streamInfo.transcodingEnabled &&
-      isHlsVideoCopySupported(streamInfo.videoCodec)
+      isHlsVideoCopySupported(streamInfo.videoCodec) &&
+      // Never remux Dolby Vision — it strips the DV layer.
+      !streamInfo.dynamicRange?.dolbyVision
     ) {
       return "remux";
     }

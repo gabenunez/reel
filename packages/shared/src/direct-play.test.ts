@@ -121,6 +121,30 @@ describe("resolveNativeTvPlaybackMode", () => {
       }),
     ).toBe("remux");
   });
+
+  it("direct-plays Dolby Vision even when the audio track is not directly supported", () => {
+    // opus is not in the native-TV direct-play audio set, so without the DV
+    // rule this would remux — which strips the DV layer. DV forces direct.
+    expect(
+      resolveNativeTvPlaybackMode({
+        audioCodec: "opus",
+        videoCodec: "hevc",
+        transcodingEnabled: true,
+        dolbyVision: true,
+      }),
+    ).toBe("direct");
+  });
+
+  it("still direct-plays Dolby Vision with directly-supported audio", () => {
+    expect(
+      resolveNativeTvPlaybackMode({
+        audioCodec: "eac3",
+        videoCodec: "hevc",
+        transcodingEnabled: true,
+        dolbyVision: true,
+      }),
+    ).toBe("direct");
+  });
 });
 
 describe("isHlsVideoCopySupported", () => {

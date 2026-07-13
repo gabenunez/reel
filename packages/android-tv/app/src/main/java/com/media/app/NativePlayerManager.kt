@@ -329,7 +329,17 @@ class NativePlayerManager(
     }
 
     private fun isHdrFormat(exoPlayer: ExoPlayer): Boolean {
+        // Dolby Vision is declared up front by the server; a DV elementary
+        // stream does not always surface an ST2084/HLG transfer function via
+        // ExoPlayer's ColorInfo, so trusting only the transfer would wrongly
+        // downgrade DV playback to SDR. Keep HDR engaged for DV content.
+        if (currentPayload?.dolbyVision == true) return true
+
         val format = exoPlayer.videoFormat ?: return hdrContentActive
+
+        // Dolby Vision sample MIME (dvhe/dvh1) — engage HDR output.
+        if (format.sampleMimeType == MimeTypes.VIDEO_DOLBY_VISION) return true
+
         val colorInfo = format.colorInfo ?: return hdrContentActive
         return when (colorInfo.colorTransfer) {
             C.COLOR_TRANSFER_ST2084, C.COLOR_TRANSFER_HLG -> true

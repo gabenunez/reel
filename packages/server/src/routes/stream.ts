@@ -383,6 +383,7 @@ export async function streamRoutes(
           audioCodec: metadata.audioCodec,
           videoCodec: metadata.videoCodec,
           transcodingEnabled: config.transcoding.enabled,
+          dolbyVision: probe?.dynamicRange?.dolbyVision ?? false,
         }),
         dynamicRange: probe?.dynamicRange ?? null,
         thumbnailsReady: Boolean(thumbCached),

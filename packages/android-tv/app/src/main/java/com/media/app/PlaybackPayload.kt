@@ -12,6 +12,7 @@ data class PlaybackPayload(
     val isHls: Boolean,
     val subtitleUrl: String?,
     val isHdr: Boolean,
+    val dolbyVision: Boolean,
 ) {
     companion object {
         fun parse(json: String): PlaybackPayload? {
@@ -27,6 +28,7 @@ data class PlaybackPayload(
                     isHls = obj.optBoolean("isHls", false),
                     subtitleUrl = obj.optString("subtitleUrl").takeIf { it.isNotBlank() },
                     isHdr = obj.optBoolean("isHdr", false),
+                    dolbyVision = obj.optBoolean("dolbyVision", false),
                 )
             } catch (_: Exception) {
                 null

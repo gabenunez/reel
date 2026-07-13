@@ -12,6 +12,8 @@ export interface NativePlaybackRequest {
   subtitleUrl?: string;
   /** Server-reported HDR metadata — native player passes HDR through to the panel. */
   isHdr?: boolean;
+  /** Source carries a Dolby Vision layer — keep DV output engaged natively. */
+  dolbyVision?: boolean;
 }
 
 export interface NativePlaybackState {

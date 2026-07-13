@@ -110,6 +110,8 @@ export function resolveNativeTvPlaybackMode(options: {
   audioCodec?: string | null;
   videoCodec?: string | null;
   transcodingEnabled: boolean;
+  /** True when the source carries a Dolby Vision layer. */
+  dolbyVision?: boolean;
 }): OriginalPlaybackMode {
   const audioOk = isNativeTvDirectPlayAudioSupported(options.audioCodec);
   const videoOk = isNativeTvDirectPlayVideoSupported(options.videoCodec);
@@ -117,6 +119,16 @@ export function resolveNativeTvPlaybackMode(options: {
   if (audioOk && videoOk) {
     return "direct";
   }
+
+  // Dolby Vision must direct-play on native TV: HLS remux into MPEG-TS strips
+  // the DV configuration/RPU, and a tone-map transcode discards DV entirely.
+  // ExoPlayer + a DV-capable panel decode the original file directly, so we
+  // keep the source even when the audio track isn't in our direct-play set
+  // (ExoPlayer handles a far wider range on-device than a browser).
+  if (options.dolbyVision && videoOk) {
+    return "direct";
+  }
+
   if (!options.transcodingEnabled) {
     return "unsupported";
   }

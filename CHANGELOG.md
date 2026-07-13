@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.160 — 2026-07-12
+
+### Fix
+
+- **Android TV** — Dolby Vision titles always direct-play (never remux/transcode) so the DV layer is preserved; native player keeps HDR output engaged for DV even when ExoPlayer ColorInfo omits the transfer function
+
 ## 0.1.159 — 2026-07-11
 
 ### Enhancement
