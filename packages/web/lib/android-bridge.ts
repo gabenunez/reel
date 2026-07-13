@@ -4,6 +4,7 @@ import { withBasePath } from "@/lib/base-path";
 export interface NativePlaybackRequest {
   url: string;
   title: string;
+  posterUrl?: string;
   fileId: number;
   itemType: "movie" | "episode";
   startSeconds: number;

@@ -6,7 +6,7 @@ import { nextOptimizedImageUrl } from "@/lib/next-image-url";
 /** Preload a poster/artwork URL so it is decoded before first paint in playback. */
 export function usePreloadedImage(
   url: string | null | undefined,
-  width = 1280,
+  width = 1200,
 ): boolean {
   const [ready, setReady] = useState(false);
 

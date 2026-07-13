@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.171 — 2026-07-13
+
+### Fix
+
+- **Images** — snap `/_next/image` preload widths to Next-allowed sizes (1280 was rejected as `"w" parameter … is not allowed`)
+- **Playback** — seek thumbnail VTT returns 202 while ffmpeg generates sprites instead of 404; client stops hard-fail retries so the console is not spammed
+
 ## 0.1.170 — 2026-07-13
 
 ### Fix

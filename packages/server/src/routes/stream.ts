@@ -421,27 +421,33 @@ export async function streamRoutes(
       }
 
       const thumbDir = thumbnailCacheDir(config.transcoding.cache_dir, type, fileId);
-      let cached = getCachedThumbnailPaths(thumbDir);
+      const cached = getCachedThumbnailPaths(thumbDir);
 
-      if (!cached) {
-        const metadata = await resolveStreamMetadata(file);
-        if (!metadata.durationMs) {
-          return reply.status(404).send({ error: "Thumbnails unavailable" });
-        }
-        cached = await ensureThumbnailSprite(
-          file.filePath,
-          thumbDir,
-          metadata.durationMs,
-        );
+      if (cached) {
+        reply.header("Content-Type", "text/vtt");
+        reply.header("Cache-Control", "public, max-age=86400");
+        return reply.send(fs.readFileSync(cached.vttPath, "utf-8"));
       }
 
-      if (!cached) {
-        return reply.status(404).send({ error: "Thumbnails not ready" });
+      if (isThumbnailGenerationPending(thumbDir)) {
+        return reply
+          .status(202)
+          .header("Retry-After", "3")
+          .send({ status: "generating" });
       }
 
-      reply.header("Content-Type", "text/vtt");
-      reply.header("Cache-Control", "public, max-age=86400");
-      return reply.send(fs.readFileSync(cached.vttPath, "utf-8"));
+      const metadata = await resolveStreamMetadata(file);
+      if (!metadata.durationMs) {
+        return reply.status(404).send({ error: "Thumbnails unavailable" });
+      }
+
+      // Generate in the background — awaiting ffmpeg here times out proxies and
+      // caused clients to spam 404s while a sibling request held the lock.
+      void ensureThumbnailSprite(file.filePath, thumbDir, metadata.durationMs);
+      return reply
+        .status(202)
+        .header("Retry-After", "3")
+        .send({ status: "generating" });
     },
   );
 

@@ -52,6 +52,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("androidx.leanback:leanback:1.0.0")
+    implementation("androidx.tvprovider:tvprovider:1.0.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.nanohttpd:nanohttpd:2.3.1")
     implementation("com.google.zxing:core:3.5.3")

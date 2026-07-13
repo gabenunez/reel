@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var nativePlayerView: PlayerView
     private lateinit var splashOverlay: View
     private lateinit var nativePlayer: NativePlayerManager
+    private lateinit var watchNextManager: WatchNextManager
     private var serverUrl: String = ""
     private var keepScreenOn = false
     private var tvCastPoller: TvCastPoller? = null
@@ -82,6 +83,7 @@ class MainActivity : AppCompatActivity() {
             isFocusableInTouchMode = false
             isClickable = false
         }
+        watchNextManager = WatchNextManager(this)
         nativePlayer = NativePlayerManager(
             nativePlayerView,
             emitJs = { script ->
@@ -93,20 +95,36 @@ class MainActivity : AppCompatActivity() {
             onHdrContentChanged = { active ->
                 runOnUiThread { setHdrPlaybackActive(active) }
             },
+            watchNextManager = watchNextManager,
         )
 
         configureWebView()
         configureBackNavigation()
         applySessionCookie()
+        val deepLink = handleWatchNextIntent(intent)
         handleSearchIntent(intent)
         startTvCastPoller()
-        webView.loadUrl(buildLaunchUrl(serverUrl))
+        webView.loadUrl(deepLink ?: buildLaunchUrl(serverUrl))
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleWatchNextIntent(intent)?.let(webView::loadUrl)
         handleSearchIntent(intent)
+    }
+
+    private fun handleWatchNextIntent(intent: Intent): String? {
+        if (intent.action != Intent.ACTION_VIEW) return null
+        val data = intent.data ?: return null
+        if (data.scheme != "media" || data.host != "watch") return null
+
+        val type = data.getQueryParameter("type")
+        val fileId = data.getQueryParameter("fileId")?.toIntOrNull()
+        if (type != "movie" && type != "episode") return null
+        if (fileId == null || fileId <= 0) return null
+
+        return "${serverUrl.trimEnd('/')}/watch/$type/$fileId/?tv=1"
     }
 
     @SuppressLint("SetJavaScriptEnabled")

@@ -5,6 +5,7 @@ import org.json.JSONObject
 data class PlaybackPayload(
     val url: String,
     val title: String,
+    val posterUrl: String?,
     val fileId: Int,
     val itemType: String,
     val startSeconds: Double,
@@ -21,6 +22,7 @@ data class PlaybackPayload(
                 PlaybackPayload(
                     url = obj.getString("url"),
                     title = obj.optString("title", "MEDIA!"),
+                    posterUrl = obj.optString("posterUrl").takeIf { it.isNotBlank() },
                     fileId = obj.getInt("fileId"),
                     itemType = obj.getString("itemType"),
                     startSeconds = obj.optDouble("startSeconds", 0.0),

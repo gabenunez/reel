@@ -85,16 +85,34 @@ export function useSeekThumbnails(
     let attempts = 0;
     const maxAttempts = 40;
     const retryDelayMs = 3_000;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRetry = () => {
+      if (cancelled || attempts >= maxAttempts) return;
+      attempts += 1;
+      timer = window.setTimeout(() => {
+        void load();
+      }, retryDelayMs);
+    };
 
     const load = async () => {
       try {
         const vttUrl = api.thumbnailVttUrl(fileId, type);
         const res = await fetch(vttUrl, { credentials: "include" });
+
+        // 202 = generation in progress; keep polling without treating as failure.
+        if (res.status === 202 || res.status === 503) {
+          scheduleRetry();
+          return;
+        }
+
+        // Hard miss / unavailable — stop so the console is not spammed with 404s.
+        if (res.status === 404 || res.status === 401) {
+          return;
+        }
+
         if (!res.ok) {
-          if (!cancelled && attempts < maxAttempts) {
-            attempts += 1;
-            window.setTimeout(load, retryDelayMs);
-          }
+          scheduleRetry();
           return;
         }
 
@@ -117,10 +135,7 @@ export function useSeekThumbnails(
           cues,
         });
       } catch {
-        if (!cancelled && attempts < maxAttempts) {
-          attempts += 1;
-          window.setTimeout(load, retryDelayMs);
-        }
+        scheduleRetry();
       }
     };
 
@@ -128,6 +143,7 @@ export function useSeekThumbnails(
 
     return () => {
       cancelled = true;
+      if (timer) window.clearTimeout(timer);
     };
   }, [enabled, fileId, type]);
 

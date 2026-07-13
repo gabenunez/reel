@@ -23,6 +23,7 @@ class NativePlayerManager(
     private val emitJs: (String) -> Unit,
     private val onPlaybackStopped: () -> Unit = {},
     private val onHdrContentChanged: (Boolean) -> Unit = {},
+    private val watchNextManager: WatchNextManager? = null,
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private var player: ExoPlayer? = null
@@ -34,6 +35,8 @@ class NativePlayerManager(
     private var displayMode: String = "fit"
     private var hdrContentActive = false
     private var subtitleStylesJson: String? = null
+    private var lastWatchNextUpdateMs = 0L
+    private var playbackEnded = false
 
     private val progressRunnable = object : Runnable {
         override fun run() {
@@ -47,6 +50,8 @@ class NativePlayerManager(
         this.sessionToken = sessionToken
         currentPayload = payload
         seekApplied = false
+        lastWatchNextUpdateMs = 0L
+        playbackEnded = false
 
         releasePlayer()
         playerView.visibility = View.VISIBLE
@@ -108,6 +113,7 @@ class NativePlayerManager(
                         }
 
                         Player.STATE_ENDED -> {
+                            playbackEnded = true
                             saveProgress(exoPlayer.duration, ended = true)
                             emitJs("window.__mediaNativePlayer?.onEnded?.()")
                             stop()
@@ -226,13 +232,16 @@ class NativePlayerManager(
 
     fun stop() {
         handler.removeCallbacks(progressRunnable)
-        saveProgress(player?.currentPosition ?: 0L, ended = false)
+        if (!playbackEnded) {
+            saveProgress(player?.currentPosition ?: 0L, ended = false)
+        }
         setHdrContentActive(false)
         releasePlayer()
         playerView.visibility = View.GONE
         playerView.scaleX = 1f
         playerView.scaleY = 1f
         currentPayload = null
+        playbackEnded = false
         onPlaybackStopped()
     }
 
@@ -426,6 +435,13 @@ class NativePlayerManager(
             )
             .put("ready", exoPlayer.playbackState == Player.STATE_READY)
 
+        if (System.currentTimeMillis() - lastWatchNextUpdateMs >= WATCH_NEXT_UPDATE_INTERVAL_MS) {
+            currentPayload?.let {
+                watchNextManager?.update(it, exoPlayer.currentPosition, durationMs)
+            }
+            lastWatchNextUpdateMs = System.currentTimeMillis()
+        }
+
         emitJs("window.__mediaNativePlayer?.onState?.($payload)")
     }
 
@@ -450,6 +466,8 @@ class NativePlayerManager(
             player?.duration?.takeIf { it > 0 } ?: return
         }
 
+        watchNextManager?.update(payload, positionMs, durationMs, ended)
+
         ServerConnector.saveProgress(
             serverUrl = serverUrl,
             sessionToken = sessionToken,
@@ -462,5 +480,6 @@ class NativePlayerManager(
 
     companion object {
         private const val PROGRESS_INTERVAL_MS = 500L
+        private const val WATCH_NEXT_UPDATE_INTERVAL_MS = 15_000L
     }
 }

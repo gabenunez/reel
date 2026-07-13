@@ -667,6 +667,7 @@ export function TvWatchView() {
       startNativePlayback({
         url: toAbsoluteMediaUrl(relativeUrl),
         title: titleRef.current || "MEDIA!",
+        posterUrl: posterUrl ?? undefined,
         fileId,
         itemType: type === "movie" ? "movie" : "episode",
         startSeconds: usingHls ? 0 : absoluteTime,
@@ -1030,6 +1031,7 @@ export function TvWatchView() {
       startNativePlayback({
         url: toAbsoluteMediaUrl(relativeUrl),
         title: titleRef.current || "MEDIA!",
+        posterUrl: posterUrl ?? undefined,
         fileId,
         itemType: type === "movie" ? "movie" : "episode",
         startSeconds: usingHls ? 0 : startAt,
