@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.163 — 2026-07-13
+
+### Fix
+
+- **Auth** — `/api/status` requires a session when a password is configured (no longer a public unauthenticated endpoint)
+
 ## 0.1.162 — 2026-07-13
 
 ### Fix
