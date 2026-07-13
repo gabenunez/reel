@@ -15,7 +15,7 @@ import { streamRoutes, subtitleRoutes } from "./routes/stream.js";
 import { subtitleSearchRoutes } from "./routes/subtitles-search.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { castRoutes } from "./routes/cast.js";
-import { AuthService, isCastMediaPath, isPublicPath } from "./services/auth.js";
+import { AuthService, isCastMediaPath, isInternalMediaApiRequest, isPublicPath } from "./services/auth.js";
 import { authRoutes } from "./routes/auth.js";
 import { updateRoutes } from "./routes/updates.js";
 import { resolveLegacyRouteRedirect, resolveSpaIndexFile } from "@media-app/shared";
@@ -50,6 +50,11 @@ async function main() {
     const passwordRequired = auth.isPasswordRequired();
 
     if (!passwordRequired || isPublicPath(pathname, passwordRequired)) {
+      return;
+    }
+
+    // Next.js SSR/ISR uses x-media-internal — allow only that token, not all localhost.
+    if (isInternalMediaApiRequest(pathname, request.headers)) {
       return;
     }
 

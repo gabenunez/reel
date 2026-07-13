@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.170 — 2026-07-13
+
+### Fix
+
+- **Auth** — restore `x-media-internal` bypass for Next SSR/ISR library fetches so password-protected installs no longer render media pages as “Sign in to view this title”
+
 ## 0.1.169 — 2026-07-13
 
 ### Fix
