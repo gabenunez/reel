@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.175 — 2026-07-13
+
+### Fix
+
+- **Cast** — prefer `x-forwarded-host` / `x-forwarded-proto` for Chromecast base URLs so playlists are not generated against `127.0.0.1` behind a reverse proxy
+
 ## 0.1.174 — 2026-07-13
 
 ### Fix

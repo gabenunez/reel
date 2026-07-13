@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "@media-app/shared";
-import { toAbsoluteUrl, withPublicPrefix } from "./network.js";
+import type { FastifyRequest } from "fastify";
+import { getCastBaseUrl, toAbsoluteUrl, withPublicPrefix } from "./network.js";
 
 function configWithPrefix(prefix?: string): AppConfig {
   return {
@@ -55,5 +56,22 @@ describe("toAbsoluteUrl", () => {
         "/api/stream/1/hls/segment_001.ts?type=movie",
       ),
     ).toBe("https://example.com/reel/api/stream/1/hls/segment_001.ts?type=movie");
+  });
+});
+
+describe("getCastBaseUrl", () => {
+  it("preserves the public reverse-proxy host for Chromecast URLs", () => {
+    const request = {
+      headers: {
+        host: "127.0.0.1:8097",
+        "x-forwarded-host": "dotpeenge.crios.bysh.me",
+        "x-forwarded-proto": "https",
+      },
+      protocol: "http",
+    } as unknown as FastifyRequest;
+
+    expect(getCastBaseUrl(request, configWithPrefix("/reel"))).toBe(
+      "https://dotpeenge.crios.bysh.me/reel",
+    );
   });
 });

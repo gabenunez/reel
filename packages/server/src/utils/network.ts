@@ -44,18 +44,27 @@ export function getCastBaseUrl(
   request: FastifyRequest,
   config: AppConfig,
 ): string {
-  const host = request.headers.host ?? "";
+  const forwardedHost = request.headers["x-forwarded-host"];
+  const host =
+    (typeof forwardedHost === "string" ? forwardedHost.split(",")[0]?.trim() : null) ??
+    request.headers.host ??
+    "";
+  const hostIsInternal =
+    !host ||
+    host.startsWith("127.0.0.1") ||
+    host.startsWith("localhost") ||
+    host.startsWith("[::1]");
+
+  if (hostIsInternal) {
+    return withPublicPrefix(config, getLanBaseUrl(config.server.port));
+  }
+
   const forwardedProto = request.headers["x-forwarded-proto"];
   const protocol =
-    (typeof forwardedProto === "string" ? forwardedProto : request.protocol) ??
+    (typeof forwardedProto === "string" ? forwardedProto.split(",")[0]?.trim() : null) ??
+    request.protocol ??
     "http";
-
-  const origin =
-    host && !host.startsWith("127.0.0.1") && !host.startsWith("localhost")
-      ? `${protocol}://${host}`
-      : getLanBaseUrl(config.server.port);
-
-  return withPublicPrefix(config, origin);
+  return withPublicPrefix(config, `${protocol}://${host}`);
 }
 
 /** Prefix an origin or path with server.public_prefix (e.g. /reel). */
