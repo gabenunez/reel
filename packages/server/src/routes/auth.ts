@@ -9,9 +9,12 @@ export async function authRoutes(
 ) {
   app.get("/api/auth/status", async (request) => {
     const required = auth.isPasswordRequired();
+    const publicPrefix = configManager.get().server.public_prefix ?? "";
     return {
       required,
       authenticated: auth.isAuthenticated(request),
+      // Android TV uses this to persist a server URL that includes basePath.
+      publicPrefix,
     };
   });
 

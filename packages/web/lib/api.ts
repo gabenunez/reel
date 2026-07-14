@@ -296,6 +296,8 @@ export interface ServerStatus {
 export interface AuthStatus {
   required: boolean;
   authenticated: boolean;
+  /** Present when server.public_prefix is configured (e.g. /reel). */
+  publicPrefix?: string;
 }
 
 export const api = {

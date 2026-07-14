@@ -66,10 +66,34 @@ const nextConfig = {
   skipTrailingSlashRedirect: true,
   outputFileTracingRoot: new URL("../../", import.meta.url).pathname,
   async rewrites() {
+    const apiDestination = `http://127.0.0.1:${runtimeApiPort}/api/:path*`;
+    const rules = [
+      {
+        // Under basePath this matches /{prefix}/api/... (browser + TV WebView).
+        source: "/api/:path*",
+        destination: apiDestination,
+      },
+    ];
+    if (publicPrefix) {
+      // Android TV pairs against host:port without the public prefix; keep
+      // unprefixed /api reachable on the public Next port.
+      rules.push({
+        source: "/api/:path*",
+        destination: apiDestination,
+        basePath: false,
+      });
+    }
+    return rules;
+  },
+  async redirects() {
+    if (!publicPrefix) return [];
     return [
       {
-        source: "/api/:path*",
-        destination: `http://127.0.0.1:${runtimeApiPort}/api/:path*`,
+        // LAN/TV clients that open the origin root still land under basePath.
+        source: "/",
+        destination: `${publicPrefix}/`,
+        basePath: false,
+        permanent: false,
       },
     ];
   },

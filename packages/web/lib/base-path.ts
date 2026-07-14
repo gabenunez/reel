@@ -12,6 +12,10 @@ export function getPublicPrefix(): string {
   );
 }
 
+/**
+ * Prefix a path with the public base path when configured.
+ * Idempotent: paths that already include the prefix are returned unchanged.
+ */
 export function withBasePath(path: string): string {
   const base = getPublicPrefix();
   if (!base) return path;
@@ -21,6 +25,9 @@ export function withBasePath(path: string): string {
   }
 
   const normalized = path.startsWith("/") ? path : `/${path}`;
+  if (normalized === base || normalized.startsWith(`${base}/`)) {
+    return normalized;
+  }
   if (normalized === "/") return `${base}/`;
   return `${base}${normalized}`;
 }

@@ -13,6 +13,8 @@ data class ConnectResult(
     val error: String? = null,
     val sessionToken: String? = null,
     val passwordRequired: Boolean = false,
+    /** Server base URL including public_prefix when configured (e.g. http://host:8096/reel). */
+    val serverUrl: String? = null,
 )
 
 object ServerConnector {
@@ -20,8 +22,14 @@ object ServerConnector {
         val authStatus = fetchAuthStatus(serverUrl)
             ?: return ConnectResult(success = false, error = "Could not reach MEDIA! at that address.")
 
+        val resolvedUrl = applyPublicPrefix(serverUrl, authStatus.publicPrefix)
+
         if (!authStatus.required) {
-            return ConnectResult(success = true, passwordRequired = false)
+            return ConnectResult(
+                success = true,
+                passwordRequired = false,
+                serverUrl = resolvedUrl,
+            )
         }
 
         if (password.isNullOrBlank()) {
@@ -29,15 +37,17 @@ object ServerConnector {
                 success = false,
                 error = "Password required",
                 passwordRequired = true,
+                serverUrl = resolvedUrl,
             )
         }
 
-        when (val login = login(serverUrl, password)) {
+        when (val login = login(resolvedUrl, password)) {
             is LoginResult.Success -> {
                 return ConnectResult(
                     success = true,
                     sessionToken = login.token,
                     passwordRequired = true,
+                    serverUrl = resolvedUrl,
                 )
             }
             is LoginResult.Failure -> {
@@ -45,9 +55,35 @@ object ServerConnector {
                     success = false,
                     error = login.error,
                     passwordRequired = true,
+                    serverUrl = resolvedUrl,
                 )
             }
         }
+    }
+
+    /** Append server.public_prefix when the saved URL is only host[:port]. */
+    internal fun applyPublicPrefix(serverUrl: String, publicPrefix: String): String {
+        val trimmed = serverUrl.trimEnd('/')
+        val prefix = normalizePublicPrefix(publicPrefix)
+        if (prefix.isEmpty()) return trimmed
+
+        return try {
+            val uri = java.net.URI(trimmed)
+            val path = (uri.path ?: "").trimEnd('/')
+            if (path == prefix || path.startsWith("$prefix/")) {
+                trimmed
+            } else {
+                "$trimmed$prefix"
+            }
+        } catch (_: Exception) {
+            if (trimmed.endsWith(prefix)) trimmed else "$trimmed$prefix"
+        }
+    }
+
+    private fun normalizePublicPrefix(value: String): String {
+        val trimmed = value.trim().trimEnd('/')
+        if (trimmed.isEmpty() || trimmed == "/") return ""
+        return if (trimmed.startsWith("/")) trimmed else "/$trimmed"
     }
 
     private sealed class LoginResult {
@@ -55,11 +91,15 @@ object ServerConnector {
         data class Failure(val error: String) : LoginResult()
     }
 
-    private data class AuthStatus(val required: Boolean, val authenticated: Boolean)
+    private data class AuthStatus(
+        val required: Boolean,
+        val authenticated: Boolean,
+        val publicPrefix: String,
+    )
 
     private fun fetchAuthStatus(serverUrl: String): AuthStatus? {
         return try {
-            val connection = openGet("$serverUrl/api/auth/status")
+            val connection = openGet("${serverUrl.trimEnd('/')}/api/auth/status")
             try {
                 if (connection.responseCode !in 200..299) return null
                 val body = readStream(connection.inputStream)
@@ -67,6 +107,7 @@ object ServerConnector {
                 AuthStatus(
                     required = json.optBoolean("required", false),
                     authenticated = json.optBoolean("authenticated", false),
+                    publicPrefix = json.optString("publicPrefix", ""),
                 )
             } finally {
                 connection.disconnect()

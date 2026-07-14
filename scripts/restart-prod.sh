@@ -82,6 +82,7 @@ stop_running_reel() {
 
   pkill -f "packages/server/dist/index.js" 2>/dev/null || true
   pkill -f "packages/web/.next/standalone/packages/web/server.js" 2>/dev/null || true
+  pkill -f "scripts/public-gateway.mjs" 2>/dev/null || true
   pkill -f "scripts/start-prod.sh" 2>/dev/null || true
 
   # Use actual listening sockets as the source of truth. pgrep can match its
@@ -89,7 +90,8 @@ stop_running_reel() {
   public_port="$(read_config_port)"
   public_port="${public_port:-8096}"
   api_port=$((public_port + 1))
-  for port in "$public_port" "$api_port"; do
+  web_upstream_port=$((public_port + 2))
+  for port in "$public_port" "$api_port" "$web_upstream_port"; do
     for listener in $(listener_pids "$port"); do
       [[ "$listener" == "$$" ]] || kill "$listener" 2>/dev/null || true
     done
@@ -97,7 +99,8 @@ stop_running_reel() {
 
   for _ in $(seq 1 40); do
     if [[ -z "$(listener_pids "$public_port")" ]] &&
-      [[ -z "$(listener_pids "$api_port")" ]]; then
+      [[ -z "$(listener_pids "$api_port")" ]] &&
+      [[ -z "$(listener_pids "$web_upstream_port")" ]]; then
       break
     fi
     sleep 0.25
@@ -105,7 +108,7 @@ stop_running_reel() {
 
   # Force-release stubborn listeners; never leave the app offline because an
   # old process ignored graceful termination.
-  for port in "$public_port" "$api_port"; do
+  for port in "$public_port" "$api_port" "$web_upstream_port"; do
     for listener in $(listener_pids "$port"); do
       [[ "$listener" == "$$" ]] || kill -9 "$listener" 2>/dev/null || true
     done

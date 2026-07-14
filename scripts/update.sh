@@ -230,9 +230,10 @@ if [[ -f "\$PID_FILE" ]]; then
 fi
 pkill -f "packages/server/dist/index.js" 2>/dev/null || true
 pkill -f "packages/web/.next/standalone/packages/web/server.js" 2>/dev/null || true
+pkill -f "scripts/public-gateway.mjs" 2>/dev/null || true
 pkill -f "scripts/start-prod.sh" 2>/dev/null || true
 for _ in \$(seq 1 40); do
-  ss -ltnp 2>/dev/null | grep -qE ":8096 |:8097 " && sleep 0.25 || break
+  ss -ltnp 2>/dev/null | grep -qE ":8096 |:8097 |:8098 " && sleep 0.25 || break
 done
 rm -rf "\$INSTALL/data/.start-prod.lock"
 
@@ -310,10 +311,12 @@ stop_running_reel() {
   fi
   pkill -f "packages/server/dist/index.js" 2>/dev/null || true
   pkill -f "packages/web/.next/standalone/packages/web/server.js" 2>/dev/null || true
+  pkill -f "scripts/public-gateway.mjs" 2>/dev/null || true
   pkill -f "scripts/start-prod.sh" 2>/dev/null || true
   for _ in $(seq 1 40); do
     if pgrep -f "packages/server/dist/index.js" >/dev/null 2>&1 ||
       pgrep -f "packages/web/.next/standalone/packages/web/server.js" >/dev/null 2>&1 ||
+      pgrep -f "scripts/public-gateway.mjs" >/dev/null 2>&1 ||
       pgrep -f "scripts/start-prod.sh" >/dev/null 2>&1; then
       sleep 0.25
       continue

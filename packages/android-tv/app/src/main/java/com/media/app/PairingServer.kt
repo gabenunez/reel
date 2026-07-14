@@ -66,7 +66,7 @@ class PairingServer(
                 )
             }
 
-            onPaired(result, serverUrl)
+            onPaired(result, result.serverUrl ?: serverUrl)
 
             jsonResponse(
                 Response.Status.OK,

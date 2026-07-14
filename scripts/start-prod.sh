@@ -52,8 +52,13 @@ fi
 
 API_PID=""
 WEB_PID=""
+GATEWAY_PID=""
 
 cleanup_children() {
+  if [[ -n "$GATEWAY_PID" ]] && kill -0 "$GATEWAY_PID" 2>/dev/null; then
+    kill "$GATEWAY_PID" 2>/dev/null || true
+    wait "$GATEWAY_PID" 2>/dev/null || true
+  fi
   if [[ -n "$WEB_PID" ]] && kill -0 "$WEB_PID" 2>/dev/null; then
     kill "$WEB_PID" 2>/dev/null || true
     wait "$WEB_PID" 2>/dev/null || true
@@ -62,6 +67,7 @@ cleanup_children() {
     kill "$API_PID" 2>/dev/null || true
     wait "$API_PID" 2>/dev/null || true
   fi
+  GATEWAY_PID=""
   WEB_PID=""
   API_PID=""
 }
@@ -83,7 +89,16 @@ start_api() {
 }
 
 start_web() {
-  HOSTNAME="$HOST" PORT="$PUBLIC_PORT" \
+  # When a public prefix is set, Next binds loopback-only and a tiny gateway
+  # owns PUBLIC_PORT so "/" can 302 to "{prefix}/" (Next alone 404s outside basePath).
+  local web_host="$HOST"
+  local web_port="$PUBLIC_PORT"
+  if [[ -n "$PUBLIC_PREFIX" ]]; then
+    web_host="127.0.0.1"
+    web_port="$((PUBLIC_PORT + 2))"
+  fi
+
+  HOSTNAME="$web_host" PORT="$web_port" \
     MEDIA_INTERNAL_API_URL="http://127.0.0.1:${API_PORT}" \
     MEDIA_INTERNAL_API_PORT="$API_PORT" \
     MEDIA_RUNTIME_API_PORT="$API_PORT" \
@@ -91,6 +106,37 @@ start_web() {
     NEXT_PUBLIC_BASE_PATH="$PUBLIC_PREFIX" \
     node packages/web/.next/standalone/packages/web/server.js &
   WEB_PID=$!
+
+  if [[ -n "$PUBLIC_PREFIX" ]]; then
+    if ! wait_for_web "$web_port"; then
+      echo "MEDIA! web failed to become ready on :${web_port}" >&2
+      return 1
+    fi
+    MEDIA_HOST="$HOST" \
+      MEDIA_GATEWAY_PORT="$PUBLIC_PORT" \
+      MEDIA_WEB_UPSTREAM_PORT="$web_port" \
+      MEDIA_PUBLIC_PREFIX="$PUBLIC_PREFIX" \
+      node "$ROOT/scripts/public-gateway.mjs" &
+    GATEWAY_PID=$!
+  fi
+}
+
+wait_for_web() {
+  local port="$1"
+  local probe_path="${PUBLIC_PREFIX:-}/"
+  for _ in $(seq 1 120); do
+    # Any HTTP response means Next is accepting connections (including 404/307).
+    if curl -sS -m 1 -o /dev/null "http://127.0.0.1:${port}${probe_path}" 2>/dev/null ||
+      curl -sS -m 1 -o /dev/null "http://127.0.0.1:${port}/" 2>/dev/null; then
+      return 0
+    fi
+    if ! kill -0 "$WEB_PID" 2>/dev/null; then
+      wait "$WEB_PID" 2>/dev/null || true
+      return 1
+    fi
+    sleep 0.25
+  done
+  return 1
 }
 
 wait_for_api() {
@@ -111,6 +157,11 @@ monitor_stack() {
   local api_failures=0
 
   while kill -0 "$API_PID" 2>/dev/null && kill -0 "$WEB_PID" 2>/dev/null; do
+    if [[ -n "$GATEWAY_PID" ]] && ! kill -0 "$GATEWAY_PID" 2>/dev/null; then
+      echo "MEDIA! gateway exited — restarting stack" >&2
+      return 1
+    fi
+
     sleep 10
 
     if curl -sf "http://127.0.0.1:${API_PORT}/api/health" >/dev/null 2>&1; then
@@ -139,12 +190,20 @@ while true; do
     continue
   fi
 
-  start_web
+  if ! start_web; then
+    echo "MEDIA! web/gateway failed to start — retrying in 5s" >&2
+    cleanup_children
+    sleep 5
+    continue
+  fi
 
   echo ""
   echo "MEDIA! running:"
-  echo "  Web: http://localhost:${PUBLIC_PORT}"
+  echo "  Web: http://localhost:${PUBLIC_PORT}${PUBLIC_PREFIX:+$PUBLIC_PREFIX/}"
   echo "  API: http://127.0.0.1:${API_PORT}"
+  if [[ -n "$PUBLIC_PREFIX" ]]; then
+    echo "  Root / redirects to ${PUBLIC_PREFIX}/"
+  fi
   echo ""
 
   monitor_stack || true

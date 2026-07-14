@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.176 — 2026-07-14
+
+### Fix
+
+- **Routing** — `withBasePath` is idempotent so native TV stream/subtitle URLs are not double-prefixed under `public_prefix`
+- **Routing** — origin `/` redirects to `{public_prefix}/` via a production gateway (preserves query); unprefixed `/api` stays reachable for TV pairing
+- **Auth** — `/api/auth/status` returns `publicPrefix` so clients can resolve the correct base URL
+
+### TV
+
+- **Native playback** — absolutize poster URLs for ExoPlayer; pairing/connect persist server URLs that include `public_prefix`
+
 ## 0.1.175 — 2026-07-13
 
 ### Fix

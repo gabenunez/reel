@@ -151,7 +151,11 @@ class SetupActivity : AppCompatActivity() {
             runOnUiThread {
                 setManualConnecting(false)
                 if (result.success) {
-                    completeConnection(serverUrl, result.sessionToken, fromPairing = false)
+                    completeConnection(
+                        result.serverUrl ?: serverUrl,
+                        result.sessionToken,
+                        fromPairing = false,
+                    )
                 } else if (result.passwordRequired) {
                     statusText.setTextColor(ContextCompat.getColor(this, R.color.media_error))
                     statusText.text = getString(R.string.password_use_phone)
