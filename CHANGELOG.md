@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.178 — 2026-07-17
+
+### TV
+
+- **Playback** — permanent ExoPlayer errors fail through to remux/HLS immediately; stall recovery uses a 90s cold-start grace then 30s × 2; seeks reset the stall clock
+- **Progress** — TV `pagehide` saves the stable absolute position so HLS restarts cannot wipe resume progress
+
+### Fix
+
+- **Transcode** — treat sessions as actively serving for 5 minutes (was 90s) so well-buffered clients above the 120s ExoPlayer buffer are not reaped early
+
 ## 0.1.177 — 2026-07-17
 
 ### TV

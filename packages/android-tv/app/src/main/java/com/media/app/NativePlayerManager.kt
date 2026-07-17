@@ -43,6 +43,8 @@ class NativePlayerManager(
     private var stallRecoveryAttempts = 0
     private var stallRecoveryPending = false
     private var playbackFailureReported = false
+    private var hasReachedReady = false
+    private var stallRecoveryRunnable: Runnable? = null
 
     private val progressRunnable = object : Runnable {
         override fun run() {
@@ -63,6 +65,8 @@ class NativePlayerManager(
         stallRecoveryAttempts = 0
         stallRecoveryPending = false
         playbackFailureReported = false
+        hasReachedReady = false
+        cancelStallRecovery()
 
         releasePlayer()
         playerView.visibility = View.VISIBLE
@@ -112,8 +116,11 @@ class NativePlayerManager(
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     when (playbackState) {
                         Player.STATE_READY -> {
+                            hasReachedReady = true
                             if (!payload.isHls && payload.startSeconds > 0 && !seekApplied) {
-                                exoPlayer.seekTo((payload.startSeconds * 1000).toLong())
+                                val startMs = (payload.startSeconds * 1000).toLong()
+                                markPlaybackProgress(startMs)
+                                exoPlayer.seekTo(startMs)
                                 seekApplied = true
                             }
                             updateHdrOutput(exoPlayer)
@@ -159,7 +166,12 @@ class NativePlayerManager(
                         "ExoPlayer error code=${error.errorCode} (${error.errorCodeName}) url=${payload.url}",
                         error,
                     )
-                    if (!schedulePlaybackRecovery(exoPlayer, "error")) {
+                    // Permanent failures (HTTP 4xx, unsupported container, decoder
+                    // init) should hand off to the web remux/HLS ladder immediately
+                    // instead of burning local seek+prepare retries.
+                    if (!isTransientPlaybackError(error) ||
+                        !schedulePlaybackRecovery(exoPlayer, "error", maxAttempts = 1)
+                    ) {
                         reportPlaybackFailure()
                     }
                     emitState()
@@ -204,7 +216,11 @@ class NativePlayerManager(
     }
 
     fun seekTo(positionMs: Long) {
-        player?.seekTo(positionMs.coerceAtLeast(0L))
+        val target = positionMs.coerceAtLeast(0L)
+        // Scrubs (including backward) must reset the stall clock so the
+        // buffering watchdog does not treat a lower position as a stall.
+        markPlaybackProgress(target)
+        player?.seekTo(target)
         emitState()
     }
 
@@ -230,6 +246,7 @@ class NativePlayerManager(
         // Explicitly prepare every hot-swapped item. Relying on the existing
         // READY state can leave the new text renderer unprepared until the
         // entire video is reopened.
+        markPlaybackProgress(position)
         exoPlayer.prepare()
         exoPlayer.seekTo(position)
         exoPlayer.playWhenReady = wasPlaying
@@ -252,6 +269,7 @@ class NativePlayerManager(
 
     fun stop() {
         handler.removeCallbacks(progressRunnable)
+        cancelStallRecovery()
         if (!playbackEnded) {
             saveProgress(player?.currentPosition ?: 0L, ended = false)
         }
@@ -264,6 +282,7 @@ class NativePlayerManager(
         playbackEnded = false
         stallRecoveryPending = false
         playbackFailureReported = false
+        hasReachedReady = false
         onPlaybackStopped()
     }
 
@@ -442,13 +461,12 @@ class NativePlayerManager(
         val now = System.currentTimeMillis()
         val currentPositionMs = exoPlayer.currentPosition
         if (currentPositionMs > lastPlaybackPositionMs) {
-            lastPlaybackPositionMs = currentPositionMs
-            lastPlaybackProgressAtMs = now
+            markPlaybackProgress(currentPositionMs)
             stallRecoveryAttempts = 0
         } else if (
             exoPlayer.playWhenReady &&
             exoPlayer.playbackState == Player.STATE_BUFFERING &&
-            now - lastPlaybackProgressAtMs >= STALL_TIMEOUT_MS
+            now - lastPlaybackProgressAtMs >= stallTimeoutMs()
         ) {
             if (!schedulePlaybackRecovery(exoPlayer, "buffering watchdog")) {
                 reportPlaybackFailure()
@@ -482,31 +500,73 @@ class NativePlayerManager(
         emitJs("window.__mediaNativePlayer?.onState?.($payload)")
     }
 
-    private fun schedulePlaybackRecovery(exoPlayer: ExoPlayer, reason: String): Boolean {
+    private fun stallTimeoutMs(): Long =
+        if (hasReachedReady) STALL_TIMEOUT_MS else INITIAL_BUFFER_GRACE_MS
+
+    private fun markPlaybackProgress(positionMs: Long) {
+        lastPlaybackPositionMs = positionMs.coerceAtLeast(0L)
+        lastPlaybackProgressAtMs = System.currentTimeMillis()
+    }
+
+    private fun cancelStallRecovery() {
+        stallRecoveryRunnable?.let { handler.removeCallbacks(it) }
+        stallRecoveryRunnable = null
+        stallRecoveryPending = false
+    }
+
+    /**
+     * Local seek+prepare can clear brief network/glitch stalls. Permanent source
+     * errors should fail through to the web remux/HLS fallback immediately.
+     */
+    private fun isTransientPlaybackError(error: PlaybackException): Boolean {
+        return when (error.errorCode) {
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+            PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+            PlaybackException.ERROR_CODE_TIMEOUT,
+            PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW,
+            PlaybackException.ERROR_CODE_REMOTE_ERROR,
+            -> true
+            else -> false
+        }
+    }
+
+    private fun schedulePlaybackRecovery(
+        exoPlayer: ExoPlayer,
+        reason: String,
+        maxAttempts: Int = MAX_STALL_RECOVERY_ATTEMPTS,
+    ): Boolean {
         if (stallRecoveryPending || exoPlayer !== player) return true
-        if (stallRecoveryAttempts >= MAX_STALL_RECOVERY_ATTEMPTS) return false
+        if (stallRecoveryAttempts >= maxAttempts) return false
 
         stallRecoveryAttempts++
         stallRecoveryPending = true
         val positionMs = exoPlayer.currentPosition
         Log.w(
             TAG,
-            "Recovering playback attempt=$stallRecoveryAttempts reason=$reason positionMs=$positionMs",
+            "Recovering playback attempt=$stallRecoveryAttempts/$maxAttempts reason=$reason positionMs=$positionMs",
         )
-        handler.postDelayed({
-            if (exoPlayer !== player || playbackEnded) return@postDelayed
+        val runnable = Runnable {
+            stallRecoveryRunnable = null
+            if (exoPlayer !== player || playbackEnded) {
+                stallRecoveryPending = false
+                return@Runnable
+            }
             stallRecoveryPending = false
-            lastPlaybackProgressAtMs = System.currentTimeMillis()
+            markPlaybackProgress(positionMs)
             exoPlayer.seekTo(positionMs.coerceAtLeast(0L))
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
-        }, RECOVERY_DELAY_MS)
+        }
+        stallRecoveryRunnable = runnable
+        handler.postDelayed(runnable, RECOVERY_DELAY_MS)
         return true
     }
 
     private fun reportPlaybackFailure() {
         if (playbackFailureReported) return
         playbackFailureReported = true
+        cancelStallRecovery()
         emitJs("window.__mediaNativePlayer?.onError?.()")
     }
 
@@ -547,8 +607,11 @@ class NativePlayerManager(
         private const val TAG = "MediaNativePlayer"
         private const val PROGRESS_INTERVAL_MS = 500L
         private const val WATCH_NEXT_UPDATE_INTERVAL_MS = 15_000L
-        private const val STALL_TIMEOUT_MS = 45_000L
+        /** After first READY, how long buffering may stall before local recovery. */
+        private const val STALL_TIMEOUT_MS = 30_000L
+        /** Cold open (esp. 4K/HLS) may buffer >30s before the first frame. */
+        private const val INITIAL_BUFFER_GRACE_MS = 90_000L
         private const val RECOVERY_DELAY_MS = 500L
-        private const val MAX_STALL_RECOVERY_ATTEMPTS = 3
+        private const val MAX_STALL_RECOVERY_ATTEMPTS = 2
     }
 }

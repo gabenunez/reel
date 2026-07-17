@@ -445,7 +445,8 @@ export function TvWatchView() {
     const pausedMs = nativePausedAtRef.current
       ? Date.now() - nativePausedAtRef.current
       : 0;
-    // Server drops idle transcode sessions after ~2 min — refresh HLS before resume when paused a while.
+    // Server drops idle transcode sessions after ~10 min — refresh HLS before
+    // resume when paused long enough that the encoder may already be gone.
     if (usingHlsRef.current && pausedMs >= 45_000) {
       restartNativeHlsAtCurrentPosition();
       return;
@@ -1211,9 +1212,16 @@ export function TvWatchView() {
       );
       if (!durationMs) return;
 
-      const positionSeconds = usingHlsPlayback
+      const liveSeconds = usingHlsPlayback
         ? hlsStartOffsetRef.current + currentTimeRef.current
         : currentTimeRef.current;
+      // Same regression guard as saveProgress — never persist a spot behind
+      // the last known-good position (HLS restarts can briefly report 0).
+      const positionSeconds = Math.max(
+        liveSeconds,
+        lastStableAbsoluteSecondsRef.current,
+      );
+      if (positionSeconds <= 0) return;
 
       void api
         .saveProgress(

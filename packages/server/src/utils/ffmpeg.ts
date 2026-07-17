@@ -22,11 +22,12 @@ const IDLE_SESSION_MS = 10 * 60 * 1000;
  * client and must never be reclaimed for capacity or reaped by same-file
  * cleanup — killing it mid-encode leaves a partial playlist and freezes that
  * viewer's playback.
+ *
+ * Must stay above client max buffer (native ExoPlayer uses 120s) so a
+ * well-buffered viewer who is not polling still counts as active. Idle
+ * cleanup (IDLE_SESSION_MS) remains the hard ceiling.
  */
-// Live playlist reloads can pause briefly (tab throttle, segment lag). Keep
-// the encode alive longer than one reload interval so capacity cleanup never
-// kills a viewer mid-buffer.
-const ACTIVELY_SERVING_MS = 90 * 1000;
+const ACTIVELY_SERVING_MS = 5 * 60 * 1000;
 export const PRUNE_CACHE_MS = 60 * 60 * 1000;
 const FFMPEG_CACHE_MS = 5 * 60 * 1000;
 let ffmpegAvailabilityCache: { available: boolean; checkedAt: number } | null = null;
