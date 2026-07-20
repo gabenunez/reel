@@ -40,6 +40,7 @@ export interface MediaItem {
   id: number;
   libraryId: number;
   tmdbId?: number | null;
+  imdbId?: string | null;
   title: string;
   overview?: string | null;
   year?: number | null;
@@ -48,6 +49,18 @@ export interface MediaItem {
   type: "movie" | "tv";
   genres?: string | null;
   rating?: number | null;
+  needsMatch?: boolean | null;
+  matchConfidence?: number | null;
+}
+
+export interface MetadataSearchCandidate {
+  tmdbId: number;
+  title: string;
+  year: number | null;
+  overview: string | null;
+  posterPath: string | null;
+  imdbId: string | null;
+  type: "movie" | "tv";
 }
 
 export interface Library {
@@ -558,6 +571,27 @@ export const api = {
       "/api/metadata/refresh",
       { method: "POST" },
     ),
+  searchMetadata: (params: {
+    query: string;
+    year?: number | null;
+    type: "movie" | "tv";
+  }) => {
+    const search = new URLSearchParams({
+      q: params.query,
+      type: params.type,
+    });
+    if (params.year != null && Number.isFinite(params.year)) {
+      search.set("year", String(params.year));
+    }
+    return fetchApi<{ results: MetadataSearchCandidate[] }>(
+      `/api/metadata/search?${search.toString()}`,
+    );
+  },
+  applyMediaMatch: (mediaId: number, tmdbId: number) =>
+    fetchApi<{ success: boolean; item: MediaItem }>(`/api/media/${mediaId}/match`, {
+      method: "POST",
+      body: JSON.stringify({ tmdbId }),
+    }),
   checkForUpdates: (force = false) =>
     fetchApi<UpdateStatus>(`/api/updates/check${force ? "?force=1" : ""}`),
   getUpdateProgress: () =>

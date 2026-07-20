@@ -35,6 +35,7 @@ async function resolvePlaybackContext(
       title: media?.title ?? "",
       year: media?.year ?? null,
       tmdbId: media?.tmdbId ?? null,
+      imdbId: media?.imdbId ?? null,
       type: "movie" as const,
     };
   }
@@ -59,10 +60,18 @@ async function resolvePlaybackContext(
     title: media?.title ?? "",
     year: media?.year ?? null,
     tmdbId: media?.tmdbId ?? null,
+    imdbId: media?.imdbId ?? null,
     seasonNumber: season.seasonNumber,
     episodeNumber: episode.episodeNumber,
     type: "episode" as const,
   };
+}
+
+function imdbIdToOpenSubtitlesNumber(imdbId: string | null | undefined): number | undefined {
+  if (!imdbId) return undefined;
+  const digits = imdbId.replace(/^tt/i, "");
+  const n = parseInt(digits, 10);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 export async function subtitleSearchRoutes(
@@ -118,17 +127,31 @@ export async function subtitleSearchRoutes(
     }
 
     const { hash, size } = computeOpenSubtitlesHash(context.filePath);
-
-    const results = await openSubtitles.search({
-      movieHash: hash,
-      movieByteSize: size,
-      query: context.title,
-      tmdbId: context.tmdbId ?? undefined,
+    const imdbId = imdbIdToOpenSubtitlesNumber(context.imdbId);
+    const shared = {
       languages,
       type: context.type,
       seasonNumber: context.seasonNumber,
       episodeNumber: context.episodeNumber,
+    } as const;
+
+    // Hash and identity filters are ANDed by OpenSubtitles — a unique rip hash
+    // would wipe an otherwise-correct IMDb/TMDB hit. Try hash alone first for
+    // sync accuracy, then fall back to listing identity.
+    let results = await openSubtitles.search({
+      movieHash: hash,
+      movieByteSize: size,
+      ...shared,
     });
+
+    if (results.length === 0) {
+      results = await openSubtitles.search({
+        query: context.title,
+        tmdbId: context.tmdbId ?? undefined,
+        imdbId,
+        ...shared,
+      });
+    }
 
     return {
       results,

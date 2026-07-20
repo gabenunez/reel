@@ -12,12 +12,14 @@ import { TvSectionLabel } from "@/components/tv/tv-page-header";
 import { TvPoster } from "@/components/tv/tv-poster";
 import { TvRow, tvScrollRowClassName } from "@/components/tv/tv-row";
 import { ThemeMusicProvider, ThemeMusicWaveform } from "@/components/theme-music-player";
+import { FixMatchDialog } from "@/components/fix-match-dialog";
 import { formatDuration, getPlaybackButtonLabel } from "@/lib/utils";
 import { resolveNextEpisodeTarget } from "@/lib/playback-utils";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { focusEpisodeItem, focusFirstContentItem, focusMediaPlayItem } from "@/lib/tv-focus";
 import { cn } from "@/lib/utils";
 import { MediaImage } from "@/components/media-image";
+import { invalidateApiCache } from "@/lib/api-cache";
 import type { MediaItem } from "@/lib/api";
 import type { MediaDetail } from "@/app/media/types";
 import { useMediaPageData } from "@/lib/use-media-page-data";
@@ -127,6 +129,7 @@ function TvMediaViewContent({
   includeTheme?: boolean;
 }) {
   const [selectedSeason, setSelectedSeason] = useState(0);
+  const [fixMatchOpen, setFixMatchOpen] = useState(false);
   const nextEpisodeIdRef = useRef<number | null>(null);
   const initializedMediaIdRef = useRef<number | null>(null);
 
@@ -176,6 +179,7 @@ function TvMediaViewContent({
   const metaLabel = [typeLabel, media.year].filter(Boolean).join(" · ");
   const showRelated = !serverShell && related.length > 0;
   const showThemeWaveform = media.hasThemeMusic && (includeTheme || serverShell);
+  const needsMatch = Boolean(media.needsMatch) || !media.tmdbId;
 
   const page = (
     <div className="pb-6">
@@ -233,12 +237,18 @@ function TvMediaViewContent({
                 </p>
               )}
 
-              {media.type === "movie" && movieFile && (
-                <div
-                  data-tv-row=""
-                  data-tv-content-row=""
-                  className="flex flex-wrap items-center gap-2 py-0.5"
-                >
+              {needsMatch && (
+                <p className="mb-2 text-xs text-amber-100/85">
+                  Unmatched — pick the correct listing below.
+                </p>
+              )}
+
+              <div
+                data-tv-row=""
+                data-tv-content-row=""
+                className="flex flex-wrap items-center gap-2 py-0.5"
+              >
+                {media.type === "movie" && movieFile && (
                   <TvFocusLink
                     href={routes.watch("movie", movieFile.id, media.id)}
                     data-tv-media-play=""
@@ -247,23 +257,19 @@ function TvMediaViewContent({
                     <Play className="h-4 w-4 fill-current" />
                     {moviePlaybackLabel}
                   </TvFocusLink>
-                  <TvFavoriteButton
-                    mediaId={media.id}
-                    initialFavorite={media.isFavorite}
-                    className="!gap-2 !px-4 !py-2.5 !text-sm"
-                  />
-                </div>
-              )}
-
-              {media.type === "tv" && (
-                <div data-tv-row="" data-tv-content-row="" className="py-0.5">
-                  <TvFavoriteButton
-                    mediaId={media.id}
-                    initialFavorite={media.isFavorite}
-                    className="!gap-2 !px-4 !py-2.5 !text-sm"
-                  />
-                </div>
-              )}
+                )}
+                <TvFavoriteButton
+                  mediaId={media.id}
+                  initialFavorite={media.isFavorite}
+                  className="!gap-2 !px-4 !py-2.5 !text-sm"
+                />
+                <TvFocusButton
+                  onClick={() => setFixMatchOpen(true)}
+                  className="rounded-lg border border-border/80 bg-background/40 px-4 py-2.5 text-sm text-muted-foreground"
+                >
+                  {needsMatch ? "Match title" : "Wrong match?"}
+                </TvFocusButton>
+              </div>
             </div>
           </div>
         </div>
@@ -387,6 +393,22 @@ function TvMediaViewContent({
           ))}
         </TvRow>
       )}
+
+      <FixMatchDialog
+        open={fixMatchOpen}
+        onClose={() => setFixMatchOpen(false)}
+        mediaId={media.id}
+        mediaType={media.type}
+        initialTitle={media.title}
+        initialYear={media.year}
+        currentImdbId={media.imdbId}
+        currentTmdbId={media.tmdbId}
+        tv
+        onMatched={() => {
+          invalidateApiCache(`media:${media.id}`);
+          window.location.reload();
+        }}
+      />
     </div>
   );
 

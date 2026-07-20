@@ -36,11 +36,47 @@ interface TmdbSearchTv {
 interface TmdbMovieDetails extends TmdbSearchMovie {
   genres?: Array<{ id: number; name: string }>;
   runtime?: number;
+  imdb_id?: string | null;
+  external_ids?: { imdb_id?: string | null };
 }
 
 interface TmdbTvDetails extends TmdbSearchTv {
   genres?: Array<{ id: number; name: string }>;
   number_of_seasons?: number;
+  external_ids?: { imdb_id?: string | null };
+}
+
+export interface MetadataSearchCandidate {
+  tmdbId: number;
+  title: string;
+  year: number | null;
+  overview: string | null;
+  posterPath: string | null;
+  imdbId: string | null;
+  type: "movie" | "tv";
+}
+
+/** Normalize IMDb ids / URLs to `tt#########`. */
+export function parseImdbId(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const fromUrl = trimmed.match(
+    /(?:imdb\.com\/title\/)?(tt\d{5,10})\b/i,
+  );
+  if (fromUrl) return fromUrl[1].toLowerCase();
+  if (/^\d{5,10}$/.test(trimmed)) return `tt${trimmed}`;
+  return null;
+}
+
+function yearFromDate(date?: string | null): number | null {
+  if (!date || date.length < 4) return null;
+  const year = parseInt(date.slice(0, 4), 10);
+  return Number.isFinite(year) ? year : null;
+}
+
+function normalizeImdbId(value?: string | null): string | null {
+  if (!value) return null;
+  return parseImdbId(value);
 }
 
 interface TmdbSeasonDetails {
@@ -174,6 +210,184 @@ export class MetadataService {
         return null;
       }
     }) as Promise<number | null>;
+  }
+
+  async getMovieDetails(tmdbId: number): Promise<TmdbMovieDetails | null> {
+    if (!this.isConfigured()) return null;
+    return this.queue.add(async () => {
+      try {
+        return await this.fetchTmdb<TmdbMovieDetails>(`/movie/${tmdbId}`, {
+          append_to_response: "external_ids",
+        });
+      } catch {
+        return null;
+      }
+    }) as Promise<TmdbMovieDetails | null>;
+  }
+
+  async getTvDetails(tmdbId: number): Promise<TmdbTvDetails | null> {
+    if (!this.isConfigured()) return null;
+    return this.queue.add(async () => {
+      try {
+        return await this.fetchTmdb<TmdbTvDetails>(`/tv/${tmdbId}`, {
+          append_to_response: "external_ids",
+        });
+      } catch {
+        return null;
+      }
+    }) as Promise<TmdbTvDetails | null>;
+  }
+
+  /**
+   * Search TMDB for rematch candidates. Accepts a title (+ optional year)
+   * or an IMDb id / URL (tt0094715).
+   */
+  async searchCandidates(options: {
+    query: string;
+    year?: number;
+    type: "movie" | "tv";
+    limit?: number;
+  }): Promise<MetadataSearchCandidate[]> {
+    if (!this.isConfigured()) return [];
+
+    const limit = Math.min(Math.max(options.limit ?? 8, 1), 20);
+    const imdbId = parseImdbId(options.query);
+
+    if (imdbId) {
+      const found = await this.findByImdbId(imdbId, options.type);
+      return found ? [found] : [];
+    }
+
+    const query = options.query.trim();
+    if (query.length < 1) return [];
+
+    return this.queue.add(async () => {
+      if (options.type === "movie") {
+        const data = await this.fetchTmdb<{ results: TmdbSearchMovie[] }>(
+          "/search/movie",
+          {
+            query,
+            ...(options.year ? { year: String(options.year) } : {}),
+          },
+        );
+        const top = (data.results ?? []).slice(0, limit);
+        return Promise.all(
+          top.map(async (item) => {
+            const imdb = await this.fetchImdbId("movie", item.id);
+            return {
+              tmdbId: item.id,
+              title: item.title,
+              year: yearFromDate(item.release_date),
+              overview: item.overview ?? null,
+              posterPath: item.poster_path ?? null,
+              imdbId: imdb,
+              type: "movie" as const,
+            };
+          }),
+        );
+      }
+
+      const data = await this.fetchTmdb<{ results: TmdbSearchTv[] }>(
+        "/search/tv",
+        { query },
+      );
+      const top = (data.results ?? []).slice(0, limit);
+      return Promise.all(
+        top.map(async (item) => {
+          const imdb = await this.fetchImdbId("tv", item.id);
+          return {
+            tmdbId: item.id,
+            title: item.name,
+            year: yearFromDate(item.first_air_date),
+            overview: item.overview ?? null,
+            posterPath: item.poster_path ?? null,
+            imdbId: imdb,
+            type: "tv" as const,
+          };
+        }),
+      );
+    }) as Promise<MetadataSearchCandidate[]>;
+  }
+
+  private async fetchImdbId(
+    type: "movie" | "tv",
+    tmdbId: number,
+  ): Promise<string | null> {
+    try {
+      const data = await this.fetchTmdb<{ imdb_id?: string | null }>(
+        `/${type}/${tmdbId}/external_ids`,
+      );
+      return normalizeImdbId(data.imdb_id);
+    } catch {
+      return null;
+    }
+  }
+
+  private async findByImdbId(
+    imdbId: string,
+    preferredType: "movie" | "tv",
+  ): Promise<MetadataSearchCandidate | null> {
+    return this.queue.add(async () => {
+      try {
+        const data = await this.fetchTmdb<{
+          movie_results?: TmdbSearchMovie[];
+          tv_results?: TmdbSearchTv[];
+        }>(`/find/${imdbId}`, { external_source: "imdb_id" });
+
+        if (preferredType === "movie" && data.movie_results?.[0]) {
+          const item = data.movie_results[0];
+          return {
+            tmdbId: item.id,
+            title: item.title,
+            year: yearFromDate(item.release_date),
+            overview: item.overview ?? null,
+            posterPath: item.poster_path ?? null,
+            imdbId,
+            type: "movie",
+          };
+        }
+        if (preferredType === "tv" && data.tv_results?.[0]) {
+          const item = data.tv_results[0];
+          return {
+            tmdbId: item.id,
+            title: item.name,
+            year: yearFromDate(item.first_air_date),
+            overview: item.overview ?? null,
+            posterPath: item.poster_path ?? null,
+            imdbId,
+            type: "tv",
+          };
+        }
+        // Fall through to the other media type if preferred is empty.
+        if (data.movie_results?.[0]) {
+          const item = data.movie_results[0];
+          return {
+            tmdbId: item.id,
+            title: item.title,
+            year: yearFromDate(item.release_date),
+            overview: item.overview ?? null,
+            posterPath: item.poster_path ?? null,
+            imdbId,
+            type: "movie",
+          };
+        }
+        if (data.tv_results?.[0]) {
+          const item = data.tv_results[0];
+          return {
+            tmdbId: item.id,
+            title: item.name,
+            year: yearFromDate(item.first_air_date),
+            overview: item.overview ?? null,
+            posterPath: item.poster_path ?? null,
+            imdbId,
+            type: "tv",
+          };
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    }) as Promise<MetadataSearchCandidate | null>;
   }
 
   async getTvSeason(tmdbId: number, seasonNumber: number): Promise<TmdbSeasonDetails | null> {

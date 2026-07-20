@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.180 — 2026-07-20
+
+### Library
+
+- **Match** — Fix match on media detail (desktop + TV): search by title/year or paste an IMDb link/`tt…` id, then apply the correct TMDB listing
+- **Metadata** — store IMDb ids on media items; OpenSubtitles searches hash first, then identity (IMDb/TMDB/title) so unique rip hashes do not wipe good results
+
 ## 0.1.179 — 2026-07-20
 
 ### TV

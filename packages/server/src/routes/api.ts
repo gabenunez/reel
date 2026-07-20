@@ -417,6 +417,73 @@ export async function apiRoutes(
     },
   );
 
+  app.get<{
+    Querystring: {
+      q?: string;
+      year?: string;
+      type?: "movie" | "tv";
+    };
+  }>("/api/metadata/search", async (request, reply) => {
+    if (!metadata.isConfigured()) {
+      return reply.status(400).send({
+        error: "TMDB API key is not configured — add one in Settings",
+      });
+    }
+
+    const q = request.query.q?.trim() ?? "";
+    if (!q) {
+      return reply.status(400).send({ error: "q is required" });
+    }
+
+    const type = request.query.type === "tv" ? "tv" : "movie";
+    const yearRaw = request.query.year?.trim();
+    const year = yearRaw ? parseInt(yearRaw, 10) : undefined;
+
+    const results = await metadata.searchCandidates({
+      query: q,
+      year: year && Number.isFinite(year) ? year : undefined,
+      type,
+    });
+
+    return { results };
+  });
+
+  app.post<{
+    Params: { id: string };
+    Body: { tmdbId?: number };
+  }>("/api/media/:id/match", async (request, reply) => {
+    if (!metadata.isConfigured()) {
+      return reply.status(400).send({
+        error: "TMDB API key is not configured — add one in Settings",
+      });
+    }
+
+    const mediaId = parseInt(request.params.id, 10);
+    const tmdbId = request.body?.tmdbId;
+    if (!Number.isFinite(mediaId) || !tmdbId || !Number.isFinite(tmdbId)) {
+      return reply.status(400).send({ error: "media id and tmdbId are required" });
+    }
+
+    const item = await db.query.mediaItems.findFirst({
+      where: eq(mediaItems.id, mediaId),
+    });
+    if (!item) {
+      return reply.status(404).send({ error: "Not found" });
+    }
+
+    try {
+      const updated = await scanner.applyManualMatch(mediaId, tmdbId);
+      if (!updated) {
+        return reply.status(404).send({ error: "TMDB listing not found" });
+      }
+      return { success: true, item: updated };
+    } catch (err) {
+      return reply.status(400).send({
+        error: errorMessage(err, "Could not apply metadata match"),
+      });
+    }
+  });
+
   app.post<{
     Body: {
       itemType: "movie" | "episode";

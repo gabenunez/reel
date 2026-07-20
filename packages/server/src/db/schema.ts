@@ -25,6 +25,8 @@ export const mediaItems = sqliteTable(
       .notNull()
       .references(() => libraries.id, { onDelete: "cascade" }),
     tmdbId: integer("tmdb_id"),
+    /** IMDb id with tt prefix when known (e.g. tt0094715). */
+    imdbId: text("imdb_id"),
     title: text("title").notNull(),
     originalTitle: text("original_title"),
     overview: text("overview"),

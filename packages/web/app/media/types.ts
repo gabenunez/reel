@@ -25,6 +25,10 @@ export interface MediaDetail {
   type: "movie" | "tv";
   genres?: string | null;
   rating?: number | null;
+  tmdbId?: number | null;
+  imdbId?: string | null;
+  needsMatch?: boolean | null;
+  matchConfidence?: number | null;
   isFavorite?: boolean;
   hasThemeMusic?: boolean;
   watchProgress?: { positionMs: number; durationMs?: number | null } | null;

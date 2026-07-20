@@ -281,6 +281,90 @@ export class ScannerService {
     return { updated, skipped };
   }
 
+  /**
+   * Apply a user-chosen TMDB match (from the Fix match UI). Confidence is
+   * forced to 1.0 and needsMatch cleared — the user explicitly confirmed it.
+   */
+  async applyManualMatch(
+    mediaId: number,
+    tmdbId: number,
+  ): Promise<typeof mediaItems.$inferSelect | null> {
+    const item = await this.db.query.mediaItems.findFirst({
+      where: eq(mediaItems.id, mediaId),
+    });
+    if (!item) return null;
+
+    if (item.type === "movie") {
+      const match = await this.metadata.getMovieDetails(tmdbId);
+      if (!match) return null;
+
+      const posterPath = await this.metadata.cachePoster(match.poster_path);
+      const backdropPath = await this.metadata.cacheBackdrop(match.backdrop_path);
+      const imdbId =
+        match.external_ids?.imdb_id ?? match.imdb_id ?? null;
+
+      const [updated] = await this.db
+        .update(mediaItems)
+        .set({
+          tmdbId: match.id,
+          imdbId: imdbId ? imdbId.toLowerCase() : null,
+          title: match.title,
+          originalTitle: match.original_title ?? null,
+          overview: match.overview ?? null,
+          year: match.release_date
+            ? parseInt(match.release_date.slice(0, 4), 10)
+            : item.year ?? null,
+          posterPath,
+          backdropPath,
+          genres: match.genres?.map((g) => g.name).join(", ") ?? null,
+          rating: match.vote_average ?? null,
+          matchConfidence: 1,
+          needsMatch: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(mediaItems.id, item.id))
+        .returning();
+
+      void revalidateMediaPage(item.id);
+      void this.themes.syncForMediaItem(updated);
+      return updated;
+    }
+
+    const match = await this.metadata.getTvDetails(tmdbId);
+    if (!match) return null;
+
+    const posterPath = await this.metadata.cachePoster(match.poster_path);
+    const backdropPath = await this.metadata.cacheBackdrop(match.backdrop_path);
+    const imdbId = match.external_ids?.imdb_id ?? null;
+
+    const [updated] = await this.db
+      .update(mediaItems)
+      .set({
+        tmdbId: match.id,
+        imdbId: imdbId ? imdbId.toLowerCase() : null,
+        title: match.name,
+        originalTitle: match.original_name ?? null,
+        overview: match.overview ?? null,
+        year: match.first_air_date
+          ? parseInt(match.first_air_date.slice(0, 4), 10)
+          : item.year ?? null,
+        posterPath,
+        backdropPath,
+        genres: match.genres?.map((g) => g.name).join(", ") ?? null,
+        rating: match.vote_average ?? null,
+        matchConfidence: 1,
+        needsMatch: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(mediaItems.id, item.id))
+      .returning();
+
+    await this.refreshTvEpisodes(item.id, match.id);
+    void revalidateMediaPage(item.id);
+    void this.themes.syncForMediaItem(updated);
+    return updated;
+  }
+
   private async refreshMovieItem(
     item: typeof mediaItems.$inferSelect,
   ): Promise<boolean> {
@@ -306,6 +390,7 @@ export class ScannerService {
       .update(mediaItems)
       .set({
         tmdbId: match.id,
+        imdbId: match.imdb_id?.toLowerCase() ?? null,
         title: match.title,
         originalTitle: match.original_title ?? null,
         overview: match.overview ?? null,
@@ -695,6 +780,7 @@ export class ScannerService {
         .values({
           libraryId: lib.id,
           tmdbId: match?.id ?? null,
+          imdbId: match?.imdb_id?.toLowerCase() ?? null,
           title: match?.title ?? parsed.title,
           originalTitle: match?.original_title ?? null,
           overview: match?.overview ?? null,

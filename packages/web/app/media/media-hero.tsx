@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Calendar, ChevronLeft, Clock3, Layers3, Play, Star } from "lucide-react";
 import { routes } from "@/lib/routes";
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/favorite-button";
+import { FixMatchDialog } from "@/components/fix-match-dialog";
 import { ThemeMusicWaveform } from "@/components/theme-music-player";
 import { formatDuration, getPlaybackButtonLabel } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -12,6 +14,7 @@ import { MediaImage } from "@/components/media-image";
 import type { MediaDetail } from "./types";
 
 export function MediaHero({ media }: { media: MediaDetail }) {
+  const [fixMatchOpen, setFixMatchOpen] = useState(false);
   const backdropUrl = api.imageUrl(media.backdropPath ?? media.posterPath);
   const posterUrl = api.imageUrl(media.posterPath);
   const movieFile = media.files?.[0];
@@ -21,6 +24,7 @@ export function MediaHero({ media }: { media: MediaDetail }) {
         media.watchProgress?.durationMs ?? movieFile.durationMs,
       )
     : "Play";
+  const needsMatch = Boolean(media.needsMatch) || !media.tmdbId;
 
   return (
     <section className="relative overflow-hidden border-b border-border/70">
@@ -104,31 +108,60 @@ export function MediaHero({ media }: { media: MediaDetail }) {
               </p>
             )}
 
-            {media.type === "movie" && movieFile && (
-              <div className="flex flex-wrap items-center gap-3">
+            {needsMatch && (
+              <p className="mb-5 max-w-xl text-sm text-amber-100/90">
+                We couldn’t confidently match this file.{" "}
+                <button
+                  type="button"
+                  onClick={() => setFixMatchOpen(true)}
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Pick the right listing
+                </button>
+              </p>
+            )}
+
+            <div className="flex flex-wrap items-center gap-3">
+              {media.type === "movie" && movieFile && (
                 <Button size="lg" asChild>
                   <Link href={routes.watch("movie", movieFile.id, media.id)}>
                     <Play className="h-5 w-5 fill-current" /> {moviePlaybackLabel}
                   </Link>
                 </Button>
-                <FavoriteButton
-                  mediaId={media.id}
-                  initialFavorite={media.isFavorite}
-                  size="lg"
-                />
-              </div>
-            )}
-
-            {media.type === "tv" && (
+              )}
               <FavoriteButton
                 mediaId={media.id}
                 initialFavorite={media.isFavorite}
                 size="lg"
               />
-            )}
+              {!needsMatch && (
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  onClick={() => setFixMatchOpen(true)}
+                  className="text-muted-foreground"
+                >
+                  Wrong match?
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      <FixMatchDialog
+        open={fixMatchOpen}
+        onClose={() => setFixMatchOpen(false)}
+        mediaId={media.id}
+        mediaType={media.type}
+        initialTitle={media.title}
+        initialYear={media.year}
+        currentImdbId={media.imdbId}
+        currentTmdbId={media.tmdbId}
+        onMatched={() => {
+          window.location.reload();
+        }}
+      />
     </section>
   );
 }
