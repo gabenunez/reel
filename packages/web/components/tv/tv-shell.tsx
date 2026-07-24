@@ -66,14 +66,21 @@ export function TvShell({ children }: { children: React.ReactNode }) {
   const pathname = useBrowserPathname();
   const wasOnWatchRef = useRef(false);
   const { required, authenticated, logout } = useAuth();
-  const hideNav = pathname.startsWith("/watch");
+  const onWatch = pathname.startsWith("/watch");
   const homeActive = pathname === "/";
   const favoritesActive = pathname.startsWith("/favorites");
   const searchActive = pathname.startsWith("/search");
   const showLogout = required && authenticated;
 
   useEffect(() => {
-    const onWatch = pathname.startsWith("/watch");
+    // Set before watch-view mounts so loading.tsx / CSS can cover the rail
+    // without waiting for the player client bundle.
+    if (onWatch) {
+      document.documentElement.setAttribute("data-tv-watch-active", "true");
+    } else {
+      document.documentElement.removeAttribute("data-tv-watch-active");
+    }
+
     let stopFrame: number | null = null;
     if (wasOnWatchRef.current && !onWatch) {
       if (nativeTvPlayerAvailable()) {
@@ -89,7 +96,7 @@ export function TvShell({ children }: { children: React.ReactNode }) {
     return () => {
       if (stopFrame !== null) cancelAnimationFrame(stopFrame);
     };
-  }, [pathname]);
+  }, [onWatch]);
 
   const handleLogout = () => {
     void logout();
@@ -98,8 +105,18 @@ export function TvShell({ children }: { children: React.ReactNode }) {
   return (
     <TvSpatialNav>
       <div className="tv-ui flex h-screen max-h-screen overflow-hidden">
-        {!hideNav && (
-          <aside className="flex w-[4.25rem] shrink-0 flex-col items-center border-r border-border/50 bg-background/95 py-5 min-h-screen">
+        {/*
+          Keep the rail mounted on /watch (invisible) so main width never jumps
+          when navigating media → player. Unmounting caused the hero/poster/actions
+          to reflow ~4–5rem wider for a frame before the fixed player covered them.
+        */}
+        <aside
+          className={cn(
+            "flex w-[4.25rem] shrink-0 flex-col items-center border-r border-border/50 bg-background/95 py-5 min-h-screen",
+            onWatch && "invisible pointer-events-none",
+          )}
+          aria-hidden={onWatch || undefined}
+        >
             <div
               data-tv-logo=""
               className="mb-5 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border-2 border-transparent"
@@ -129,8 +146,7 @@ export function TvShell({ children }: { children: React.ReactNode }) {
               </TvNavButton>
               {showLogout && <TvLogoutButton onLogout={handleLogout} />}
             </nav>
-          </aside>
-        )}
+        </aside>
 
         <main className="min-w-0 flex-1 overflow-y-auto bg-background pb-6">{children}</main>
       </div>

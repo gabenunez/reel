@@ -70,11 +70,29 @@ export function BrowseLoadingSkeleton() {
 }
 
 export function WatchLoadingSkeleton() {
-  return <RouteLoading>
+  const isTvMode = useTvMode();
+
+  // Full-bleed black cover — must sit above the TV rail so media→watch does not
+  // flash a padded centered card while the sidebar width changes.
+  if (isTvMode) {
+    return (
+      <div
+        data-tv-route-loading=""
+        data-tv-watch-loading=""
+        className="fixed inset-0 z-40 flex items-center justify-center bg-black"
+        role="status"
+        aria-label="Loading"
+      >
+        <Loader2 className="h-9 w-9 animate-spin text-primary" aria-hidden />
+      </div>
+    );
+  }
+
+  return (
     <div className="flex min-h-[50vh] items-center justify-center">
       <Skeleton className="h-10 w-40" />
     </div>
-  </RouteLoading>;
+  );
 }
 
 export function SettingsLoadingSkeleton() {

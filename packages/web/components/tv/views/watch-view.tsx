@@ -716,16 +716,11 @@ export function TvWatchView() {
   );
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-tv-watch-active", "true");
-    return () => {
-      document.documentElement.removeAttribute("data-tv-watch-active");
-    };
-  }, []);
-
-  useEffect(() => {
     if (!usesNativePlayer) return;
 
-    document.documentElement.setAttribute("data-native-video", "true");
+    // Prepare the native surface early, but keep the WebView opaque + black until
+    // ExoPlayer reports ready — flipping data-native-video immediately made the
+    // whole shell transparent and felt like a layout thrash on enter.
     prepareNativeVideoOverlay();
     applySubtitleStyles(readSubtitleStyles());
     return registerNativePlayerHandlers({
@@ -780,6 +775,9 @@ export function TvWatchView() {
         if (state.ready || state.isPlaying || state.buffered > 0.5) {
           playbackHasBegunRef.current = true;
           setPlaybackHasBegun((begun) => begun || true);
+          // Reveal the native surface only once frames are flowing — keeps enter
+          // covered in opaque black instead of a transparent shell thrash.
+          document.documentElement.setAttribute("data-native-video", "true");
         }
         if (
           state.ready &&
@@ -905,6 +903,7 @@ export function TvWatchView() {
     setShowControls(true);
     setPlaybackHasBegun(false);
     playbackHasBegunRef.current = false;
+    document.documentElement.removeAttribute("data-native-video");
     lastStableAbsoluteSecondsRef.current = 0;
     hlsStartOffsetRef.current = 0;
     setHlsStartOffset(0);
@@ -1987,10 +1986,11 @@ export function TvWatchView() {
   return (
     <div
       data-tv-watch-player=""
-      data-native-video={usesNativePlayer ? "" : undefined}
       className={cn(
-        "fixed inset-0 z-40",
-        usesNativePlayer ? "bg-transparent" : "bg-black",
+        "fixed inset-0 z-40 bg-black",
+        // Stay opaque until native playback has begun so media→watch does not
+        // flash a transparent shell over the Activity.
+        usesNativePlayer && playbackHasBegun && "bg-transparent",
       )}
       onMouseMove={() => {
         if (!centerMessageVisible) revealControls(true, true);

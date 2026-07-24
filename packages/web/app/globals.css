@@ -146,6 +146,14 @@
     padding-block: 1rem 2rem;
   }
 
+  /* Watch is a fixed full-bleed player — drop main padding so loading/player
+     never sit in a padded column beside an invisible rail. */
+  html[data-tv-watch-active] .tv-ui > main {
+    padding: 0;
+    overflow: hidden;
+    background: #000;
+  }
+
   .tv-ui .tv-row-section {
     margin-bottom: var(--tv-section-gap);
   }

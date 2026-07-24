@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.185 — 2026-07-24
+
+### TV
+
+- **Watch transition** — keep the nav rail mounted (invisible) on `/watch`, use a full-bleed black loading cover, and delay native WebView transparency until playback starts so media→player no longer reflows/shifts
+
 ## 0.1.184 — 2026-07-24
 
 ### TV
