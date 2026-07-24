@@ -21,6 +21,9 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Sideload-only app — sign release with the debug keystore so
+            // `deploy-android-tv.sh --release` installs cleanly over adb.
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

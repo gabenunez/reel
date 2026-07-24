@@ -350,10 +350,13 @@ ensure_device() {
 build_apk() {
   local variant=debug
   local task=assembleDebug
-  if [ "${1:-}" = "release" ]; then
-    variant=release
-    task=assembleRelease
-  fi
+  # Accept "release", "yes", or "--release" from callers.
+  case "${1:-}" in
+    release|yes|--release)
+      variant=release
+      task=assembleRelease
+      ;;
+  esac
   # Progress/gradle go to stderr so command substitution only captures the path.
   echo "Building $task..." >&2
   (cd "$ANDROID_TV_DIR" && ./gradlew "$task") >&2
