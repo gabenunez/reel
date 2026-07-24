@@ -45,6 +45,8 @@ class NativePlayerManager(
     private var playbackFailureReported = false
     private var hasReachedReady = false
     private var stallRecoveryRunnable: Runnable? = null
+    /** Latch so we only enable the GPU upscale graph once per play session. */
+    private var sdUpscaleApplied = false
 
     /** When true, JS chrome is hidden — emit progress less often to cut WebView work. */
     private var uiOverlayVisible = true
@@ -75,22 +77,41 @@ class NativePlayerManager(
         stallRecoveryPending = false
         playbackFailureReported = false
         hasReachedReady = false
+        sdUpscaleApplied = false
         cancelStallRecovery()
 
         releasePlayer()
         playerView.visibility = View.VISIBLE
 
         val mediaSourceFactory = authenticatedMediaSourceFactory(sessionToken)
+        // Progressive low-bitrate SD (e.g. 1.4 Mbps 480p) fills a 120s buffer in
+        // seconds, then ExoPlayer stops reading until ~minBuffer remains — ~90s of
+        // idle HTTP/disk. Symlink/NAS targets often stall on that first refill, so
+        // playback buffers a couple minutes in every time. Keep a deep buffer for
+        // HLS (growing remux/transcode); tighten progressive so the connection
+        // stays warm.
         val loadControl =
-            DefaultLoadControl.Builder()
-                .setBufferDurationsMs(
-                    30_000,
-                    120_000,
-                    5_000,
-                    15_000,
-                )
-                .setBackBuffer(60_000, true)
-                .build()
+            if (payload.isHls) {
+                DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                        HLS_MIN_BUFFER_MS,
+                        HLS_MAX_BUFFER_MS,
+                        HLS_BUFFER_FOR_PLAYBACK_MS,
+                        HLS_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
+                    )
+                    .setBackBuffer(HLS_BACK_BUFFER_MS, true)
+                    .build()
+            } else {
+                DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                        PROGRESSIVE_MIN_BUFFER_MS,
+                        PROGRESSIVE_MAX_BUFFER_MS,
+                        PROGRESSIVE_BUFFER_FOR_PLAYBACK_MS,
+                        PROGRESSIVE_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
+                    )
+                    .setBackBuffer(PROGRESSIVE_BACK_BUFFER_MS, true)
+                    .build()
+            }
         val exoPlayer =
             ExoPlayer.Builder(playerView.context)
                 .setMediaSourceFactory(mediaSourceFactory)
@@ -300,6 +321,7 @@ class NativePlayerManager(
         stallRecoveryPending = false
         playbackFailureReported = false
         hasReachedReady = false
+        sdUpscaleApplied = false
         onPlaybackStopped()
     }
 
@@ -317,7 +339,7 @@ class NativePlayerManager(
         // path, which tone-maps HDR/DV to SDR on most Android TV SoCs. Never
         // touch effects for HDR content — and never call setVideoEffects with
         // an empty list as a "no-op", since that still enables the graph.
-        if (isHdrPayload() || hdrContentActive) {
+        if (sdUpscaleApplied || isHdrPayload() || hdrContentActive) {
             return
         }
 
@@ -337,6 +359,7 @@ class NativePlayerManager(
         }
 
         exoPlayer.setVideoEffects(listOf(Presentation.createForHeight(targetH)))
+        sdUpscaleApplied = true
     }
 
     private fun applyDisplayMode() {
@@ -642,5 +665,20 @@ class NativePlayerManager(
         private const val RECOVERY_DELAY_MS = 500L
         /** Transient network errors only — buffering watchdog fails through instead. */
         private const val MAX_STALL_RECOVERY_ATTEMPTS = 1
+
+        // HLS / remux / transcode — deep forward buffer for growing playlists.
+        private const val HLS_MIN_BUFFER_MS = 30_000
+        private const val HLS_MAX_BUFFER_MS = 120_000
+        private const val HLS_BUFFER_FOR_PLAYBACK_MS = 5_000
+        private const val HLS_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 15_000
+        private const val HLS_BACK_BUFFER_MS = 60_000
+
+        // Progressive direct play — shorter max so HTTP/disk never sit idle ~90s
+        // after a low-bitrate SD file fills the buffer in a few seconds.
+        private const val PROGRESSIVE_MIN_BUFFER_MS = 15_000
+        private const val PROGRESSIVE_MAX_BUFFER_MS = 50_000
+        private const val PROGRESSIVE_BUFFER_FOR_PLAYBACK_MS = 2_500
+        private const val PROGRESSIVE_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 5_000
+        private const val PROGRESSIVE_BACK_BUFFER_MS = 30_000
     }
 }

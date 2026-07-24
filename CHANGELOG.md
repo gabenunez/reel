@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.184 — 2026-07-24
+
+### TV
+
+- **Playback (APK 1.5.5)** — tighten ExoPlayer progressive buffer (15–50s) so low-bitrate SD direct play does not idle HTTP/disk for ~90s after filling a 120s buffer — that refill stall hit symlink/NAS titles a couple minutes in every time. HLS keeps the deep 120s buffer. Latch SD GPU upscale so it is applied once per session.
+
 ## 0.1.183 — 2026-07-23
 
 ### TV
